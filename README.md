@@ -38,7 +38,7 @@ Firebase Hosting is configured to serve `dist` and rewrite all routes, including
 
 GitHub Actions deploys every pushed branch to the live Firebase Hosting site using `.github/workflows/firebase-hosting.yml`. Add these repository secrets before relying on automatic deployment:
 
-- `FIREBASE_SERVICE_ACCOUNT_FLEXSPACE_1`: JSON service account credentials with permission to deploy Firebase Hosting for `flexspace-1`.
+- `FIREBASE_SERVICE_ACCOUNT`: JSON service account credentials with permission to deploy Firebase Hosting for `flexspace-1`.
 
 The deployed site will be available at:
 
