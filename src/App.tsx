@@ -33,7 +33,9 @@ function App() {
   const [sessionStatus, setSessionStatus] = useState('Preparing your anonymous co-pilot profile...');
   const preferencesQuery = sessionId ? collection(db, 'sessions', sessionId, 'userPreferences') : null;
   const [preferences = [], preferencesLoading, preferencesError] = useCollectionData<UserPreferenceDocument>(
-    preferencesQuery,
+    // react-firebase-hooks accepts nullable refs at runtime, but its generic Query type can be stricter than
+    // Firestore's untyped CollectionReference. Cast here keeps the stream typed at the document boundary.
+    preferencesQuery as any,
     { idField: 'userId' },
   );
 
@@ -44,9 +46,11 @@ function App() {
   }, [authLoading, user]);
 
   useEffect(() => {
-    if (!user) {
+    if (authLoading || !user) {
       return;
     }
+
+    const activeUser = user;
 
     async function bootstrapSession() {
       setSessionStatus('Connecting this device to the shared session...');
@@ -61,21 +65,21 @@ function App() {
           id: activeSessionId,
           dynamicShareLink: shareLink,
           createdAt: serverTimestamp(),
-          partnerIds: [user.uid],
+          partnerIds: [activeUser.uid],
           vehiclesShortlist: CANADIAN_VEHICLES.map((vehicle) => vehicle.id),
         };
         await setDoc(sessionRef, newSession);
       } else {
         await updateDoc(sessionRef, {
-          partnerIds: arrayUnion(user.uid),
+          partnerIds: arrayUnion(activeUser.uid),
           dynamicShareLink: shareLink,
         });
       }
 
       await setDoc(
-        doc(db, 'sessions', activeSessionId, 'userPreferences', user.uid),
+        doc(db, 'sessions', activeSessionId, 'userPreferences', activeUser.uid),
         {
-          userId: user.uid,
+          userId: activeUser.uid,
           criteriaWeights: DEFAULT_WEIGHTS,
           personalNotes: {},
         },
@@ -92,7 +96,7 @@ function App() {
     void bootstrapSession().catch((error: unknown) => {
       setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize the shared session.');
     });
-  }, [sessionId, user]);
+  }, [authLoading, sessionId, user]);
 
   const myPreference = preferences.find((preference) => preference.userId === user?.uid);
   const combinedWeights = useMemo(() => averagePartnerWeights(preferences), [preferences]);
