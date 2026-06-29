@@ -70,6 +70,9 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   const [selectedVehicleId, setSelectedVehicleId] = useState(CANADIAN_VEHICLES[0].id);
   const [testDriveEntries, setTestDriveEntries] = useState<TestDriveEntry[]>([]);
   const [activeSection, setActiveSection] = useState<'dashboard' | 'browse' | 'profile' | 'calculator' | 'diary'>('dashboard');
+  const [activeProfile, setActiveProfile] = useState<'Emily' | 'Nick'>('Emily');
+  const [favoritesByProfile, setFavoritesByProfile] = useState<Record<'Emily' | 'Nick', string[]>>({ Emily: [], Nick: [] });
+  const [sharedNotesByVehicle, setSharedNotesByVehicle] = useState<Record<string, string>>({});
   const preferencesQuery = sessionId ? collection(db, 'sessions', sessionId, 'userPreferences') : null;
   const [preferencesSnapshot, preferencesLoading, preferencesError] = useCollection(preferencesQuery as any);
 
@@ -142,19 +145,19 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   return (
     <main className="shell">
       <section className="hero card">
-        <p className="eyebrow">CarMatch</p>
-        <h1>Compare family vehicles together, in real time.</h1>
-        <p>Pair two devices, rank priorities, estimate payments, track test drives, and keep manufacturer research in one shared workspace.</p>
-        <div className="invite-panel">
-          <span>{sessionStatus}</span>
-          <input readOnly value={session?.dynamicShareLink ?? 'Creating invite link...'} aria-label="Invite link" />
+        <div className="hero-topline"><p className="eyebrow">CarMatch</p><span>{sessionStatus}</span></div>
+        <h1>Compare family vehicles together.</h1>
+        <p>Rank priorities, browse models, estimate payments, and track test drives in one shared workspace.</p>
+        <div className="profile-switcher" aria-label="User profile selector">
+          {(['Emily', 'Nick'] as const).map((profileName) => (
+            <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>
+          ))}
         </div>
       </section>
 
       <nav className="app-menu" aria-label="Primary app sections">
         <button className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}>Shared priorities</button>
         <button className={activeSection === 'browse' ? 'active' : ''} onClick={() => setActiveSection('browse')}>Browse vehicles</button>
-        <button className={activeSection === 'profile' ? 'active' : ''} onClick={() => setActiveSection('profile')}>Model profile</button>
         <button className={activeSection === 'calculator' ? 'active' : ''} onClick={() => setActiveSection('calculator')}>Payment calculator</button>
         <button className={activeSection === 'diary' ? 'active' : ''} onClick={() => setActiveSection('diary')}>Test drive diary</button>
       </nav>
@@ -167,10 +170,10 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
       )}
 
       {activeSection === 'browse' && (
-        <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
+        <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} activeProfile={activeProfile} favorites={favoritesByProfile[activeProfile]} onToggleFavorite={(vehicleId) => setFavoritesByProfile((current) => toggleProfileFavorite(current, activeProfile, vehicleId))} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
       )}
 
-      {activeSection === 'profile' && <VehicleProfile vehicle={selectedVehicle} />}
+      {activeSection === 'profile' && <VehicleProfile vehicle={selectedVehicle} activeProfile={activeProfile} isFavorite={favoritesByProfile[activeProfile].includes(selectedVehicle.id)} onToggleFavorite={() => setFavoritesByProfile((current) => toggleProfileFavorite(current, activeProfile, selectedVehicle.id))} sharedNote={sharedNotesByVehicle[selectedVehicle.id] ?? ''} onSharedNoteChange={(note) => setSharedNotesByVehicle((current) => ({ ...current, [selectedVehicle.id]: note }))} />}
       {activeSection === 'calculator' && <PaymentCalculator vehicle={selectedVehicle} />}
       {activeSection === 'diary' && <TestDriveDiary vehicles={scoredVehicles} entries={testDriveEntries} onEntriesChange={setTestDriveEntries} />}
     </main>
@@ -256,54 +259,78 @@ interface VehicleBrowserProps {
   filters: { query: string; bodyStyle: 'All' | BodyStyle; drivetrain: 'All' | Drivetrain; powertrain: 'All' | Powertrain; maxPrice: number };
   onFiltersChange: (filters: VehicleBrowserProps['filters']) => void;
   vehicles: ScoredVehicle[];
+  activeProfile: 'Emily' | 'Nick';
+  favorites: string[];
+  onToggleFavorite: (vehicleId: string) => void;
   onSelectVehicle: (vehicleId: string) => void;
 }
 
-function VehicleBrowser({ filters, onFiltersChange, vehicles, onSelectVehicle }: VehicleBrowserProps) {
+function VehicleBrowser({ filters, onFiltersChange, vehicles, activeProfile, favorites, onToggleFavorite, onSelectVehicle }: VehicleBrowserProps) {
   return (
     <section className="card stack">
       <div className="section-heading"><p className="eyebrow">Browse models</p><span>{vehicles.length} matches</span></div>
       <div className="filters">
-        <input value={filters.query} onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })} placeholder="Search make or model" />
-        <select value={filters.bodyStyle} onChange={(event) => onFiltersChange({ ...filters, bodyStyle: event.target.value as 'All' | BodyStyle })}>{bodyStyleOptions.map((option) => <option key={option}>{option}</option>)}</select>
-        <select value={filters.drivetrain} onChange={(event) => onFiltersChange({ ...filters, drivetrain: event.target.value as 'All' | Drivetrain })}>{drivetrainOptions.map((option) => <option key={option}>{option}</option>)}</select>
-        <select value={filters.powertrain} onChange={(event) => onFiltersChange({ ...filters, powertrain: event.target.value as 'All' | Powertrain })}>{powertrainOptions.map((option) => <option key={option}>{option}</option>)}</select>
-        <label>Max ${filters.maxPrice.toLocaleString('en-CA')}<input type="range" min="30000" max="70000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label>
+        <label>Search<input value={filters.query} onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })} placeholder="Make or model" /></label>
+        <label>Body style<select value={filters.bodyStyle} onChange={(event) => onFiltersChange({ ...filters, bodyStyle: event.target.value as 'All' | BodyStyle })}>{bodyStyleOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+        <label>Drivetrain<select value={filters.drivetrain} onChange={(event) => onFiltersChange({ ...filters, drivetrain: event.target.value as 'All' | Drivetrain })}>{drivetrainOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+        <label>Powertrain<select value={filters.powertrain} onChange={(event) => onFiltersChange({ ...filters, powertrain: event.target.value as 'All' | Powertrain })}>{powertrainOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+        <label>Max price ${filters.maxPrice.toLocaleString('en-CA')}<input type="range" min="30000" max="70000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label>
       </div>
       <div className="vehicle-cards">
-        {vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} onSelect={() => onSelectVehicle(vehicle.id)} />)}
+        {vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} isFavorite={favorites.includes(vehicle.id)} activeProfile={activeProfile} onToggleFavorite={() => onToggleFavorite(vehicle.id)} onSelect={() => onSelectVehicle(vehicle.id)} />)}
       </div>
     </section>
   );
 }
 
-function VehicleCard({ vehicle, onSelect }: { vehicle: ScoredVehicle; onSelect: () => void }) {
+function VehicleCard({ vehicle, isFavorite, activeProfile, onToggleFavorite, onSelect }: { vehicle: ScoredVehicle; isFavorite: boolean; activeProfile: 'Emily' | 'Nick'; onToggleFavorite: () => void; onSelect: () => void }) {
   return (
-    <button className="vehicle-card" onClick={onSelect}>
-      <VehicleImage vehicle={vehicle} />
-      <strong>{vehicle.name}</strong>
-      <span>${vehicle.msrp.toLocaleString('en-CA')} • {vehicle.drivetrain} • {vehicle.powertrain}</span>
-      <b>{vehicle.familyCompatibilityScore}/100</b>
-    </button>
+    <article className="vehicle-card">
+      <button className="star-button" onClick={onToggleFavorite} aria-label={`${isFavorite ? 'Remove from' : 'Add to'} ${activeProfile}'s favourites`}>{isFavorite ? '★' : '☆'}</button>
+      <button className="vehicle-card-main" onClick={onSelect}>
+        <VehicleImage vehicle={vehicle} />
+        <strong>{vehicle.name}</strong>
+        <span>${vehicle.msrp.toLocaleString('en-CA')} • {vehicle.drivetrain} • {vehicle.powertrain}</span>
+        <b>{vehicle.familyCompatibilityScore}/100</b>
+      </button>
+    </article>
   );
 }
 
-function VehicleImage({ vehicle }: { vehicle: ScoredVehicle }) {
-  return vehicle.imageUrl ? <img className="vehicle-photo" src={vehicle.imageUrl} alt={`${vehicle.name} manufacturer gallery`} /> : <div className="vehicle-photo photo-fallback">{vehicle.make}</div>;
+
+function toggleProfileFavorite(current: Record<'Emily' | 'Nick', string[]>, profile: 'Emily' | 'Nick', vehicleId: string) {
+  const currentFavorites = current[profile];
+  return {
+    ...current,
+    [profile]: currentFavorites.includes(vehicleId)
+      ? currentFavorites.filter((favoriteId) => favoriteId !== vehicleId)
+      : [...currentFavorites, vehicleId],
+  };
 }
 
-function VehicleProfile({ vehicle }: { vehicle: ScoredVehicle }) {
+function VehicleImage({ vehicle }: { vehicle: ScoredVehicle }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  if (vehicle.imageUrl && !imageFailed) {
+    return <img className="vehicle-photo" src={vehicle.imageUrl} alt={`${vehicle.name} manufacturer gallery`} loading="lazy" onError={() => setImageFailed(true)} />;
+  }
+
+  return <div className="vehicle-photo photo-fallback"><strong>{vehicle.make}</strong><span>Open profile for manufacturer photos</span></div>;
+}
+
+function VehicleProfile({ vehicle, activeProfile, isFavorite, onToggleFavorite, sharedNote, onSharedNoteChange }: { vehicle: ScoredVehicle; activeProfile: 'Emily' | 'Nick'; isFavorite: boolean; onToggleFavorite: () => void; sharedNote: string; onSharedNoteChange: (note: string) => void }) {
   return (
     <section className="card profile">
       <VehicleImage vehicle={vehicle} />
       <div>
-        <p className="eyebrow">Model profile</p>
+        <div className="section-heading"><p className="eyebrow">Model profile</p><button className="star-inline" onClick={onToggleFavorite}>{isFavorite ? '★' : '☆'} {activeProfile}'s favourite</button></div>
         <h2>{vehicle.year} {vehicle.name}</h2>
         <div className="spec-grid">
           <span>MSRP <b>${vehicle.msrp.toLocaleString('en-CA')}</b></span><span>Body <b>{vehicle.bodyStyle}</b></span><span>Seats <b>{vehicle.seats}</b></span><span>Cargo <b>{vehicle.cargoLitres} L</b></span><span>Drive <b>{vehicle.drivetrain}</b></span><span>Efficiency <b>{vehicle.fuelEfficiency}</b></span>
         </div>
         <h3>Why it fits</h3><ul>{vehicle.highlights.map((item) => <li key={item}>{item}</li>)}</ul>
         <h3>Watch-outs</h3><ul>{vehicle.tradeoffs.map((item) => <li key={item}>{item}</li>)}</ul>
+        <label className="shared-note">Shared notes<textarea value={sharedNote} onChange={(event) => onSharedNoteChange(event.target.value)} placeholder="Add shared observations, must-have trim notes, dealer quotes, or partner comments..." /></label>
         <a href={vehicle.manufacturerUrl} target="_blank" rel="noreferrer">Open manufacturer page / gallery</a>
         <small>Photo/source: {vehicle.photoCredit}</small>
       </div>

@@ -9,9 +9,6 @@ button { cursor: pointer; }
 .hero h1 { max-width: 850px; margin: 0; font-size: clamp(2.3rem, 7vw, 5.2rem); line-height: .95; letter-spacing: -.07em; }
 .hero p:not(.eyebrow) { max-width: 760px; color: #53627c; font-size: 1.08rem; line-height: 1.7; }
 .eyebrow { margin: 0 0 10px; color: #4361ee; font-size: .76rem; font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
-.invite-panel { display: grid; grid-template-columns: minmax(180px,.8fr) minmax(240px,1.2fr); gap: 14px; align-items: center; margin-top: 28px; }
-.invite-panel span, .section-heading span, .weight-summary span, .muted, small { color: #53627c; }
-.invite-panel input, .filters input, .filters select, .calculator-grid input, .diary-form input, .diary-form select, .diary-form textarea { width: 100%; border: 1px solid #d7def5; border-radius: 14px; color: #26395f; background: #f8faff; padding: 12px 14px; }
 .app-menu { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 24px; }
 .app-menu button { border: 1px solid #d7def5; border-radius: 999px; background: #fff; color: #26395f; padding: 11px 16px; font-weight: 800; }
 .app-menu button.active { border-color: #4361ee; background: #4361ee; color: #fff; box-shadow: 0 12px 30px rgba(67,97,238,.22); }
@@ -34,7 +31,8 @@ input[type='range'] { accent-color: #4361ee; }
 .vehicle-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 .vehicle-card { display: grid; gap: 10px; border: 1px solid #e3e9f8; border-radius: 20px; background: #fff; padding: 14px; color: inherit; text-align: left; }
 .vehicle-photo { width: 100%; height: 150px; object-fit: cover; border-radius: 16px; background: linear-gradient(135deg,#dbeafe,#eef2ff); }
-.photo-fallback { display: grid; place-items: center; color: #4361ee; font-weight: 800; letter-spacing: .08em; }
+.photo-fallback { display: grid; place-items: center; align-content: center; gap: 6px; color: #4361ee; font-weight: 800; letter-spacing: .08em; text-align: center; }
+.photo-fallback span { max-width: 150px; color: #53627c; font-size: .75rem; letter-spacing: 0; }
 .profile { display: grid; grid-template-columns: minmax(260px,.8fr) minmax(0,1.2fr); gap: 24px; margin-bottom: 24px; }
 .profile .vehicle-photo { height: 100%; min-height: 320px; }
 .spec-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px,1fr)); gap: 10px; margin: 16px 0; }
@@ -47,4 +45,15 @@ input[type='range'] { accent-color: #4361ee; }
 .ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 10px; padding-left: 18px; }
 .error, .error-text { color: #b42318; }
 a { color: #3155d4; font-weight: 700; }
-@media (max-width: 900px) { .grid, .invite-panel, .profile, .filters, .calculator-grid, .diary-form { grid-template-columns: 1fr; } .slider-row, .vehicle-row { grid-template-columns: 1fr; } }
+.hero { padding: 24px clamp(20px, 4vw, 32px); }
+.hero h1 { font-size: clamp(1.9rem, 4vw, 3.4rem); }
+.hero-topline { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; align-items: center; }
+.profile-switcher { display: flex; gap: 10px; margin-top: 18px; }
+.profile-switcher button, .star-inline { border: 1px solid #d7def5; border-radius: 999px; background: #fff; color: #26395f; padding: 10px 15px; font-weight: 800; }
+.profile-switcher button.active, .star-inline { border-color: #4361ee; background: #4361ee; color: #fff; }
+.filters label, .calculator-grid label, .diary-form label, .shared-note { display: grid; gap: 7px; color: #53627c; font-size: .9rem; font-weight: 800; }
+.vehicle-card { position: relative; padding: 0; overflow: hidden; }
+.vehicle-card-main { display: grid; gap: 10px; width: 100%; border: 0; background: transparent; color: inherit; text-align: left; padding: 14px; }
+.star-button { position: absolute; z-index: 1; top: 22px; right: 22px; width: 40px; height: 40px; border-radius: 999px; border: 1px solid rgba(255,255,255,.7); background: rgba(255,255,255,.92); color: #f59e0b; font-size: 1.35rem; line-height: 1; box-shadow: 0 8px 22px rgba(20,33,61,.16); }
+.shared-note { margin: 18px 0; }
+.shared-note textarea { width: 100%; min-height: 110px; border: 1px solid #d7def5; border-radius: 14px; color: #26395f; background: #f8faff; padding: 12px 14px; }
