@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { signInAnonymously } from 'firebase/auth';
+import { signInAnonymously, type User } from 'firebase/auth';
 import {
   arrayUnion,
   collection,
@@ -10,7 +10,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { useCollectionData } from 'react-firebase-hooks/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
 import { auth, db } from './firebase';
 import { averagePartnerWeights, CANADIAN_VEHICLES, DEFAULT_WEIGHTS, scoreVehicles } from './scoring';
 import type { CriteriaKey, CriteriaWeights, SessionDocument, UserPreferenceDocument } from './types';
@@ -28,16 +28,6 @@ function getSessionIdFromUrl() {
 
 function App() {
   const [user, authLoading, authError] = useAuthState(auth);
-  const [sessionId, setSessionId] = useState<string | null>(getSessionIdFromUrl);
-  const [session, setSession] = useState<SessionDocument | null>(null);
-  const [sessionStatus, setSessionStatus] = useState('Preparing your anonymous co-pilot profile...');
-  const preferencesQuery = sessionId ? collection(db, 'sessions', sessionId, 'userPreferences') : null;
-  const [preferences = [], preferencesLoading, preferencesError] = useCollectionData<UserPreferenceDocument>(
-    // react-firebase-hooks accepts nullable refs at runtime, but its generic Query type can be stricter than
-    // Firestore's untyped CollectionReference. Cast here keeps the stream typed at the document boundary.
-    preferencesQuery as any,
-    { idField: 'userId' },
-  );
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -45,13 +35,45 @@ function App() {
     }
   }, [authLoading, user]);
 
+  if (authError) {
+    return <main className="shell error">Firebase Auth error: {authError.message}</main>;
+  }
+
+  if (authLoading || !user) {
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Initializing Secure Session...</div>;
+  }
+
+  const activeUser = user;
+
+  return <AuthenticatedSession activeUser={activeUser} />;
+}
+
+interface AuthenticatedSessionProps {
+  activeUser: User;
+}
+
+function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
+  const [sessionId, setSessionId] = useState<string | null>(getSessionIdFromUrl);
+  const [session, setSession] = useState<SessionDocument | null>(null);
+  const [sessionStatus, setSessionStatus] = useState('Preparing your anonymous co-pilot profile...');
+  const preferencesQuery = sessionId ? collection(db, 'sessions', sessionId, 'userPreferences') : null;
+  const [preferencesSnapshot, preferencesLoading, preferencesError] = useCollection(preferencesQuery as any);
+
+  const preferences = useMemo<UserPreferenceDocument[]>(() => {
+    return (
+      preferencesSnapshot?.docs.map((preferenceDoc) => {
+        const data = preferenceDoc.data() as Partial<UserPreferenceDocument>;
+
+        return {
+          userId: data.userId ?? preferenceDoc.id,
+          criteriaWeights: data.criteriaWeights ?? DEFAULT_WEIGHTS,
+          personalNotes: data.personalNotes ?? {},
+        };
+      }) ?? []
+    );
+  }, [preferencesSnapshot]);
+
   useEffect(() => {
-    if (authLoading || !user) {
-      return;
-    }
-
-    const activeUser = user;
-
     async function bootstrapSession() {
       setSessionStatus('Connecting this device to the shared session...');
       const activeSessionId = sessionId ?? doc(collection(db, 'sessions')).id;
@@ -96,15 +118,11 @@ function App() {
     void bootstrapSession().catch((error: unknown) => {
       setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize the shared session.');
     });
-  }, [authLoading, sessionId, user]);
+  }, [activeUser.uid, sessionId]);
 
-  const myPreference = preferences.find((preference) => preference.userId === user?.uid);
+  const myPreference = preferences.find((preference) => preference.userId === activeUser.uid);
   const combinedWeights = useMemo(() => averagePartnerWeights(preferences), [preferences]);
   const scoredVehicles = useMemo(() => scoreVehicles(combinedWeights), [combinedWeights]);
-
-  if (authError) {
-    return <main className="shell error">Firebase Auth error: {authError.message}</main>;
-  }
 
   return (
     <main className="shell">
@@ -122,11 +140,11 @@ function App() {
       </section>
 
       <section className="grid">
-        <PrioritySliders sessionId={sessionId} userId={user?.uid} currentWeights={myPreference?.criteriaWeights} />
+        <PrioritySliders sessionId={sessionId} userId={activeUser.uid} currentWeights={myPreference?.criteriaWeights} />
         <Dashboard
           scoredVehicles={scoredVehicles}
           combinedWeights={combinedWeights}
-          loading={preferencesLoading || authLoading || !sessionId}
+          loading={preferencesLoading || !sessionId}
           error={preferencesError?.message}
           partnerCount={preferences.length}
         />
