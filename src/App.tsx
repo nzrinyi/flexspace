@@ -28,15 +28,37 @@ function getSessionIdFromUrl() {
 
 function App() {
   const [user, authLoading, authError] = useAuthState(auth);
+  const [anonymousSignInError, setAnonymousSignInError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      void signInAnonymously(auth);
+    if (authLoading || user) {
+      return;
     }
+
+    void signInAnonymously(auth)
+      .then(() => setAnonymousSignInError(null))
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Anonymous sign-in failed.';
+        setAnonymousSignInError(message);
+      });
   }, [authLoading, user]);
 
-  if (authError) {
-    return <main className="shell error">Firebase Auth error: {authError.message}</main>;
+  const authFailureMessage = authError?.message ?? anonymousSignInError;
+
+  if (authFailureMessage) {
+    return (
+      <main className="shell error">
+        <section className="card">
+          <p className="eyebrow">Firebase Auth setup required</p>
+          <h1>Co-Pilot could not start a secure anonymous session.</h1>
+          <p>{authFailureMessage}</p>
+          <p>
+            In Firebase Console, confirm Authentication is enabled for the <strong>flexspace-1</strong> project and
+            that the <strong>Anonymous</strong> sign-in provider is enabled.
+          </p>
+        </section>
+      </main>
+    );
   }
 
   if (authLoading || !user) {

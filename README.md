@@ -34,6 +34,18 @@ firebase deploy --only hosting --project flexspace-1
 
 Firebase Hosting is configured to serve `dist` and rewrite all routes, including `/join?session=...`, to `index.html` so invite links work as a single-page application.
 
+
+## Firebase console prerequisites
+
+Before the deployed site can create paired sessions, enable Firebase Authentication for the `flexspace-1` project and turn on the **Anonymous** sign-in provider:
+
+1. Open Firebase Console for `flexspace-1`.
+2. Go to **Authentication** > **Sign-in method**.
+3. Enable **Anonymous** as a provider.
+4. Confirm Firestore is created for the same project.
+
+If Anonymous Auth is not enabled, the deployed app will show `auth/configuration-not-found` when it tries to start a guest session.
+
 ## GitHub deployment
 
 GitHub Actions deploys every pushed branch to the live Firebase Hosting site using `.github/workflows/firebase-hosting.yml`. Add these repository secrets before relying on automatic deployment:
