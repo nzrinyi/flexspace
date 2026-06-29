@@ -7,12 +7,14 @@ CarMatch is a shared decision-making prototype for paired partners comparing fam
 
 - Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, and max-price filters.
 - Model profile cards with MSRP, cargo, seating, drivetrain, efficiency, highlights, tradeoffs, and manufacturer source links.
-- Payment calculator with editable vehicle price, interest rate, term, down payment, and extra lump-sum principal payment.
+- Emily/Nick profile switcher with separate priority weights that combine into the shared vehicle score.
+- Expanded priority criteria for space, winter traction, value, reliability, fuel efficiency, safety tech, and comfort.
+- Payment calculator with editable vehicle price, fees, tax rate, interest rate, term, down payment, and extra lump-sum principal payment.
 - Test drive diary for car-seat fit, stroller fit, winter confidence, partner rating, dealer/location, and notes.
 
 ## Manufacturer research sources
 
-The static model profiles use manufacturer model pages as source links. Direct manufacturer photo URLs are included where reliably discoverable; otherwise the UI shows a branded fallback tile and links to the manufacturer gallery to avoid broken hotlinked images.
+The static model profiles use manufacturer model pages as source links. Vehicle imagery is stored in `public/vehicles` and served by Firebase Hosting at `/vehicles/{model}.svg`, avoiding third-party hotlink failures or disappearing remote image URLs.
 
 ## Firebase project
 

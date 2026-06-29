@@ -1,8 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { signInAnonymously, type User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { useCollection } from 'react-firebase-hooks/firestore';
 import { auth, db } from './firebase';
 import { averagePartnerWeights, CANADIAN_VEHICLES, DEFAULT_WEIGHTS, scoreVehicles } from './scoring';
 import type { BodyStyle, CriteriaKey, CriteriaWeights, Drivetrain, Powertrain, ScoredVehicle, SessionDocument, TestDriveEntry, UserPreferenceDocument } from './types';
@@ -12,6 +11,10 @@ const sliderConfig: Array<{ key: CriteriaKey; label: string; help: string }> = [
   { key: 'space', label: 'Car Seat & Cabin Space', help: 'Prioritize second-row room, cargo access, and family ergonomics.' },
   { key: 'winterTraction', label: 'Ottawa Winter Traction', help: 'Favor snow confidence, AWD behavior, and cold-weather stability.' },
   { key: 'valueMSRP', label: 'Value & MSRP Budget', help: 'Emphasize purchase price, features per dollar, and long-term value.' },
+  { key: 'reliability', label: 'Long-Term Reliability', help: 'Favor dependable ownership, resale confidence, and fewer surprise repairs.' },
+  { key: 'fuelEfficiency', label: 'Fuel Economy & Hybrid Efficiency', help: 'Prioritize lower fuel use, electrified options, and commuter efficiency.' },
+  { key: 'safetyTech', label: 'Safety & Driver Assistance', help: 'Value active safety aids, visibility, crash confidence, and family protection.' },
+  { key: 'comfort', label: 'Ride Comfort & Quiet Cabin', help: 'Reward calm highway manners, supportive seats, and low road noise.' },
 ];
 
 const bodyStyleOptions: Array<'All' | BodyStyle> = ['All', 'Compact SUV', 'Midsize SUV', 'Wagon'];
@@ -73,19 +76,15 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   const [activeProfile, setActiveProfile] = useState<'Emily' | 'Nick'>('Emily');
   const [favoritesByProfile, setFavoritesByProfile] = useState<Record<'Emily' | 'Nick', string[]>>({ Emily: [], Nick: [] });
   const [sharedNotesByVehicle, setSharedNotesByVehicle] = useState<Record<string, string>>({});
-  const preferencesQuery = sessionId ? collection(db, 'sessions', sessionId, 'userPreferences') : null;
-  const [preferencesSnapshot, preferencesLoading, preferencesError] = useCollection(preferencesQuery as any);
+  const [profileWeights, setProfileWeights] = useState<Record<'Emily' | 'Nick', CriteriaWeights>>({
+    Emily: DEFAULT_WEIGHTS,
+    Nick: DEFAULT_WEIGHTS,
+  });
 
-  const preferences = useMemo<UserPreferenceDocument[]>(() => {
-    return preferencesSnapshot?.docs.map((preferenceDoc: { id: string; data: () => Partial<UserPreferenceDocument> }) => {
-      const data = preferenceDoc.data();
-      return {
-        userId: data.userId ?? preferenceDoc.id,
-        criteriaWeights: data.criteriaWeights ?? DEFAULT_WEIGHTS,
-        personalNotes: data.personalNotes ?? {},
-      };
-    }) ?? [];
-  }, [preferencesSnapshot]);
+  const profilePreferences = useMemo<UserPreferenceDocument[]>(() => [
+    { userId: 'Emily', criteriaWeights: profileWeights.Emily, personalNotes: {} },
+    { userId: 'Nick', criteriaWeights: profileWeights.Nick, personalNotes: {} },
+  ], [profileWeights]);
 
   useEffect(() => {
     async function bootstrapSession() {
@@ -126,8 +125,11 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
     });
   }, [activeUser.uid, sessionId]);
 
-  const myPreference = preferences.find((preference) => preference.userId === activeUser.uid);
-  const combinedWeights = useMemo(() => averagePartnerWeights(preferences), [preferences]);
+  const handleProfileWeightsChange = useCallback((profileName: 'Emily' | 'Nick', weights: CriteriaWeights) => {
+    setProfileWeights((current) => ({ ...current, [profileName]: weights }));
+  }, []);
+
+  const combinedWeights = useMemo(() => averagePartnerWeights(profilePreferences), [profilePreferences]);
   const scoredVehicles = useMemo(() => scoreVehicles(combinedWeights), [combinedWeights]);
   const filteredVehicles = useMemo(() => {
     const search = filters.query.trim().toLowerCase();
@@ -164,8 +166,8 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
 
       {activeSection === 'dashboard' && (
         <section className="grid">
-          <PrioritySliders sessionId={sessionId} userId={activeUser.uid} currentWeights={myPreference?.criteriaWeights} />
-          <Dashboard scoredVehicles={filteredVehicles} combinedWeights={combinedWeights} loading={preferencesLoading || !sessionId} error={preferencesError?.message} partnerCount={preferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
+          <PrioritySliders profileName={activeProfile} currentWeights={profileWeights[activeProfile]} onWeightsChange={handleProfileWeightsChange} />
+          <Dashboard scoredVehicles={filteredVehicles} combinedWeights={combinedWeights} loading={!sessionId} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
         </section>
       )}
 
@@ -181,30 +183,29 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
 }
 
 interface PrioritySlidersProps {
-  sessionId: string | null;
-  userId?: string;
-  currentWeights?: CriteriaWeights;
+  profileName: 'Emily' | 'Nick';
+  currentWeights: CriteriaWeights;
+  onWeightsChange: (profileName: 'Emily' | 'Nick', weights: CriteriaWeights) => void;
 }
 
-function PrioritySliders({ sessionId, userId, currentWeights }: PrioritySlidersProps) {
-  const [draftWeights, setDraftWeights] = useState<CriteriaWeights>(currentWeights ?? DEFAULT_WEIGHTS);
-  const [saveState, setSaveState] = useState('Ready');
+function PrioritySliders({ profileName, currentWeights, onWeightsChange }: PrioritySlidersProps) {
+  const [draftWeights, setDraftWeights] = useState<CriteriaWeights>(currentWeights);
+  const [saveState, setSaveState] = useState(`${profileName}'s priorities ready`);
 
   useEffect(() => {
-    setDraftWeights(currentWeights ?? DEFAULT_WEIGHTS);
-  }, [currentWeights]);
+    setDraftWeights(currentWeights);
+    setSaveState(`${profileName}'s priorities ready`);
+  }, [currentWeights, profileName]);
 
   useEffect(() => {
-    if (!sessionId || !userId) return;
-
-    setSaveState('Saving...');
-    const timeout = window.setTimeout(async () => {
-      await setDoc(doc(db, 'sessions', sessionId, 'userPreferences', userId), { userId, criteriaWeights: draftWeights, personalNotes: {} }, { merge: true });
-      setSaveState('Synced');
-    }, 350);
+    setSaveState(`Updating ${profileName}...`);
+    const timeout = window.setTimeout(() => {
+      onWeightsChange(profileName, draftWeights);
+      setSaveState(`${profileName}'s priorities applied`);
+    }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [draftWeights, sessionId, userId]);
+  }, [draftWeights, onWeightsChange, profileName]);
 
   function handleSliderChange(key: CriteriaKey, value: string) {
     setDraftWeights((current) => ({ ...current, [key]: Number(value) }));
@@ -212,12 +213,12 @@ function PrioritySliders({ sessionId, userId, currentWeights }: PrioritySlidersP
 
   return (
     <form className="card sliders" onSubmit={(event: FormEvent) => event.preventDefault()}>
-      <div className="section-heading"><p className="eyebrow">Your priorities</p><span>{saveState}</span></div>
-      <h2>Balance what matters most.</h2>
+      <div className="section-heading"><p className="eyebrow">{profileName}'s priorities</p><span>{saveState}</span></div>
+      <h2>Balance what matters most for {profileName}.</h2>
       {sliderConfig.map((slider) => (
         <label className="slider-row" key={slider.key}>
           <span className="slider-label"><strong>{slider.label}</strong><small>{slider.help}</small></span>
-          <input type="range" min="1" max="10" value={draftWeights[slider.key]} onChange={(event) => handleSliderChange(slider.key, event.target.value)} disabled={!sessionId || !userId} />
+          <input type="range" min="1" max="10" value={draftWeights[slider.key]} onChange={(event) => handleSliderChange(slider.key, event.target.value)} />
           <b>{draftWeights[slider.key]}</b>
         </label>
       ))}
@@ -239,9 +240,9 @@ function Dashboard({ scoredVehicles, combinedWeights, loading, error, partnerCou
     <section className="card dashboard">
       <div className="section-heading"><p className="eyebrow">Live ranking</p><span>{partnerCount} partner profile{partnerCount === 1 ? '' : 's'} connected</span></div>
       <h2>Compatibility Score</h2>
-      {loading && <p className="muted">Loading shared Firestore preferences...</p>}
+      {loading && <p className="muted">Preparing shared profile scoring...</p>}
       {error && <p className="error-text">Preference stream error: {error}</p>}
-      <div className="weight-summary"><span>Space {combinedWeights.space.toFixed(1)}</span><span>Winter {combinedWeights.winterTraction.toFixed(1)}</span><span>Value {combinedWeights.valueMSRP.toFixed(1)}</span></div>
+      <div className="weight-summary"><span>Space {combinedWeights.space.toFixed(1)}</span><span>Winter {combinedWeights.winterTraction.toFixed(1)}</span><span>Value {combinedWeights.valueMSRP.toFixed(1)}</span><span>Reliability {combinedWeights.reliability.toFixed(1)}</span><span>Efficiency {combinedWeights.fuelEfficiency.toFixed(1)}</span><span>Safety {combinedWeights.safetyTech.toFixed(1)}</span><span>Comfort {combinedWeights.comfort.toFixed(1)}</span></div>
       <div className="bars">
         {scoredVehicles.slice(0, 8).map((vehicle) => (
           <button className="vehicle-row" key={vehicle.id} onClick={() => onSelectVehicle(vehicle.id)}>
