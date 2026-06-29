@@ -1,6 +1,19 @@
-# Co-Pilot
+# Family Fleet Finder
 
-Co-Pilot is a shared decision-making prototype for paired partners comparing family vehicles with live Firebase synchronization.
+Family Fleet Finder is a shared decision-making prototype for paired partners comparing family vehicles with live Firebase synchronization.
+
+
+## App features
+
+- Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, and max-price filters.
+- Model profile cards with MSRP, cargo, seating, drivetrain, efficiency, highlights, tradeoffs, and manufacturer source links.
+- Payment calculator with editable vehicle price, interest rate, term, down payment, and extra lump-sum principal payment.
+- Test drive diary for car-seat fit, stroller fit, winter confidence, partner rating, dealer/location, and notes.
+- Suggested next features for ownership-cost, insurance, shortlist voting, and synced test-drive photos.
+
+## Manufacturer research sources
+
+The static model profiles use manufacturer model pages as source links. Direct manufacturer photo URLs are included where reliably discoverable; otherwise the UI shows a branded fallback tile and links to the manufacturer gallery to avoid broken hotlinked images.
 
 ## Firebase project
 

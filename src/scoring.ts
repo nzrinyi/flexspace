@@ -1,3 +1,4 @@
+import { VEHICLES } from './vehicles';
 import type { CriteriaWeights, ScoredVehicle, UserPreferenceDocument, VehicleReference } from './types';
 
 export const DEFAULT_WEIGHTS: CriteriaWeights = {
@@ -6,11 +7,7 @@ export const DEFAULT_WEIGHTS: CriteriaWeights = {
   valueMSRP: 5,
 };
 
-export const CANADIAN_VEHICLES: VehicleReference[] = [
-  { id: 'crv', name: 'Honda CR-V', msrp: 36975, spaceScore: 95, winterScore: 80, valueScore: 85 },
-  { id: 'rav4', name: 'Toyota RAV4', msrp: 37500, spaceScore: 75, winterScore: 90, valueScore: 95 },
-  { id: 'forester', name: 'Subaru Forester', msrp: 34195, spaceScore: 85, winterScore: 98, valueScore: 90 },
-];
+export const CANADIAN_VEHICLES: VehicleReference[] = VEHICLES;
 
 export function averagePartnerWeights(preferences: UserPreferenceDocument[] = []): CriteriaWeights {
   if (preferences.length === 0) {

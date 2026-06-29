@@ -1,6 +1,9 @@
 import type { Timestamp } from 'firebase/firestore';
 
 export type CriteriaKey = 'space' | 'winterTraction' | 'valueMSRP';
+export type Drivetrain = 'AWD' | 'FWD' | '4WD';
+export type Powertrain = 'Gas' | 'Hybrid' | 'Plug-in Hybrid' | 'Electric';
+export type BodyStyle = 'Compact SUV' | 'Midsize SUV' | 'Wagon';
 
 export interface CriteriaWeights {
   space: number;
@@ -35,13 +38,39 @@ export interface TestDriveDocument {
 
 export interface VehicleReference {
   id: string;
+  make: string;
+  model: string;
   name: string;
+  year: number;
+  bodyStyle: BodyStyle;
   msrp: number;
+  drivetrain: Drivetrain;
+  powertrain: Powertrain;
+  seats: number;
+  cargoLitres: number;
+  fuelEfficiency: string;
+  towingKg?: number;
   spaceScore: number;
   winterScore: number;
   valueScore: number;
+  highlights: string[];
+  tradeoffs: string[];
+  manufacturerUrl: string;
+  imageUrl?: string;
+  photoCredit: string;
 }
 
 export interface ScoredVehicle extends VehicleReference {
   familyCompatibilityScore: number;
+}
+
+export interface TestDriveEntry {
+  vehicleId: string;
+  date: string;
+  dealer: string;
+  notes: string;
+  carSeatFits: boolean;
+  strollerFits: boolean;
+  winterConfidence: number;
+  partnerRating: number;
 }
