@@ -1,6 +1,6 @@
-# Family Fleet Finder
+# CarMatch
 
-Family Fleet Finder is a shared decision-making prototype for paired partners comparing family vehicles with live Firebase synchronization.
+CarMatch is a shared decision-making prototype for paired partners comparing family vehicles with live Firebase synchronization.
 
 
 ## App features
@@ -9,7 +9,6 @@ Family Fleet Finder is a shared decision-making prototype for paired partners co
 - Model profile cards with MSRP, cargo, seating, drivetrain, efficiency, highlights, tradeoffs, and manufacturer source links.
 - Payment calculator with editable vehicle price, interest rate, term, down payment, and extra lump-sum principal payment.
 - Test drive diary for car-seat fit, stroller fit, winter confidence, partner rating, dealer/location, and notes.
-- Suggested next features for ownership-cost, insurance, shortlist voting, and synced test-drive photos.
 
 ## Manufacturer research sources
 

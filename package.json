@@ -1,5 +1,5 @@
 {
-  "name": "family-fleet-finder",
+  "name": "carmatch",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "firebase:apps:create": "firebase apps:create WEB \"Family Fleet Finder Web\" --project flexspace-1",
+    "firebase:apps:create": "firebase apps:create WEB \"CarMatch Web\" --project flexspace-1",
     "firebase:apps:sdkconfig": "firebase apps:sdkconfig WEB 1:544136326567:web:eeab9a468ce0f82299da82 --project flexspace-1",
     "deploy": "npm run build && firebase deploy --only hosting --project flexspace-1"
   },

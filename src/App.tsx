@@ -43,7 +43,7 @@ function App() {
       <main className="shell error">
         <section className="card">
           <p className="eyebrow">Firebase Auth setup required</p>
-          <h1>Family Fleet Finder could not start a secure anonymous session.</h1>
+          <h1>CarMatch could not start a secure anonymous session.</h1>
           <p>{authFailureMessage}</p>
           <p>Enable Authentication and the Anonymous provider for the <strong>flexspace-1</strong> project.</p>
         </section>
@@ -69,6 +69,7 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   const [filters, setFilters] = useState({ query: '', bodyStyle: 'All' as 'All' | BodyStyle, drivetrain: 'All' as 'All' | Drivetrain, powertrain: 'All' as 'All' | Powertrain, maxPrice: 60000 });
   const [selectedVehicleId, setSelectedVehicleId] = useState(CANADIAN_VEHICLES[0].id);
   const [testDriveEntries, setTestDriveEntries] = useState<TestDriveEntry[]>([]);
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'browse' | 'profile' | 'calculator' | 'diary'>('dashboard');
   const preferencesQuery = sessionId ? collection(db, 'sessions', sessionId, 'userPreferences') : null;
   const [preferencesSnapshot, preferencesLoading, preferencesError] = useCollection(preferencesQuery as any);
 
@@ -141,7 +142,7 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   return (
     <main className="shell">
       <section className="hero card">
-        <p className="eyebrow">Family Fleet Finder</p>
+        <p className="eyebrow">CarMatch</p>
         <h1>Compare family vehicles together, in real time.</h1>
         <p>Pair two devices, rank priorities, estimate payments, track test drives, and keep manufacturer research in one shared workspace.</p>
         <div className="invite-panel">
@@ -150,16 +151,28 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
         </div>
       </section>
 
-      <section className="grid">
-        <PrioritySliders sessionId={sessionId} userId={activeUser.uid} currentWeights={myPreference?.criteriaWeights} />
-        <Dashboard scoredVehicles={filteredVehicles} combinedWeights={combinedWeights} loading={preferencesLoading || !sessionId} error={preferencesError?.message} partnerCount={preferences.length} onSelectVehicle={setSelectedVehicleId} />
-      </section>
+      <nav className="app-menu" aria-label="Primary app sections">
+        <button className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}>Shared priorities</button>
+        <button className={activeSection === 'browse' ? 'active' : ''} onClick={() => setActiveSection('browse')}>Browse vehicles</button>
+        <button className={activeSection === 'profile' ? 'active' : ''} onClick={() => setActiveSection('profile')}>Model profile</button>
+        <button className={activeSection === 'calculator' ? 'active' : ''} onClick={() => setActiveSection('calculator')}>Payment calculator</button>
+        <button className={activeSection === 'diary' ? 'active' : ''} onClick={() => setActiveSection('diary')}>Test drive diary</button>
+      </nav>
 
-      <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} onSelectVehicle={setSelectedVehicleId} />
-      <VehicleProfile vehicle={selectedVehicle} />
-      <PaymentCalculator vehicle={selectedVehicle} />
-      <TestDriveDiary vehicles={scoredVehicles} entries={testDriveEntries} onEntriesChange={setTestDriveEntries} />
-      <FeatureIdeas />
+      {activeSection === 'dashboard' && (
+        <section className="grid">
+          <PrioritySliders sessionId={sessionId} userId={activeUser.uid} currentWeights={myPreference?.criteriaWeights} />
+          <Dashboard scoredVehicles={filteredVehicles} combinedWeights={combinedWeights} loading={preferencesLoading || !sessionId} error={preferencesError?.message} partnerCount={preferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
+        </section>
+      )}
+
+      {activeSection === 'browse' && (
+        <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
+      )}
+
+      {activeSection === 'profile' && <VehicleProfile vehicle={selectedVehicle} />}
+      {activeSection === 'calculator' && <PaymentCalculator vehicle={selectedVehicle} />}
+      {activeSection === 'diary' && <TestDriveDiary vehicles={scoredVehicles} entries={testDriveEntries} onEntriesChange={setTestDriveEntries} />}
     </main>
   );
 }
@@ -352,20 +365,6 @@ function TestDriveDiary({ vehicles, entries, onEntriesChange }: { vehicles: Scor
         <button type="submit">Add diary entry</button>
       </form>
       <div className="diary-list">{entries.map((entry, index) => <article key={`${entry.vehicleId}-${entry.date}-${index}`}><strong>{vehicles.find((vehicle) => vehicle.id === entry.vehicleId)?.name}</strong><span>{entry.date} • {entry.dealer || 'No dealer noted'}</span><p>{entry.notes || 'No notes yet.'}</p></article>)}</div>
-    </section>
-  );
-}
-
-function FeatureIdeas() {
-  return (
-    <section className="card stack">
-      <p className="eyebrow">Suggested next features</p>
-      <ul className="ideas">
-        <li>Shared shortlist voting and vetoes.</li>
-        <li>Insurance quote and winter tire cost tracking.</li>
-        <li>Trade-in value and fuel-cost comparison over five years.</li>
-        <li>Firestore-backed diary sync with photo uploads from test drives.</li>
-      </ul>
     </section>
   );
 }
