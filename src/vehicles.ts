@@ -7,7 +7,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 95, winterScore: 80, valueScore: 85,
     highlights: ['Roomy rear seat and cargo area', 'Hybrid option', 'Strong family ergonomics'],
     tradeoffs: ['AWD trims increase price', 'Less winter-specialized than Subaru'],
-    manufacturerUrl: 'https://www.honda.ca/en/crv', photoCredit: 'Honda Canada model gallery',
+    manufacturerUrl: 'https://www.honda.ca/en/crv', imageUrl: 'https://source.unsplash.com/900x600/?honda%20cr-v%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'rav4', make: 'Toyota', model: 'RAV4', name: 'Toyota RAV4', year: 2026, bodyStyle: 'Compact SUV', msrp: 37500,
@@ -15,7 +15,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 75, winterScore: 90, valueScore: 95,
     highlights: ['All-hybrid direction', 'Excellent resale reputation', 'Broad trim availability'],
     tradeoffs: ['Rear-seat room trails the CR-V', 'High demand can affect availability'],
-    manufacturerUrl: 'https://www.toyota.ca/en/vehicles/rav4/overview/', photoCredit: 'Toyota Canada model page',
+    manufacturerUrl: 'https://www.toyota.ca/en/vehicles/rav4/overview/', imageUrl: 'https://source.unsplash.com/900x600/?toyota%20rav4%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'forester', make: 'Subaru', model: 'Forester', name: 'Subaru Forester', year: 2026, bodyStyle: 'Compact SUV', msrp: 34195,
@@ -23,7 +23,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 85, winterScore: 98, valueScore: 90,
     highlights: ['Standard symmetrical AWD', 'Great visibility', 'Available hybrid'],
     tradeoffs: ['CVT feel is not for everyone', 'Cargo shape is practical but not class-largest'],
-    manufacturerUrl: 'https://m.subaru.ca/2026Forester', imageUrl: 'https://www.subaru.ca/content/7907/media/General/webimage/xv/25FOR_H_Front_side_motion_snow_forest_F2.jpg', photoCredit: 'Subaru Canada gallery',
+    manufacturerUrl: 'https://m.subaru.ca/2026Forester', imageUrl: 'https://www.subaru.ca/content/7907/media/General/webimage/xv/25FOR_H_Front_side_motion_snow_forest_F2.jpg', photoCredit: 'Manufacturer/Unsplash vehicle photo source',
   },
   {
     id: 'cx5', make: 'Mazda', model: 'CX-5', name: 'Mazda CX-5', year: 2026, bodyStyle: 'Compact SUV', msrp: 33900,
@@ -31,7 +31,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 76, winterScore: 86, valueScore: 84,
     highlights: ['Premium-feeling cabin', 'Standard AWD', 'Engaging steering'],
     tradeoffs: ['Less cargo volume than CR-V/RAV4', 'Hybrid not yet broadly available'],
-    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-5/', photoCredit: 'Mazda Canada model page',
+    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-5/', imageUrl: 'https://source.unsplash.com/900x600/?mazda%20cx-5%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'tucson', make: 'Hyundai', model: 'Tucson', name: 'Hyundai Tucson', year: 2026, bodyStyle: 'Compact SUV', msrp: 34599,
@@ -39,7 +39,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 90, winterScore: 84, valueScore: 88,
     highlights: ['Excellent cargo room', 'Long warranty', 'Hybrid availability'],
     tradeoffs: ['Controls may feel tech-heavy', 'Resale trails Toyota/Honda'],
-    manufacturerUrl: 'https://www.hyundaicanada.com/en/showroom/2026/tucson', photoCredit: 'Hyundai Canada model page',
+    manufacturerUrl: 'https://www.hyundaicanada.com/en/showroom/2026/tucson', imageUrl: 'https://source.unsplash.com/900x600/?hyundai%20tucson%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'sportage', make: 'Kia', model: 'Sportage', name: 'Kia Sportage', year: 2026, bodyStyle: 'Compact SUV', msrp: 33295,
@@ -47,7 +47,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 91, winterScore: 83, valueScore: 89,
     highlights: ['Large cargo hold', 'Strong feature value', 'Hybrid/PHEV availability'],
     tradeoffs: ['Polarizing exterior styling', 'Dealer inventory varies'],
-    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sportage/2026', photoCredit: 'Kia Canada model page',
+    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sportage/2026', imageUrl: 'https://source.unsplash.com/900x600/?kia%20sportage%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'rogue', make: 'Nissan', model: 'Rogue', name: 'Nissan Rogue', year: 2026, bodyStyle: 'Compact SUV', msrp: 33648,
@@ -55,7 +55,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 84, winterScore: 82, valueScore: 83,
     highlights: ['Comfortable ride', 'Family-friendly rear doors', 'Useful cargo floor'],
     tradeoffs: ['No mainstream hybrid in Canada', 'CVT long-term preferences vary'],
-    manufacturerUrl: 'https://www.nissan.ca/vehicles/crossovers-suvs/rogue.html', photoCredit: 'Nissan Canada model page',
+    manufacturerUrl: 'https://www.nissan.ca/vehicles/crossovers-suvs/rogue.html', imageUrl: 'https://source.unsplash.com/900x600/?nissan%20rogue%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'escape', make: 'Ford', model: 'Escape', name: 'Ford Escape', year: 2026, bodyStyle: 'Compact SUV', msrp: 34999,
@@ -63,7 +63,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 78, winterScore: 80, valueScore: 82,
     highlights: ['PHEV option', 'Comfortable daily driver', 'Frequent incentives'],
     tradeoffs: ['Interior feels less premium', 'PHEV is typically FWD'],
-    manufacturerUrl: 'https://www.ford.ca/suvs/escape/', photoCredit: 'Ford Canada model page',
+    manufacturerUrl: 'https://www.ford.ca/suvs/escape/', imageUrl: 'https://source.unsplash.com/900x600/?ford%20escape%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'equinox', make: 'Chevrolet', model: 'Equinox', name: 'Chevrolet Equinox', year: 2026, bodyStyle: 'Compact SUV', msrp: 33499,
@@ -71,7 +71,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 79, winterScore: 81, valueScore: 86,
     highlights: ['Simple controls', 'Good incentives', 'Available AWD'],
     tradeoffs: ['No hybrid option', 'Cargo trails leaders'],
-    manufacturerUrl: 'https://www.chevrolet.ca/en/suvs/equinox', photoCredit: 'Chevrolet Canada model page',
+    manufacturerUrl: 'https://www.chevrolet.ca/en/suvs/equinox', imageUrl: 'https://source.unsplash.com/900x600/?chevrolet%20equinox%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'tiguan', make: 'Volkswagen', model: 'Tiguan', name: 'Volkswagen Tiguan', year: 2026, bodyStyle: 'Compact SUV', msrp: 39995,
@@ -79,7 +79,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 88, winterScore: 85, valueScore: 78,
     highlights: ['European road feel', 'Spacious cabin', 'Standard safety tech'],
     tradeoffs: ['Higher starting price', 'No hybrid option'],
-    manufacturerUrl: 'https://www.volkswagen.ca/en/models/tiguan.html', photoCredit: 'Volkswagen Canada model page',
+    manufacturerUrl: 'https://www.volkswagen.ca/en/models/tiguan.html', imageUrl: 'https://source.unsplash.com/900x600/?volkswagen%20tiguan%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'outback', make: 'Subaru', model: 'Outback', name: 'Subaru Outback', year: 2026, bodyStyle: 'Wagon', msrp: 34995,
@@ -87,7 +87,7 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 86, winterScore: 99, valueScore: 87,
     highlights: ['Excellent winter traction', 'Low roof for loading', 'Great road-trip comfort'],
     tradeoffs: ['Wagon shape is not for everyone', 'Longer footprint'],
-    manufacturerUrl: 'https://www.subaru.ca/outback', photoCredit: 'Subaru Canada model page',
+    manufacturerUrl: 'https://www.subaru.ca/outback', imageUrl: 'https://source.unsplash.com/900x600/?subaru%20outback%20wagon', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
   {
     id: 'sorento', make: 'Kia', model: 'Sorento', name: 'Kia Sorento', year: 2026, bodyStyle: 'Midsize SUV', msrp: 41995,
@@ -95,6 +95,6 @@ export const VEHICLES: VehicleReference[] = [
     spaceScore: 94, winterScore: 84, valueScore: 80,
     highlights: ['Occasional third row', 'Hybrid availability', 'Strong feature list'],
     tradeoffs: ['Costs more than compact SUVs', 'Third row best for kids'],
-    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sorento/2026', photoCredit: 'Kia Canada model page',
+    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sorento/2026', imageUrl: 'https://source.unsplash.com/900x600/?kia%20sorento%20suv', photoCredit: 'Unsplash vehicle photo search and manufacturer source link',
   },
 ];

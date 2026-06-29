@@ -344,10 +344,15 @@ function PaymentCalculator({ vehicle }: { vehicle: ScoredVehicle }) {
   const [termMonths, setTermMonths] = useState(60);
   const [downPayment, setDownPayment] = useState(5000);
   const [extraPrincipal, setExtraPrincipal] = useState(0);
+  const [fees, setFees] = useState(2495);
+  const [taxRate, setTaxRate] = useState(13);
+  const [rebate, setRebate] = useState(0);
 
   useEffect(() => setPrice(vehicle.msrp), [vehicle.msrp]);
 
-  const principal = Math.max(price - downPayment - extraPrincipal, 0);
+  const taxAmount = (Math.max(price + fees - rebate, 0) * taxRate) / 100;
+  const allInPrice = Math.max(price + fees + taxAmount - rebate, 0);
+  const principal = Math.max(allInPrice - downPayment - extraPrincipal, 0);
   const monthlyRate = rate / 100 / 12;
   const safeTermMonths = Math.max(termMonths, 1);
   const payment = monthlyRate === 0 ? principal / safeTermMonths : (principal * monthlyRate) / (1 - (1 + monthlyRate) ** -safeTermMonths);
@@ -362,8 +367,12 @@ function PaymentCalculator({ vehicle }: { vehicle: ScoredVehicle }) {
         <label>Term months<input type="number" value={termMonths} onChange={(event) => setTermMonths(Number(event.target.value))} /></label>
         <label>Down payment<input type="number" value={downPayment} onChange={(event) => setDownPayment(Number(event.target.value))} /></label>
         <label>Lump principal<input type="number" value={extraPrincipal} onChange={(event) => setExtraPrincipal(Number(event.target.value))} /></label>
+        <label>Fees / freight / PDI<input type="number" value={fees} onChange={(event) => setFees(Number(event.target.value))} /></label>
+        <label>Tax rate %<input type="number" step="0.1" value={taxRate} onChange={(event) => setTaxRate(Number(event.target.value))} /></label>
+        <label>Rebates / discounts<input type="number" value={rebate} onChange={(event) => setRebate(Number(event.target.value))} /></label>
       </div>
-      <div className="payment-result"><strong>${Math.round(payment).toLocaleString('en-CA')}</strong><span>/ month estimated</span><small>Financed principal ${principal.toLocaleString('en-CA')} • estimated interest ${Math.round(totalInterest).toLocaleString('en-CA')}</small></div>
+      <div className="payment-result"><strong>${Math.round(payment).toLocaleString('en-CA')}</strong><span>/ month estimated</span><small>MSRP/base ${price.toLocaleString('en-CA')} • fees ${fees.toLocaleString('en-CA')} • tax ${Math.round(taxAmount).toLocaleString('en-CA')} • all-in ${Math.round(allInPrice).toLocaleString('en-CA')} • financed ${Math.round(principal).toLocaleString('en-CA')} • interest ${Math.round(totalInterest).toLocaleString('en-CA')}</small></div>
+      <p className="muted">MSRP usually excludes freight/PDI, dealer fees, accessories, licensing, insurance, and sales tax. Use the fee and tax fields to estimate a more realistic drive-away amount.</p>
     </section>
   );
 }
@@ -380,7 +389,7 @@ function TestDriveDiary({ vehicles, entries, onEntriesChange }: { vehicles: Scor
   return (
     <section className="card stack">
       <div className="section-heading"><p className="eyebrow">Test drive diary</p><span>{entries.length} entries</span></div>
-      <form className="diary-form" onSubmit={addEntry}>
+      <form className="diary-form diary-panel" onSubmit={addEntry}>
         <select value={draft.vehicleId} onChange={(event) => setDraft({ ...draft, vehicleId: event.target.value })}>{vehicles.map((vehicle) => <option value={vehicle.id} key={vehicle.id}>{vehicle.name}</option>)}</select>
         <input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} />
         <input placeholder="Dealer / location" value={draft.dealer} onChange={(event) => setDraft({ ...draft, dealer: event.target.value })} />
@@ -391,7 +400,16 @@ function TestDriveDiary({ vehicles, entries, onEntriesChange }: { vehicles: Scor
         <label>Partner rating {draft.partnerRating}<input type="range" min="1" max="10" value={draft.partnerRating} onChange={(event) => setDraft({ ...draft, partnerRating: Number(event.target.value) })} /></label>
         <button type="submit">Add diary entry</button>
       </form>
-      <div className="diary-list">{entries.map((entry, index) => <article key={`${entry.vehicleId}-${entry.date}-${index}`}><strong>{vehicles.find((vehicle) => vehicle.id === entry.vehicleId)?.name}</strong><span>{entry.date} • {entry.dealer || 'No dealer noted'}</span><p>{entry.notes || 'No notes yet.'}</p></article>)}</div>
+      <div className="diary-list">{entries.map((entry, index) => {
+        const vehicleName = vehicles.find((vehicle) => vehicle.id === entry.vehicleId)?.name ?? 'Selected vehicle';
+        return (
+          <article className="diary-entry" key={`${entry.vehicleId}-${entry.date}-${index}`}>
+            <div><strong>{vehicleName}</strong><span>{entry.date} • {entry.dealer || 'No dealer noted'}</span></div>
+            <p>{entry.notes || 'No notes yet.'}</p>
+            <div className="diary-chips"><span>{entry.carSeatFits ? '✓' : '○'} Car seat</span><span>{entry.strollerFits ? '✓' : '○'} Stroller</span><span>Winter {entry.winterConfidence}/10</span><span>Partner {entry.partnerRating}/10</span></div>
+          </article>
+        );
+      })}</div>
     </section>
   );
 }
