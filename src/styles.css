@@ -32,7 +32,7 @@ input[type='range'] { accent-color: var(--accent); }
 .filters, .calculator-grid { display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)); gap: 12px; align-items: end; }
 .vehicle-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 .vehicle-card { display: grid; gap: 10px; border: 1px solid #e3e9f8; border-radius: 20px; background: #fff; padding: 14px; color: inherit; text-align: left; }
-.vehicle-photo { width: 100%; height: 150px; object-fit: contain; border-radius: 16px; background: linear-gradient(135deg,#dbeafe,#eef2ff); }
+.vehicle-photo { width: 100%; height: 150px; object-fit: cover; border-radius: 16px; background: linear-gradient(135deg,#dbeafe,#eef2ff); }
 .photo-fallback { display: grid; place-items: center; align-content: center; gap: 6px; color: var(--accent); font-weight: 800; letter-spacing: .08em; text-align: center; }
 .photo-fallback span { max-width: 150px; color: #53627c; font-size: .75rem; letter-spacing: 0; }
 .profile { display: grid; grid-template-columns: minmax(260px,.8fr) minmax(0,1.2fr); gap: 24px; margin-bottom: 24px; }

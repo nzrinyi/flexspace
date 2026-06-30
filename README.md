@@ -14,7 +14,7 @@ CarMatch is a shared decision-making prototype for paired partners comparing fam
 
 ## Manufacturer research sources
 
-The static model profiles use manufacturer model pages as source links. Vehicle imagery is stored in `public/vehicles` and served by Firebase Hosting at `/vehicles/{model}.svg`, avoiding third-party hotlink failures or disappearing remote image URLs.
+The static model profiles use manufacturer model pages as source links. Vehicle imagery uses stable Wikimedia Commons file URLs for actual vehicle photos, with each model retaining its manufacturer source link separately.
 
 ## Firebase project
 

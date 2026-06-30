@@ -1,5 +1,8 @@
 import type { VehicleReference } from './types';
 
+const commonsPhoto = (fileName: string) => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(fileName)}?width=1200`;
+const commonsCredit = (fileName: string) => `Wikimedia Commons photo: ${fileName}`;
+
 export const VEHICLES: VehicleReference[] = [
   {
     id: 'crv', make: 'Honda', model: 'CR-V', name: 'Honda CR-V', year: 2026, bodyStyle: 'Compact SUV', msrp: 36975,
@@ -8,7 +11,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 82, efficiencyScore: 87, safetyScore: 88, comfortScore: 90,
     highlights: ['Roomy rear seat and cargo area', 'Hybrid option', 'Strong family ergonomics'],
     tradeoffs: ['AWD trims increase price', 'Less winter-specialized than Subaru'],
-    manufacturerUrl: 'https://www.honda.ca/en/crv', imageUrl: '/vehicles/crv.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.honda.ca/en/crv', imageUrl: commonsPhoto('2023 Honda CR-V EL 4WD.jpg'), photoCredit: commonsCredit('2023 Honda CR-V EL 4WD.jpg'),
   },
   {
     id: 'rav4', make: 'Toyota', model: 'RAV4', name: 'Toyota RAV4', year: 2026, bodyStyle: 'Compact SUV', msrp: 37500,
@@ -17,7 +20,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 92, efficiencyScore: 97, safetyScore: 82, comfortScore: 85,
     highlights: ['All-hybrid direction', 'Excellent resale reputation', 'Broad trim availability'],
     tradeoffs: ['Rear-seat room trails the CR-V', 'High demand can affect availability'],
-    manufacturerUrl: 'https://www.toyota.ca/en/vehicles/rav4/overview/', imageUrl: '/vehicles/rav4.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.toyota.ca/en/vehicles/rav4/overview/', imageUrl: commonsPhoto('23 Toyota RAV4 LE.jpg'), photoCredit: commonsCredit('23 Toyota RAV4 LE.jpg'),
   },
   {
     id: 'forester', make: 'Subaru', model: 'Forester', name: 'Subaru Forester', year: 2026, bodyStyle: 'Compact SUV', msrp: 34195,
@@ -26,7 +29,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 94, efficiencyScore: 92, safetyScore: 92, comfortScore: 88,
     highlights: ['Standard symmetrical AWD', 'Great visibility', 'Available hybrid'],
     tradeoffs: ['CVT feel is not for everyone', 'Cargo shape is practical but not class-largest'],
-    manufacturerUrl: 'https://m.subaru.ca/2026Forester', imageUrl: '/vehicles/forester.svg', photoCredit: 'Locally hosted/manufacturer vehicle image source',
+    manufacturerUrl: 'https://m.subaru.ca/2026Forester', imageUrl: commonsPhoto('2023 Subaru Forester Sport, front 3.24.23.jpg'), photoCredit: commonsCredit('2023 Subaru Forester Sport, front 3.24.23.jpg'),
   },
   {
     id: 'cx5', make: 'Mazda', model: 'CX-5', name: 'Mazda CX-5', year: 2026, bodyStyle: 'Compact SUV', msrp: 33900,
@@ -35,7 +38,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 85, efficiencyScore: 86, safetyScore: 81, comfortScore: 80,
     highlights: ['Premium-feeling cabin', 'Standard AWD', 'Engaging steering'],
     tradeoffs: ['Less cargo volume than CR-V/RAV4', 'Hybrid not yet broadly available'],
-    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-5/', imageUrl: '/vehicles/cx5.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-5/', imageUrl: commonsPhoto('Mazda CX-5 Newground 1X7A6786 (cropped).jpg'), photoCredit: commonsCredit('Mazda CX-5 Newground 1X7A6786 (cropped).jpg'),
   },
   {
     id: 'tucson', make: 'Hyundai', model: 'Tucson', name: 'Hyundai Tucson', year: 2026, bodyStyle: 'Compact SUV', msrp: 34599,
@@ -44,7 +47,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 86, efficiencyScore: 90, safetyScore: 87, comfortScore: 89,
     highlights: ['Excellent cargo room', 'Long warranty', 'Hybrid availability'],
     tradeoffs: ['Controls may feel tech-heavy', 'Resale trails Toyota/Honda'],
-    manufacturerUrl: 'https://www.hyundaicanada.com/en/showroom/2026/tucson', imageUrl: '/vehicles/tucson.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.hyundaicanada.com/en/showroom/2026/tucson', imageUrl: commonsPhoto('2022 Hyundai Tucson Hybrid.jpg'), photoCredit: commonsCredit('2022 Hyundai Tucson Hybrid.jpg'),
   },
   {
     id: 'sportage', make: 'Kia', model: 'Sportage', name: 'Kia Sportage', year: 2026, bodyStyle: 'Compact SUV', msrp: 33295,
@@ -53,7 +56,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 86, efficiencyScore: 91, safetyScore: 87, comfortScore: 90,
     highlights: ['Large cargo hold', 'Strong feature value', 'Hybrid/PHEV availability'],
     tradeoffs: ['Polarizing exterior styling', 'Dealer inventory varies'],
-    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sportage/2026', imageUrl: '/vehicles/sportage.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sportage/2026', imageUrl: commonsPhoto('2023 Kia Sportage Hybrid.jpg'), photoCredit: commonsCredit('2023 Kia Sportage Hybrid.jpg'),
   },
   {
     id: 'rogue', make: 'Nissan', model: 'Rogue', name: 'Nissan Rogue', year: 2026, bodyStyle: 'Compact SUV', msrp: 33648,
@@ -62,7 +65,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 82, efficiencyScore: 85, safetyScore: 83, comfortScore: 84,
     highlights: ['Comfortable ride', 'Family-friendly rear doors', 'Useful cargo floor'],
     tradeoffs: ['No mainstream hybrid in Canada', 'CVT long-term preferences vary'],
-    manufacturerUrl: 'https://www.nissan.ca/vehicles/crossovers-suvs/rogue.html', imageUrl: '/vehicles/rogue.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.nissan.ca/vehicles/crossovers-suvs/rogue.html', imageUrl: commonsPhoto('2021 Nissan Rogue.jpg'), photoCredit: commonsCredit('2021 Nissan Rogue.jpg'),
   },
   {
     id: 'escape', make: 'Ford', model: 'Escape', name: 'Ford Escape', year: 2026, bodyStyle: 'Compact SUV', msrp: 34999,
@@ -71,7 +74,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 81, efficiencyScore: 84, safetyScore: 79, comfortScore: 80,
     highlights: ['PHEV option', 'Comfortable daily driver', 'Frequent incentives'],
     tradeoffs: ['Interior feels less premium', 'PHEV is typically FWD'],
-    manufacturerUrl: 'https://www.ford.ca/suvs/escape/', imageUrl: '/vehicles/escape.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.ford.ca/suvs/escape/', imageUrl: commonsPhoto('2020 Ford Escape Hybrid front NYIAS 2019.jpg'), photoCredit: commonsCredit('2020 Ford Escape Hybrid front NYIAS 2019.jpg'),
   },
   {
     id: 'equinox', make: 'Chevrolet', model: 'Equinox', name: 'Chevrolet Equinox', year: 2026, bodyStyle: 'Compact SUV', msrp: 33499,
@@ -80,7 +83,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 84, efficiencyScore: 88, safetyScore: 80, comfortScore: 82,
     highlights: ['Simple controls', 'Good incentives', 'Available AWD'],
     tradeoffs: ['No hybrid option', 'Cargo trails leaders'],
-    manufacturerUrl: 'https://www.chevrolet.ca/en/suvs/equinox', imageUrl: '/vehicles/equinox.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.chevrolet.ca/en/suvs/equinox', imageUrl: commonsPhoto('2022 Chevrolet Equinox LT (facelift), front 7.2.22.jpg'), photoCredit: commonsCredit('2022 Chevrolet Equinox LT (facelift), front 7.2.22.jpg'),
   },
   {
     id: 'tiguan', make: 'Volkswagen', model: 'Tiguan', name: 'Volkswagen Tiguan', year: 2026, bodyStyle: 'Compact SUV', msrp: 39995,
@@ -89,7 +92,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 82, efficiencyScore: 80, safetyScore: 86, comfortScore: 83,
     highlights: ['European road feel', 'Spacious cabin', 'Standard safety tech'],
     tradeoffs: ['Higher starting price', 'No hybrid option'],
-    manufacturerUrl: 'https://www.volkswagen.ca/en/models/tiguan.html', imageUrl: '/vehicles/tiguan.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.volkswagen.ca/en/models/tiguan.html', imageUrl: commonsPhoto('Volkswagen Tiguan 2.0 TDI (2022) (53957630118).jpg'), photoCredit: commonsCredit('Volkswagen Tiguan 2.0 TDI (2022) (53957630118).jpg'),
   },
   {
     id: 'outback', make: 'Subaru', model: 'Outback', name: 'Subaru Outback', year: 2026, bodyStyle: 'Wagon', msrp: 34995,
@@ -98,7 +101,7 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 93, efficiencyScore: 89, safetyScore: 92, comfortScore: 86,
     highlights: ['Excellent winter traction', 'Low roof for loading', 'Great road-trip comfort'],
     tradeoffs: ['Wagon shape is not for everyone', 'Longer footprint'],
-    manufacturerUrl: 'https://www.subaru.ca/outback', imageUrl: '/vehicles/outback.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.subaru.ca/outback', imageUrl: commonsPhoto('2023 Subaru Outback Premium, front right, 09-09-2023.jpg'), photoCredit: commonsCredit('2023 Subaru Outback Premium, front right, 09-09-2023.jpg'),
   },
   {
     id: 'sorento', make: 'Kia', model: 'Sorento', name: 'Kia Sorento', year: 2026, bodyStyle: 'Midsize SUV', msrp: 41995,
@@ -107,6 +110,6 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 82, efficiencyScore: 82, safetyScore: 89, comfortScore: 87,
     highlights: ['Occasional third row', 'Hybrid availability', 'Strong feature list'],
     tradeoffs: ['Costs more than compact SUVs', 'Third row best for kids'],
-    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sorento/2026', imageUrl: '/vehicles/sorento.svg', photoCredit: 'Locally hosted vehicle image with manufacturer source link',
+    manufacturerUrl: 'https://www.kia.ca/en/vehicles/sorento/2026', imageUrl: commonsPhoto('2021 Kia Sorento SX AWD, front 1.14.20.jpg'), photoCredit: commonsCredit('2021 Kia Sorento SX AWD, front 1.14.20.jpg'),
   },
 ];
