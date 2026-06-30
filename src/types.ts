@@ -7,6 +7,7 @@ export type BodyStyle = 'Compact SUV' | 'Midsize SUV' | 'Wagon';
 export type ProfileName = 'Emily' | 'Nick';
 export type VehicleStage = 'Browsing' | 'Shortlisted' | 'Test drive booked' | 'Test driven' | 'Quote received' | 'Finalist' | 'Rejected' | 'Winner';
 export type UserReaction = 'Love' | 'Maybe' | 'No' | 'Unrated';
+export type TestDriveStatus = 'Planned' | 'Completed';
 
 export interface CriteriaWeights {
   space: number;
@@ -129,5 +130,7 @@ export interface TestDriveEntry {
   prepaymentRules: boolean;
   winterConfidence: number;
   partnerRating: number;
+  photoUrls?: string[];
+  status?: TestDriveStatus;
   createdAt?: Timestamp;
 }
