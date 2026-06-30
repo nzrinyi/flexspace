@@ -145,7 +145,7 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   const selectedVehicle = scoredVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? scoredVehicles[0]!;
 
   return (
-    <main className="shell">
+    <main className={`shell profile-${activeProfile.toLowerCase()}`}>
       <section className="hero card">
         <div className="hero-topline"><p className="eyebrow">CarMatch</p><span>{sessionStatus}</span></div>
         <h1>Compare family vehicles together.</h1>
