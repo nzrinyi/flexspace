@@ -14,7 +14,7 @@ interface ComparisonTableProps {
 }
 
 export function ComparisonTable({ vehicles, favoritesByProfile, notes, quotes, entries, onStageChange, onReorder }: ComparisonTableProps) {
-  const rows = ['MSRP', 'Monthly', 'Overall', 'Confidence', 'Test drive', 'Deal', 'Seats', 'Cargo', 'Drive', 'Powertrain', 'Emily', 'Nick', 'Best quote', 'Diary entries'] as const;
+  const rows = ['Actual / quote', 'MSRP', 'Monthly', 'Overall', 'Confidence', 'Test drive', 'Deal', 'Seats', 'Cargo', 'Drive', 'Powertrain', 'Emily', 'Nick', 'Best quote', 'Diary entries'] as const;
 
   return (
     <section className="card stack">
@@ -50,11 +50,17 @@ function ComparisonRow({ row, vehicles, favoritesByProfile, notes, quotes, entri
   return <><div className="compare-label">{row}</div>{vehicles.map((vehicle) => <div key={`${row}-${vehicle.id}`}>{comparisonValue(row, vehicle, favoritesByProfile, notes, quotes, entries)}</div>)}</>;
 }
 
+function actualVehiclePrice(vehicle: ScoredVehicle, quotes: DealQuoteDocument[]) {
+  const bestQuote = quotes.filter((quote) => quote.vehicleId === vehicle.id).sort((a, b) => quoteNetPrice(a) - quoteNetPrice(b))[0];
+  return bestQuote ? quoteNetPrice(bestQuote) : Math.round((vehicle.msrp + 2495) * 1.13);
+}
+
 function comparisonValue(row: string, vehicle: ScoredVehicle, favoritesByProfile: Record<ProfileName, string[]>, notes: Record<string, VehicleNoteDocument>, quotes: DealQuoteDocument[], entries: TestDriveEntry[]) {
   const note = notes[vehicle.id] ?? { reactions: { Emily: 'Unrated', Nick: 'Unrated' } };
   const bestQuote = quotes.filter((quote) => quote.vehicleId === vehicle.id).sort((a, b) => quoteNetPrice(a) - quoteNetPrice(b))[0];
   const diaryCount = entries.filter((entry) => entry.vehicleId === vehicle.id).length;
   const values: Record<string, string> = {
+    'Actual / quote': `$${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')}`,
     MSRP: `$${vehicle.msrp.toLocaleString('en-CA')}`,
     Monthly: `$${estimateMonthlyPayment(vehicle).toLocaleString('en-CA')}`,
     Overall: `${vehicle.overallRecommendationScore}`,

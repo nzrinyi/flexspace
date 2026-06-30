@@ -3,9 +3,9 @@ import type { ScoredVehicle } from '../types';
 
 type PaymentMode = 'Simple' | 'Realistic' | 'Ownership';
 
-export function PaymentCalculator({ vehicle, budgetLimit, onBudgetLimitChange }: { vehicle: ScoredVehicle; budgetLimit: number; onBudgetLimitChange: (value: number) => void }) {
+export function PaymentCalculator({ vehicle, initialPrice, budgetLimit, onBudgetLimitChange }: { vehicle: ScoredVehicle; initialPrice?: number; budgetLimit: number; onBudgetLimitChange: (value: number) => void }) {
   const [mode, setMode] = useState<PaymentMode>('Simple');
-  const [price, setPrice] = useState(vehicle.msrp);
+  const [price, setPrice] = useState(initialPrice ?? vehicle.msrp);
   const [rate, setRate] = useState(5.99);
   const [termMonths, setTermMonths] = useState(60);
   const [downPayment, setDownPayment] = useState(5000);
@@ -17,7 +17,7 @@ export function PaymentCalculator({ vehicle, budgetLimit, onBudgetLimitChange }:
   const [fuel, setFuel] = useState(160);
   const [maintenance, setMaintenance] = useState(85);
 
-  useEffect(() => setPrice(vehicle.msrp), [vehicle.msrp]);
+  useEffect(() => setPrice(initialPrice ?? vehicle.msrp), [initialPrice, vehicle.msrp]);
 
   const taxAmount = (Math.max(price + fees - rebate, 0) * taxRate) / 100;
   const allInPrice = Math.max(price + fees + taxAmount - rebate, 0);
@@ -36,7 +36,7 @@ export function PaymentCalculator({ vehicle, budgetLimit, onBudgetLimitChange }:
         {(['Simple', 'Realistic', 'Ownership'] as PaymentMode[]).map((option) => <button type="button" className={mode === option ? 'active' : ''} onClick={() => setMode(option)} key={option}>{option}</button>)}
       </div>
       <div className="calculator-grid">
-        <Field label="Price" tip="Vehicle selling price before taxes and fees."><input type="number" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field>
+        <Field label="Actual / quote price" tip="Best saved dealer quote when available; otherwise an estimated drive-away price based on MSRP, default fees, and tax."><input type="number" value={price} onChange={(event) => setPrice(Number(event.target.value))} /></Field>
         <Field label="Down payment" tip="Cash paid up front to reduce the financed principal."><input type="number" value={downPayment} onChange={(event) => setDownPayment(Number(event.target.value))} /></Field>
         <Field label="Interest %" tip="Annual percentage rate for financing."><input type="number" step="0.1" value={rate} onChange={(event) => setRate(Number(event.target.value))} /></Field>
         <Field label="Term months" tip="Loan length in months."><input type="number" value={termMonths} onChange={(event) => setTermMonths(Number(event.target.value))} /></Field>

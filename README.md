@@ -5,7 +5,7 @@ CarMatch is a shared decision-making prototype for paired partners comparing fam
 
 ## App features
 
-- Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, max-price, monthly-budget, lifecycle-stage, seat-count, AWD, hybrid, and car-seat-tested filters.
+- Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, actual/quote price display, max-price, monthly-budget, lifecycle-stage, seat-count, AWD, hybrid, and car-seat-tested filters.
 - Real-time dashboard ranking models by combined Emily/Nick priorities, confidence, deal, and test-drive signals.
 - Emily/Nick profile switcher with Firestore-persisted priority weights, favourite vehicle stars, reactions, and shared notes.
 - Sticky compare tray with clear/compare actions, mini thumbnails, four-vehicle limit messaging, and drag/reorder controls for side-by-side finalist comparison.
@@ -13,7 +13,7 @@ CarMatch is a shared decision-making prototype for paired partners comparing fam
 - Payment calculator split into Simple, Realistic, and Ownership modes with inline field tooltips, editable costs, and budget guardrails.
 - Deal tracker for dealer quotes, trims, discounts, fees, accessories, trade-in, rates, quote expiry, contacts, listing URLs, and used-vehicle inspection details.
 - Test-drive timeline grouped by vehicle with dealer/date headers, checklist progress rings, photo URL slots, planned/completed status, reminders, and comparison chips.
-- Export summary view for copying top picks, weights, favourites, notes, quotes, and test-drive history. Local UI filters, active section, and compare selections persist in localStorage.
+- Local UI filters, active section, and compare selections persist in localStorage.
 
 ## Manufacturer research sources
 
