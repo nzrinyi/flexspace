@@ -152,9 +152,11 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   useEffect(() => {
     if (!sessionId || !canReadProfilePreferences) return;
 
+    const activeSessionId = sessionId;
+
     async function ensureProfilePreferenceDocs() {
       await Promise.all(profileNames.map(async (profileName) => {
-        const preferenceRef = doc(db, 'sessions', sessionId, 'userPreferences', profileName);
+        const preferenceRef = doc(db, 'sessions', activeSessionId, 'userPreferences', profileName);
         const snapshot = await getDoc(preferenceRef);
 
         if (!snapshot.exists()) {
@@ -176,8 +178,10 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   const saveProfilePreference = useCallback((profileName: ProfileName, weights: CriteriaWeights, favoriteVehicleIds: string[]) => {
     if (!sessionId) return;
 
+    const activeSessionId = sessionId;
+
     void setDoc(
-      doc(db, 'sessions', sessionId, 'userPreferences', profileName),
+      doc(db, 'sessions', activeSessionId, 'userPreferences', profileName),
       { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds },
       { merge: true },
     ).catch((error: unknown) => {
