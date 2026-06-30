@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "firebase:apps:create": "firebase apps:create WEB \"CarMatch Web\" --project flexspace-1",
     "firebase:apps:sdkconfig": "firebase apps:sdkconfig WEB 1:544136326567:web:eeab9a468ce0f82299da82 --project flexspace-1",
-    "deploy": "npm run build && firebase deploy --only hosting,firestore:rules --project flexspace-1",
+    "deploy": "npm run build && firebase deploy --only hosting --project flexspace-1",
     "deploy:rules": "firebase deploy --only firestore:rules --project flexspace-1"
   },
   "dependencies": {
