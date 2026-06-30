@@ -2,6 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { signInAnonymously, type User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
+import { useCollection } from 'react-firebase-hooks/firestore';
 import { auth, db } from './firebase';
 import { averagePartnerWeights, CANADIAN_VEHICLES, DEFAULT_WEIGHTS, scoreVehicles } from './scoring';
 import type { BodyStyle, CriteriaKey, CriteriaWeights, Drivetrain, Powertrain, ScoredVehicle, SessionDocument, TestDriveEntry, UserPreferenceDocument } from './types';
@@ -20,6 +21,8 @@ const sliderConfig: Array<{ key: CriteriaKey; label: string; help: string }> = [
 const bodyStyleOptions: Array<'All' | BodyStyle> = ['All', 'Compact SUV', 'Midsize SUV', 'Wagon'];
 const drivetrainOptions: Array<'All' | Drivetrain> = ['All', 'AWD', 'FWD', '4WD'];
 const powertrainOptions: Array<'All' | Powertrain> = ['All', 'Gas', 'Hybrid', 'Plug-in Hybrid', 'Electric'];
+const profileNames = ['Emily', 'Nick'] as const;
+type ProfileName = (typeof profileNames)[number];
 
 function getSessionIdFromUrl() {
   return new URLSearchParams(window.location.search).get('session');
@@ -73,18 +76,39 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
   const [selectedVehicleId, setSelectedVehicleId] = useState(CANADIAN_VEHICLES[0].id);
   const [testDriveEntries, setTestDriveEntries] = useState<TestDriveEntry[]>([]);
   const [activeSection, setActiveSection] = useState<'dashboard' | 'browse' | 'profile' | 'calculator' | 'diary'>('dashboard');
-  const [activeProfile, setActiveProfile] = useState<'Emily' | 'Nick'>('Emily');
-  const [favoritesByProfile, setFavoritesByProfile] = useState<Record<'Emily' | 'Nick', string[]>>({ Emily: [], Nick: [] });
+  const [activeProfile, setActiveProfile] = useState<ProfileName>('Emily');
+  const [favoritesByProfile, setFavoritesByProfile] = useState<Record<ProfileName, string[]>>({ Emily: [], Nick: [] });
   const [sharedNotesByVehicle, setSharedNotesByVehicle] = useState<Record<string, string>>({});
-  const [profileWeights, setProfileWeights] = useState<Record<'Emily' | 'Nick', CriteriaWeights>>({
+  const [profileWeights, setProfileWeights] = useState<Record<ProfileName, CriteriaWeights>>({
     Emily: DEFAULT_WEIGHTS,
     Nick: DEFAULT_WEIGHTS,
   });
+  const canReadProfilePreferences = Boolean(sessionId && session?.partnerIds?.includes(activeUser.uid));
+  const preferencesQuery = useMemo(() => (sessionId && canReadProfilePreferences ? collection(db, 'sessions', sessionId, 'userPreferences') : null), [canReadProfilePreferences, sessionId]);
+  const [preferencesSnapshot, preferencesLoading, preferencesError] = useCollection(preferencesQuery as any);
 
   const profilePreferences = useMemo<UserPreferenceDocument[]>(() => [
-    { userId: 'Emily', criteriaWeights: profileWeights.Emily, personalNotes: {} },
-    { userId: 'Nick', criteriaWeights: profileWeights.Nick, personalNotes: {} },
-  ], [profileWeights]);
+    { userId: 'Emily', criteriaWeights: profileWeights.Emily, personalNotes: {}, favoriteVehicleIds: favoritesByProfile.Emily },
+    { userId: 'Nick', criteriaWeights: profileWeights.Nick, personalNotes: {}, favoriteVehicleIds: favoritesByProfile.Nick },
+  ], [favoritesByProfile, profileWeights]);
+
+  useEffect(() => {
+    if (!preferencesSnapshot) return;
+
+    const nextWeights: Record<ProfileName, CriteriaWeights> = { Emily: DEFAULT_WEIGHTS, Nick: DEFAULT_WEIGHTS };
+    const nextFavorites: Record<ProfileName, string[]> = { Emily: [], Nick: [] };
+
+    preferencesSnapshot.docs.forEach((preferenceDoc: { data: () => Partial<UserPreferenceDocument> }) => {
+      const data = preferenceDoc.data();
+      if (data.userId === 'Emily' || data.userId === 'Nick') {
+        nextWeights[data.userId] = data.criteriaWeights ?? DEFAULT_WEIGHTS;
+        nextFavorites[data.userId] = data.favoriteVehicleIds ?? [];
+      }
+    });
+
+    setProfileWeights(nextWeights);
+    setFavoritesByProfile(nextFavorites);
+  }, [preferencesSnapshot]);
 
   useEffect(() => {
     async function bootstrapSession() {
@@ -109,7 +133,7 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
 
       await setDoc(
         doc(db, 'sessions', activeSessionId, 'userPreferences', activeUser.uid),
-        { userId: activeUser.uid, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {} },
+        { userId: activeUser.uid, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [] },
         { merge: true },
       );
 
@@ -125,9 +149,54 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
     });
   }, [activeUser.uid, sessionId]);
 
-  const handleProfileWeightsChange = useCallback((profileName: 'Emily' | 'Nick', weights: CriteriaWeights) => {
+  useEffect(() => {
+    if (!sessionId || !canReadProfilePreferences) return;
+
+    async function ensureProfilePreferenceDocs() {
+      await Promise.all(profileNames.map(async (profileName) => {
+        const preferenceRef = doc(db, 'sessions', sessionId, 'userPreferences', profileName);
+        const snapshot = await getDoc(preferenceRef);
+
+        if (!snapshot.exists()) {
+          await setDoc(preferenceRef, {
+            userId: profileName,
+            criteriaWeights: DEFAULT_WEIGHTS,
+            personalNotes: {},
+            favoriteVehicleIds: [],
+          });
+        }
+      }));
+    }
+
+    void ensureProfilePreferenceDocs().catch((error: unknown) => {
+      setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize saved profile preferences.');
+    });
+  }, [canReadProfilePreferences, sessionId]);
+
+  const saveProfilePreference = useCallback((profileName: ProfileName, weights: CriteriaWeights, favoriteVehicleIds: string[]) => {
+    if (!sessionId) return;
+
+    void setDoc(
+      doc(db, 'sessions', sessionId, 'userPreferences', profileName),
+      { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds },
+      { merge: true },
+    ).catch((error: unknown) => {
+      setSessionStatus(error instanceof Error ? error.message : 'Unable to save profile preferences.');
+    });
+  }, [sessionId]);
+
+  const handleProfileWeightsChange = useCallback((profileName: ProfileName, weights: CriteriaWeights) => {
     setProfileWeights((current) => ({ ...current, [profileName]: weights }));
-  }, []);
+    saveProfilePreference(profileName, weights, favoritesByProfile[profileName]);
+  }, [favoritesByProfile, saveProfilePreference]);
+
+  const handleToggleFavorite = useCallback((vehicleId: string) => {
+    setFavoritesByProfile((current) => {
+      const next = toggleProfileFavorite(current, activeProfile, vehicleId);
+      saveProfilePreference(activeProfile, profileWeights[activeProfile], next[activeProfile]);
+      return next;
+    });
+  }, [activeProfile, profileWeights, saveProfilePreference]);
 
   const combinedWeights = useMemo(() => averagePartnerWeights(profilePreferences), [profilePreferences]);
   const scoredVehicles = useMemo(() => scoreVehicles(combinedWeights), [combinedWeights]);
@@ -167,15 +236,15 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
       {activeSection === 'dashboard' && (
         <section className="grid">
           <PrioritySliders profileName={activeProfile} currentWeights={profileWeights[activeProfile]} onWeightsChange={handleProfileWeightsChange} />
-          <Dashboard scoredVehicles={filteredVehicles} combinedWeights={combinedWeights} loading={!sessionId} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
+          <Dashboard scoredVehicles={filteredVehicles} combinedWeights={combinedWeights} loading={!sessionId || preferencesLoading} error={preferencesError?.message} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
         </section>
       )}
 
       {activeSection === 'browse' && (
-        <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} activeProfile={activeProfile} favorites={favoritesByProfile[activeProfile]} onToggleFavorite={(vehicleId) => setFavoritesByProfile((current) => toggleProfileFavorite(current, activeProfile, vehicleId))} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
+        <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} activeProfile={activeProfile} favorites={favoritesByProfile[activeProfile]} onToggleFavorite={handleToggleFavorite} onSelectVehicle={(vehicleId) => { setSelectedVehicleId(vehicleId); setActiveSection('profile'); }} />
       )}
 
-      {activeSection === 'profile' && <VehicleProfile vehicle={selectedVehicle} activeProfile={activeProfile} isFavorite={favoritesByProfile[activeProfile].includes(selectedVehicle.id)} onToggleFavorite={() => setFavoritesByProfile((current) => toggleProfileFavorite(current, activeProfile, selectedVehicle.id))} sharedNote={sharedNotesByVehicle[selectedVehicle.id] ?? ''} onSharedNoteChange={(note) => setSharedNotesByVehicle((current) => ({ ...current, [selectedVehicle.id]: note }))} />}
+      {activeSection === 'profile' && <VehicleProfile vehicle={selectedVehicle} activeProfile={activeProfile} isFavorite={favoritesByProfile[activeProfile].includes(selectedVehicle.id)} onToggleFavorite={() => handleToggleFavorite(selectedVehicle.id)} sharedNote={sharedNotesByVehicle[selectedVehicle.id] ?? ''} onSharedNoteChange={(note) => setSharedNotesByVehicle((current) => ({ ...current, [selectedVehicle.id]: note }))} />}
       {activeSection === 'calculator' && <PaymentCalculator vehicle={selectedVehicle} />}
       {activeSection === 'diary' && <TestDriveDiary vehicles={scoredVehicles} entries={testDriveEntries} onEntriesChange={setTestDriveEntries} />}
     </main>
@@ -183,9 +252,9 @@ function AuthenticatedSession({ activeUser }: AuthenticatedSessionProps) {
 }
 
 interface PrioritySlidersProps {
-  profileName: 'Emily' | 'Nick';
+  profileName: ProfileName;
   currentWeights: CriteriaWeights;
-  onWeightsChange: (profileName: 'Emily' | 'Nick', weights: CriteriaWeights) => void;
+  onWeightsChange: (profileName: ProfileName, weights: CriteriaWeights) => void;
 }
 
 function PrioritySliders({ profileName, currentWeights, onWeightsChange }: PrioritySlidersProps) {
@@ -260,7 +329,7 @@ interface VehicleBrowserProps {
   filters: { query: string; bodyStyle: 'All' | BodyStyle; drivetrain: 'All' | Drivetrain; powertrain: 'All' | Powertrain; maxPrice: number };
   onFiltersChange: (filters: VehicleBrowserProps['filters']) => void;
   vehicles: ScoredVehicle[];
-  activeProfile: 'Emily' | 'Nick';
+  activeProfile: ProfileName;
   favorites: string[];
   onToggleFavorite: (vehicleId: string) => void;
   onSelectVehicle: (vehicleId: string) => void;
@@ -284,7 +353,7 @@ function VehicleBrowser({ filters, onFiltersChange, vehicles, activeProfile, fav
   );
 }
 
-function VehicleCard({ vehicle, isFavorite, activeProfile, onToggleFavorite, onSelect }: { vehicle: ScoredVehicle; isFavorite: boolean; activeProfile: 'Emily' | 'Nick'; onToggleFavorite: () => void; onSelect: () => void }) {
+function VehicleCard({ vehicle, isFavorite, activeProfile, onToggleFavorite, onSelect }: { vehicle: ScoredVehicle; isFavorite: boolean; activeProfile: ProfileName; onToggleFavorite: () => void; onSelect: () => void }) {
   return (
     <article className="vehicle-card">
       <button className="star-button" onClick={onToggleFavorite} aria-label={`${isFavorite ? 'Remove from' : 'Add to'} ${activeProfile}'s favourites`}>{isFavorite ? '★' : '☆'}</button>
@@ -299,7 +368,7 @@ function VehicleCard({ vehicle, isFavorite, activeProfile, onToggleFavorite, onS
 }
 
 
-function toggleProfileFavorite(current: Record<'Emily' | 'Nick', string[]>, profile: 'Emily' | 'Nick', vehicleId: string) {
+function toggleProfileFavorite(current: Record<ProfileName, string[]>, profile: ProfileName, vehicleId: string) {
   const currentFavorites = current[profile];
   return {
     ...current,
@@ -319,7 +388,7 @@ function VehicleImage({ vehicle }: { vehicle: ScoredVehicle }) {
   return <div className="vehicle-photo photo-fallback"><strong>{vehicle.make}</strong><span>Open profile for manufacturer photos</span></div>;
 }
 
-function VehicleProfile({ vehicle, activeProfile, isFavorite, onToggleFavorite, sharedNote, onSharedNoteChange }: { vehicle: ScoredVehicle; activeProfile: 'Emily' | 'Nick'; isFavorite: boolean; onToggleFavorite: () => void; sharedNote: string; onSharedNoteChange: (note: string) => void }) {
+function VehicleProfile({ vehicle, activeProfile, isFavorite, onToggleFavorite, sharedNote, onSharedNoteChange }: { vehicle: ScoredVehicle; activeProfile: ProfileName; isFavorite: boolean; onToggleFavorite: () => void; sharedNote: string; onSharedNoteChange: (note: string) => void }) {
   return (
     <section className="card profile">
       <VehicleImage vehicle={vehicle} />

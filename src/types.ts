@@ -27,6 +27,7 @@ export interface UserPreferenceDocument {
   userId: string;
   criteriaWeights: CriteriaWeights;
   personalNotes: Record<string, string>;
+  favoriteVehicleIds?: string[];
 }
 
 export interface TestDriveDocument {

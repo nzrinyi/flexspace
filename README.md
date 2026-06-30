@@ -7,7 +7,7 @@ CarMatch is a shared decision-making prototype for paired partners comparing fam
 
 - Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, and max-price filters.
 - Model profile cards with MSRP, cargo, seating, drivetrain, efficiency, highlights, tradeoffs, and manufacturer source links.
-- Emily/Nick profile switcher with separate priority weights that combine into the shared vehicle score.
+- Emily/Nick profile switcher with Firestore-persisted priority weights and favourite vehicle stars that combine into the shared vehicle score.
 - Expanded priority criteria for space, winter traction, value, reliability, fuel efficiency, safety tech, and comfort.
 - Payment calculator with editable vehicle price, fees, tax rate, interest rate, term, down payment, and extra lump-sum principal payment.
 - Test drive diary for car-seat fit, stroller fit, winter confidence, partner rating, dealer/location, and notes.

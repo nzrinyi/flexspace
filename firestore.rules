@@ -19,6 +19,10 @@ service cloud.firestore {
         && request.auth.uid in sessionData(sessionId).partnerIds;
     }
 
+    function isSharedProfile(userId) {
+      return userId in ['Emily', 'Nick'];
+    }
+
     function isJoiningExistingSession() {
       return signedIn()
         && request.resource.data.diff(resource.data).changedKeys().hasOnly(['partnerIds', 'dynamicShareLink'])
@@ -47,10 +51,11 @@ service cloud.firestore {
         allow read: if isSessionPartner(sessionId);
         allow create, update: if isSessionPartner(sessionId)
           && signedIn()
-          && userId == request.auth.uid
-          && request.resource.data.userId == request.auth.uid
+          && (userId == request.auth.uid || isSharedProfile(userId))
+          && request.resource.data.userId == userId
           && request.resource.data.criteriaWeights is map
-          && request.resource.data.personalNotes is map;
+          && request.resource.data.personalNotes is map
+          && request.resource.data.favoriteVehicleIds is list;
         allow delete: if false;
       }
 
