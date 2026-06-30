@@ -167,9 +167,10 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
 
   useEffect(() => {
     if (!sessionId || !canReadSharedCollections) return;
+    const activeSessionId = sessionId;
     async function ensureProfilePreferenceDocs() {
       await Promise.all(profileNames.map(async (profileName) => {
-        const preferenceRef = doc(db, 'sessions', sessionId, 'userPreferences', profileName);
+        const preferenceRef = doc(db, 'sessions', activeSessionId, 'userPreferences', profileName);
         const snapshot = await getDoc(preferenceRef);
         if (!snapshot.exists()) await setDoc(preferenceRef, { userId: profileName, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [] });
       }));
@@ -179,26 +180,30 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
 
   const saveProfilePreference = useCallback((profileName: ProfileName, weights: CriteriaWeights, favoriteVehicleIds: string[]) => {
     if (!sessionId) return;
-    void setDoc(doc(db, 'sessions', sessionId, 'userPreferences', profileName), { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save profile preferences.'));
+    const activeSessionId = sessionId;
+    void setDoc(doc(db, 'sessions', activeSessionId, 'userPreferences', profileName), { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save profile preferences.'));
   }, [sessionId]);
 
   const saveVehicleNote = useCallback((vehicleId: string, patch: Partial<VehicleNoteDocument>) => {
     if (!sessionId) return;
+    const activeSessionId = sessionId;
     const nextNote = { ...emptyVehicleNote(vehicleId), ...(vehicleNotes[vehicleId] ?? {}), ...patch, vehicleId };
     setVehicleNotes((current) => ({ ...current, [vehicleId]: nextNote }));
-    void setDoc(doc(db, 'sessions', sessionId, 'vehicleNotes', vehicleId), { ...nextNote, updatedAt: serverTimestamp() }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save shared vehicle notes.'));
+    void setDoc(doc(db, 'sessions', activeSessionId, 'vehicleNotes', vehicleId), { ...nextNote, updatedAt: serverTimestamp() }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save shared vehicle notes.'));
   }, [sessionId, vehicleNotes]);
 
   const saveDiaryEntry = useCallback((entry: TestDriveEntry) => {
     if (!sessionId) return;
+    const activeSessionId = sessionId;
     const entryId = entry.id ?? `${entry.vehicleId}-${Date.now()}`;
-    void setDoc(doc(db, 'sessions', sessionId, 'testDriveDiary', entryId), { ...entry, id: entryId, createdAt: serverTimestamp() }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save test-drive diary.'));
+    void setDoc(doc(db, 'sessions', activeSessionId, 'testDriveDiary', entryId), { ...entry, id: entryId, createdAt: serverTimestamp() }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save test-drive diary.'));
   }, [sessionId]);
 
   const saveDealQuote = useCallback((quote: DealQuoteDocument) => {
     if (!sessionId) return;
+    const activeSessionId = sessionId;
     const quoteId = quote.id ?? `${quote.vehicleId}-${Date.now()}`;
-    void setDoc(doc(db, 'sessions', sessionId, 'dealQuotes', quoteId), { ...quote, id: quoteId, createdAt: serverTimestamp() }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save deal quote.'));
+    void setDoc(doc(db, 'sessions', activeSessionId, 'dealQuotes', quoteId), { ...quote, id: quoteId, createdAt: serverTimestamp() }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save deal quote.'));
   }, [sessionId]);
 
   const handleProfileWeightsChange = useCallback((profileName: ProfileName, weights: CriteriaWeights) => {
