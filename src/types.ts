@@ -4,6 +4,9 @@ export type CriteriaKey = 'space' | 'winterTraction' | 'valueMSRP' | 'reliabilit
 export type Drivetrain = 'AWD' | 'FWD' | '4WD';
 export type Powertrain = 'Gas' | 'Hybrid' | 'Plug-in Hybrid' | 'Electric';
 export type BodyStyle = 'Compact SUV' | 'Midsize SUV' | 'Wagon';
+export type ProfileName = 'Emily' | 'Nick';
+export type VehicleStage = 'Browsing' | 'Shortlisted' | 'Test drive booked' | 'Test driven' | 'Quote received' | 'Finalist' | 'Rejected' | 'Winner';
+export type UserReaction = 'Love' | 'Maybe' | 'No' | 'Unrated';
 
 export interface CriteriaWeights {
   space: number;
@@ -28,6 +31,37 @@ export interface UserPreferenceDocument {
   criteriaWeights: CriteriaWeights;
   personalNotes: Record<string, string>;
   favoriteVehicleIds?: string[];
+}
+
+export interface VehicleNoteDocument {
+  vehicleId: string;
+  sharedNote: string;
+  stage: VehicleStage;
+  reactions: Record<ProfileName, UserReaction>;
+  updatedAt?: Timestamp;
+}
+
+export interface DealQuoteDocument {
+  id?: string;
+  vehicleId: string;
+  dealer: string;
+  trim: string;
+  price: number;
+  discount: number;
+  fees: number;
+  accessories: number;
+  tradeIn: number;
+  financeRate: number;
+  leaseRate: number;
+  expiryDate: string;
+  contact: string;
+  listingUrl: string;
+  usedYear?: number;
+  mileageKm?: number;
+  accidentHistory?: string;
+  cpo?: boolean;
+  inspectionNotes?: string;
+  createdAt?: Timestamp;
 }
 
 export interface TestDriveDocument {
@@ -71,15 +105,29 @@ export interface VehicleReference {
 
 export interface ScoredVehicle extends VehicleReference {
   familyCompatibilityScore: number;
+  confidenceScore: number;
+  testDriveScore: number;
+  dealScore: number;
+  overallRecommendationScore: number;
 }
 
 export interface TestDriveEntry {
+  id?: string;
   vehicleId: string;
   date: string;
+  appointmentTime: string;
+  reminderDate: string;
   dealer: string;
   notes: string;
   carSeatFits: boolean;
   strollerFits: boolean;
+  doorsOpen90: boolean;
+  passengerLegroom: boolean;
+  cargoFloorWorks: boolean;
+  winterTireQuote: boolean;
+  outTheDoorQuote: boolean;
+  prepaymentRules: boolean;
   winterConfidence: number;
   partnerRating: number;
+  createdAt?: Timestamp;
 }

@@ -5,12 +5,15 @@ CarMatch is a shared decision-making prototype for paired partners comparing fam
 
 ## App features
 
-- Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, and max-price filters.
-- Model profile cards with MSRP, cargo, seating, drivetrain, efficiency, highlights, tradeoffs, and manufacturer source links.
-- Emily/Nick profile switcher with Firestore-persisted priority weights and favourite vehicle stars that combine into the shared vehicle score.
-- Expanded priority criteria for space, winter traction, value, reliability, fuel efficiency, safety tech, and comfort.
-- Payment calculator with editable vehicle price, fees, tax rate, interest rate, term, down payment, and extra lump-sum principal payment.
-- Test drive diary for car-seat fit, stroller fit, winter confidence, partner rating, dealer/location, and notes.
+- Expanded Canadian-market model browser with body style, drivetrain, powertrain, search, max-price, monthly-budget, lifecycle-stage, seat-count, AWD, hybrid, and car-seat-tested filters.
+- Real-time dashboard ranking models by combined Emily/Nick priorities, confidence, deal, and test-drive signals.
+- Emily/Nick profile switcher with Firestore-persisted priority weights, favourite vehicle stars, reactions, and shared notes.
+- Side-by-side finalist comparison table with quote, diary, favourite, score, and lifecycle-stage details.
+- Model profiles with manufacturer source links, photo credits, specs, highlights, shared notes, ownership estimates, reactions, and watch-outs.
+- Payment calculator with editable vehicle price, fees, tax rate, interest rate, term, down payment, extra lump-sum principal payment, insurance, fuel, maintenance, and budget guardrails.
+- Deal tracker for dealer quotes, trims, discounts, fees, accessories, trade-in, rates, quote expiry, contacts, listing URLs, and used-vehicle inspection details.
+- Test drive diary for appointments, reminders, car-seat fit, stroller fit, door openings, passenger legroom, cargo fit, winter-tire quote, out-the-door quote, prepayment rules, winter confidence, partner rating, dealer/location, and notes.
+- Export summary view for copying top picks, weights, favourites, notes, quotes, and test-drive history.
 
 ## Manufacturer research sources
 

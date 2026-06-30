@@ -59,6 +59,35 @@ service cloud.firestore {
         allow delete: if false;
       }
 
+
+      match /vehicleNotes/{vehicleId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId == vehicleId
+          && request.resource.data.sharedNote is string
+          && request.resource.data.stage is string
+          && request.resource.data.reactions is map;
+        allow delete: if false;
+      }
+
+      match /testDriveDiary/{entryId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId is string
+          && request.resource.data.date is string
+          && request.resource.data.notes is string;
+        allow delete: if false;
+      }
+
+      match /dealQuotes/{quoteId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId is string
+          && request.resource.data.dealer is string
+          && request.resource.data.price is number;
+        allow delete: if false;
+      }
+
       match /testDrives/{vehicleId} {
         allow read: if isSessionPartner(sessionId);
         allow create, update: if isSessionPartner(sessionId)

@@ -62,10 +62,19 @@ export function scoreVehicles(weights: CriteriaWeights, vehicles = CANADIAN_VEHI
         vehicle.safetyScore * weights.safetyTech +
         vehicle.comfortScore * weights.comfort;
 
+      const familyCompatibilityScore = Math.round(weightedScore / totalWeight);
+      const confidenceScore = Math.round((vehicle.safetyScore + vehicle.reliabilityScore + vehicle.efficiencyScore) / 3);
+      const testDriveScore = 50;
+      const dealScore = Math.round((vehicle.valueScore * 0.7) + (vehicle.efficiencyScore * 0.3));
+
       return {
         ...vehicle,
-        familyCompatibilityScore: Math.round(weightedScore / totalWeight),
+        familyCompatibilityScore,
+        confidenceScore,
+        testDriveScore,
+        dealScore,
+        overallRecommendationScore: Math.round((familyCompatibilityScore * 0.55) + (confidenceScore * 0.25) + (dealScore * 0.2)),
       };
     })
-    .sort((a, b) => b.familyCompatibilityScore - a.familyCompatibilityScore);
+    .sort((a, b) => b.overallRecommendationScore - a.overallRecommendationScore);
 }
