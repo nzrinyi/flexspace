@@ -264,23 +264,29 @@ interface PrioritySlidersProps {
 function PrioritySliders({ profileName, currentWeights, onWeightsChange }: PrioritySlidersProps) {
   const [draftWeights, setDraftWeights] = useState<CriteriaWeights>(currentWeights);
   const [saveState, setSaveState] = useState(`${profileName}'s priorities ready`);
+  const [hasUserEdited, setHasUserEdited] = useState(false);
 
   useEffect(() => {
     setDraftWeights(currentWeights);
+    setHasUserEdited(false);
     setSaveState(`${profileName}'s priorities ready`);
   }, [currentWeights, profileName]);
 
   useEffect(() => {
+    if (!hasUserEdited) return;
+
     setSaveState(`Updating ${profileName}...`);
     const timeout = window.setTimeout(() => {
       onWeightsChange(profileName, draftWeights);
+      setHasUserEdited(false);
       setSaveState(`${profileName}'s priorities applied`);
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [draftWeights, onWeightsChange, profileName]);
+  }, [draftWeights, hasUserEdited, onWeightsChange, profileName]);
 
   function handleSliderChange(key: CriteriaKey, value: string) {
+    setHasUserEdited(true);
     setDraftWeights((current) => ({ ...current, [key]: Number(value) }));
   }
 
