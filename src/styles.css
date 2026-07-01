@@ -302,3 +302,14 @@ a { color: var(--accent); font-weight: 700; }
 @media (max-width: 430px) {
   .menu-toggle, .app-menu { width: calc(100% + 16px); margin-left: -8px; margin-right: -8px; }
 }
+/* Shared priorities visibility */
+.priority-board { grid-column: 1 / -1; }
+.priority-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.priority-card { display: grid; gap: 13px; border: 1px solid #e8edf7; border-radius: 22px; background: #fff; padding: 16px; box-shadow: 0 12px 28px rgba(15,23,42,.06); }
+.priority-card > strong { color: var(--accent); font-size: 1.1rem; }
+.priority-meter { display: grid; grid-template-columns: minmax(0,1fr) 32px; gap: 8px; align-items: center; }
+.priority-meter span { color: #475569; font-size: .88rem; font-weight: 800; }
+.priority-meter b { justify-self: end; color: #0f172a; }
+.priority-meter em { grid-column: 1 / -1; height: 8px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+.priority-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--accent-2),var(--accent)); }
+@media (max-width: 760px) { .priority-columns { grid-template-columns: 1fr; } .priority-card { padding: 14px; border-radius: 18px; } }
