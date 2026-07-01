@@ -3,6 +3,14 @@ import { quoteNetPrice } from '../hooks/useDealQuotes';
 
 const stageOptions: VehicleStage[] = ['Browsing', 'Shortlisted', 'Test drive booked', 'Test driven', 'Quote received', 'Finalist', 'Rejected', 'Winner'];
 
+const metricGroups = [
+  { label: 'Financial Specs', rows: ['Actual / quote', 'MSRP', 'Monthly', 'Best quote'] },
+  { label: 'Algorithm Scores', rows: ['Overall', 'Confidence', 'Test drive', 'Deal'] },
+  { label: 'Family Evaluation', rows: ['Seats', 'Cargo', 'Drive', 'Powertrain', 'Emily', 'Nick', 'Diary entries'] },
+] as const;
+
+type ComparisonRowName = (typeof metricGroups)[number]['rows'][number];
+
 interface ComparisonTableProps {
   vehicles: ScoredVehicle[];
   favoritesByProfile: Record<ProfileName, string[]>;
@@ -11,43 +19,76 @@ interface ComparisonTableProps {
   entries: TestDriveEntry[];
   onStageChange: (vehicleId: string, stage: VehicleStage) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
+  onRemove: (vehicleId: string) => void;
 }
 
-export function ComparisonTable({ vehicles, favoritesByProfile, notes, quotes, entries, onStageChange, onReorder }: ComparisonTableProps) {
-  const rows = ['Actual / quote', 'MSRP', 'Monthly', 'Overall', 'Confidence', 'Test drive', 'Deal', 'Seats', 'Cargo', 'Drive', 'Powertrain', 'Emily', 'Nick', 'Best quote', 'Diary entries'] as const;
+function ArrowLeftIcon() {
+  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5M8 10h8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+function ArrowRightIcon() {
+  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5M4 10h8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+function TrashIcon() {
+  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 8v7M13 8v7M5 5h10M8 5l.5-1h3l.5 1M6 5l.5 12h7L14 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+function ChevronDownIcon() {
+  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+export function ComparisonTable({ vehicles, favoritesByProfile, notes, quotes, entries, onStageChange, onReorder, onRemove }: ComparisonTableProps) {
+  const bestScore = Math.max(...vehicles.map((vehicle) => vehicle.overallRecommendationScore), 0);
+  const gridTemplateColumns = `minmax(135px, .62fr) repeat(${Math.max(vehicles.length, 1)}, minmax(210px, 1fr))`;
 
   return (
-    <section className="card stack">
-      <div className="section-heading"><p className="eyebrow">Side-by-side comparison</p><span>Drag headers or use arrows to reorder columns</span></div>
-      <div className="comparison-table fixed-compare" style={{ gridTemplateColumns: `minmax(130px, .7fr) repeat(${Math.max(vehicles.length, 1)}, minmax(180px, 1fr))` }}>
-        <div className="compare-head">Metric</div>
-        {vehicles.map((vehicle, index) => (
-          <div
-            className="compare-head"
-            key={vehicle.id}
-            draggable
-            onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={(event) => {
-              event.preventDefault();
-              const fromIndex = Number(event.dataTransfer.getData('text/plain'));
-              if (!Number.isNaN(fromIndex)) onReorder(fromIndex, index);
-            }}
-          >
-            {vehicle.imageUrl && <img className="vehicle-photo" src={vehicle.imageUrl} alt={`${vehicle.name} thumbnail`} />}
-            <strong>{vehicle.name}</strong>
-            <div className="column-actions"><button type="button" onClick={() => onReorder(index, Math.max(index - 1, 0))}>←</button><button type="button" onClick={() => onReorder(index, Math.min(index + 1, vehicles.length - 1))}>→</button></div>
-            <select value={notes[vehicle.id]?.stage ?? 'Browsing'} onChange={(event) => onStageChange(vehicle.id, event.target.value as VehicleStage)}>{stageOptions.map((stage) => <option key={stage}>{stage}</option>)}</select>
-          </div>
+    <section className="card stack comparison-panel">
+      <div className="section-heading"><div><p className="eyebrow">Side-by-side comparison</p><h2>Compare finalists at a glance.</h2></div><span>Drag headers or use arrows to reorder columns</span></div>
+      <div className="comparison-grid" style={{ gridTemplateColumns }}>
+        <div className="compare-grid-corner">Metric</div>
+        {vehicles.map((vehicle, index) => {
+          const isBestMatch = vehicle.overallRecommendationScore === bestScore;
+          return (
+            <div
+              className={`compare-column-card compare-head-card ${isBestMatch ? 'best-match' : ''}`}
+              key={vehicle.id}
+              draggable
+              onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                const fromIndex = Number(event.dataTransfer.getData('text/plain'));
+                if (!Number.isNaN(fromIndex)) onReorder(fromIndex, index);
+              }}
+            >
+              {isBestMatch && <span className="best-match-badge">Best Match</span>}
+              <div className="compare-column-actions">
+                <button type="button" onClick={() => onReorder(index, Math.max(index - 1, 0))} aria-label={`Move ${vehicle.name} left`}><ArrowLeftIcon /></button>
+                <button type="button" onClick={() => onReorder(index, Math.min(index + 1, vehicles.length - 1))} aria-label={`Move ${vehicle.name} right`}><ArrowRightIcon /></button>
+                <button className="remove" type="button" onClick={() => onRemove(vehicle.id)} aria-label={`Remove ${vehicle.name}`}><TrashIcon /></button>
+              </div>
+              {vehicle.imageUrl && <img className="vehicle-photo" src={vehicle.imageUrl} alt={`${vehicle.name} thumbnail`} />}
+              <strong>{vehicle.name}</strong>
+              <small>${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')} actual / quote</small>
+              <label className="stage-select"><span className="sr-only">Stage for {vehicle.name}</span><select value={notes[vehicle.id]?.stage ?? 'Browsing'} onChange={(event) => onStageChange(vehicle.id, event.target.value as VehicleStage)}>{stageOptions.map((stage) => <option key={stage}>{stage}</option>)}</select><ChevronDownIcon /></label>
+            </div>
+          );
+        })}
+        {metricGroups.map((group) => (
+          <ComparisonMetricGroup key={group.label} group={group} vehicles={vehicles} favoritesByProfile={favoritesByProfile} notes={notes} quotes={quotes} entries={entries} bestScore={bestScore} />
         ))}
-        {rows.map((row) => <ComparisonRow key={row} row={row} vehicles={vehicles} favoritesByProfile={favoritesByProfile} notes={notes} quotes={quotes} entries={entries} />)}
       </div>
     </section>
   );
 }
 
-function ComparisonRow({ row, vehicles, favoritesByProfile, notes, quotes, entries }: { row: string; vehicles: ScoredVehicle[]; favoritesByProfile: Record<ProfileName, string[]>; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; entries: TestDriveEntry[] }) {
-  return <><div className="compare-label">{row}</div>{vehicles.map((vehicle) => <div key={`${row}-${vehicle.id}`}>{comparisonValue(row, vehicle, favoritesByProfile, notes, quotes, entries)}</div>)}</>;
+function ComparisonMetricGroup({ group, vehicles, favoritesByProfile, notes, quotes, entries, bestScore }: { group: (typeof metricGroups)[number]; vehicles: ScoredVehicle[]; favoritesByProfile: Record<ProfileName, string[]>; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; entries: TestDriveEntry[]; bestScore: number }) {
+  return <><div className="compare-category">{group.label}</div>{group.rows.map((row, rowIndex) => <ComparisonRow key={row} row={row} rowIndex={rowIndex} vehicles={vehicles} favoritesByProfile={favoritesByProfile} notes={notes} quotes={quotes} entries={entries} bestScore={bestScore} />)}</>;
+}
+
+function ComparisonRow({ row, rowIndex, vehicles, favoritesByProfile, notes, quotes, entries, bestScore }: { row: ComparisonRowName; rowIndex: number; vehicles: ScoredVehicle[]; favoritesByProfile: Record<ProfileName, string[]>; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; entries: TestDriveEntry[]; bestScore: number }) {
+  return <><div className={`compare-label-card ${rowIndex % 2 ? 'alt' : ''}`}>{row}</div>{vehicles.map((vehicle) => <div className={`compare-value-card ${rowIndex % 2 ? 'alt' : ''} ${vehicle.overallRecommendationScore === bestScore ? 'best-match' : ''}`} key={`${row}-${vehicle.id}`}>{comparisonValue(row, vehicle, favoritesByProfile, notes, quotes, entries)}</div>)}</>;
 }
 
 function actualVehiclePrice(vehicle: ScoredVehicle, quotes: DealQuoteDocument[]) {
