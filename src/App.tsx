@@ -30,6 +30,10 @@ const profileNames: ProfileName[] = ['Emily', 'Nick'];
 const stageOptions: VehicleStage[] = ['Browsing', 'Shortlisted', 'Test drive booked', 'Test driven', 'Quote received', 'Finalist', 'Rejected', 'Winner'];
 const reactionOptions: UserReaction[] = ['Unrated', 'Love', 'Maybe', 'No'];
 
+type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary';
+
+const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary' };
+
 interface Filters {
   query: string;
   bodyStyle: 'All' | BodyStyle;
@@ -101,8 +105,9 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [testDriveEntries, setTestDriveEntries] = useState<TestDriveEntry[]>([]);
   const [dealQuotes, setDealQuotes] = useState<DealQuoteDocument[]>([]);
   const [vehicleNotes, setVehicleNotes] = useState<Record<string, VehicleNoteDocument>>({});
-  const [activeSection, setActiveSection] = useLocalStorageState<'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary'>('carmatch.activeSection', 'dashboard');
+  const [activeSection, setActiveSection] = useLocalStorageState<AppSection>('carmatch.activeSection', 'dashboard');
   const [compareMessage, setCompareMessage] = useState('');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeProfile, setActiveProfile] = useState<ProfileName>('Emily');
   const [favoritesByProfile, setFavoritesByProfile] = useState<Record<ProfileName, string[]>>({ Emily: [], Nick: [] });
   const [profileWeights, setProfileWeights] = useState<Record<ProfileName, CriteriaWeights>>({ Emily: DEFAULT_WEIGHTS, Nick: DEFAULT_WEIGHTS });
@@ -260,6 +265,8 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
 
   const selectedVehicle = scoredVehicles.find((vehicle) => vehicle.id === selectedVehicleIds[0]) ?? scoredVehicles[0]!;
   const selectedVehicles = selectedVehicleIds.map((vehicleId) => scoredVehicles.find((vehicle) => vehicle.id === vehicleId)).filter(Boolean) as ScoredVehicle[];
+  const showCompareTray = activeSection === 'browse' || activeSection === 'compare';
+  const activeSectionLabel = sectionLabels[activeSection as AppSection];
 
   const reorderComparedVehicles = useCallback((fromIndex: number, toIndex: number) => {
     setSelectedVehicleIds((current) => {
@@ -276,6 +283,10 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
     const timeout = window.setTimeout(() => setCompareMessage(''), 2200);
     return () => window.clearTimeout(timeout);
   }, [compareMessage]);
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [activeSection]);
 
   const toggleComparedVehicle = useCallback((vehicleId: string) => {
     setSelectedVehicleIds((current) => {
@@ -303,7 +314,8 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
         <div className="profile-switcher" aria-label="User profile selector">{profileNames.map((profileName) => <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>)}</div>
       </section>
 
-      <nav className="app-menu" aria-label="Primary app sections">
+      <button className="menu-toggle" type="button" aria-expanded={isMenuOpen} aria-controls="primary-app-menu" onClick={() => setIsMenuOpen((open: boolean) => !open)}><span className="menu-icon" aria-hidden="true"><span /><span /><span /></span><span>{activeSectionLabel}</span></button>
+      <nav id="primary-app-menu" className={`app-menu ${isMenuOpen ? 'open' : ''}`} aria-label="Primary app sections">
         <button className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}>Shared priorities</button>
         <button className={activeSection === 'browse' ? 'active' : ''} onClick={() => setActiveSection('browse')}>Browse vehicles</button>
         <button className={activeSection === 'compare' ? 'active' : ''} onClick={() => setActiveSection('compare')}>Compare</button>
@@ -312,7 +324,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
         <button className={activeSection === 'diary' ? 'active' : ''} onClick={() => setActiveSection('diary')}>Test drive diary</button>
       </nav>
 
-      <CompareTray selectedVehicles={selectedVehicles} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} onReorder={reorderComparedVehicles} />
+      {showCompareTray && <CompareTray selectedVehicles={selectedVehicles} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} onReorder={reorderComparedVehicles} />}
       {compareMessage && <div className="toast" role="status">✓ {compareMessage}</div>}
 
       {activeSection === 'dashboard' && <section className="grid"><PrioritySliders profileName={activeProfile} currentWeights={profileWeights[activeProfile]} onWeightsChange={handleProfileWeightsChange} /><Dashboard scoredVehicles={filteredVehicles} quotes={dealQuotes} combinedWeights={combinedWeights} loading={!sessionId || preferencesLoading} error={preferencesError?.message} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); setActiveSection('compare'); }} /></section>}
