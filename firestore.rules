@@ -32,6 +32,18 @@ service cloud.firestore {
         && request.resource.data.dynamicShareLink is string;
     }
 
+
+    match /profilePreferences/{profileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && isSharedProfile(profileName)
+        && request.resource.data.userId == profileName
+        && request.resource.data.criteriaWeights is map
+        && request.resource.data.personalNotes is map
+        && request.resource.data.favoriteVehicleIds is list;
+      allow delete: if false;
+    }
+
     match /sessions/{sessionId} {
       allow create: if signedIn()
         && request.resource.data.id == sessionId

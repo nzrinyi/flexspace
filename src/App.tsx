@@ -114,10 +114,12 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
 
   const canReadSharedCollections = Boolean(sessionId && session?.partnerIds?.includes(activeUser.uid));
   const preferencesQuery = useMemo(() => (sessionId && canReadSharedCollections ? collection(db, 'sessions', sessionId, 'userPreferences') : null), [canReadSharedCollections, sessionId]);
+  const globalPreferencesQuery = useMemo(() => collection(db, 'profilePreferences'), []);
   const notesQuery = useMemo(() => (sessionId && canReadSharedCollections ? collection(db, 'sessions', sessionId, 'vehicleNotes') : null), [canReadSharedCollections, sessionId]);
   const diaryQuery = useMemo(() => (sessionId && canReadSharedCollections ? collection(db, 'sessions', sessionId, 'testDriveDiary') : null), [canReadSharedCollections, sessionId]);
   const quotesQuery = useMemo(() => (sessionId && canReadSharedCollections ? collection(db, 'sessions', sessionId, 'dealQuotes') : null), [canReadSharedCollections, sessionId]);
   const [preferencesSnapshot, preferencesLoading, preferencesError] = useCollection(preferencesQuery as any);
+  const [globalPreferencesSnapshot] = useCollection(globalPreferencesQuery as any);
   const [notesSnapshot] = useCollection(notesQuery as any);
   const [diarySnapshot] = useCollection(diaryQuery as any);
   const [quotesSnapshot] = useCollection(quotesQuery as any);
@@ -128,19 +130,22 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   ], [favoritesByProfile, profileWeights]);
 
   useEffect(() => {
-    if (!preferencesSnapshot) return;
     const nextWeights: Record<ProfileName, CriteriaWeights> = { Emily: DEFAULT_WEIGHTS, Nick: DEFAULT_WEIGHTS };
     const nextFavorites: Record<ProfileName, string[]> = { Emily: [], Nick: [] };
-    preferencesSnapshot.docs.forEach((preferenceDoc: { data: () => Partial<UserPreferenceDocument> }) => {
-      const data = preferenceDoc.data();
-      if (data.userId === 'Emily' || data.userId === 'Nick') {
-        nextWeights[data.userId] = { ...DEFAULT_WEIGHTS, ...(data.criteriaWeights ?? {}) };
-        nextFavorites[data.userId] = data.favoriteVehicleIds ?? [];
-      }
-    });
+    const applyPreferenceDocs = (docs?: Array<{ data: () => Partial<UserPreferenceDocument> }>) => {
+      docs?.forEach((preferenceDoc) => {
+        const data = preferenceDoc.data();
+        if (data.userId === 'Emily' || data.userId === 'Nick') {
+          nextWeights[data.userId] = { ...DEFAULT_WEIGHTS, ...(data.criteriaWeights ?? {}) };
+          nextFavorites[data.userId] = data.favoriteVehicleIds ?? [];
+        }
+      });
+    };
+    applyPreferenceDocs(preferencesSnapshot?.docs);
+    applyPreferenceDocs(globalPreferencesSnapshot?.docs);
     setProfileWeights(nextWeights);
     setFavoritesByProfile(nextFavorites);
-  }, [preferencesSnapshot]);
+  }, [globalPreferencesSnapshot, preferencesSnapshot]);
 
   useEffect(() => {
     if (!notesSnapshot) return;
@@ -186,6 +191,17 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   }, [activeUser.uid, sessionId]);
 
   useEffect(() => {
+    async function ensureGlobalProfilePreferenceDocs() {
+      await Promise.all(profileNames.map(async (profileName) => {
+        const preferenceRef = doc(db, 'profilePreferences', profileName);
+        const snapshot = await getDoc(preferenceRef);
+        if (!snapshot.exists()) await setDoc(preferenceRef, { userId: profileName, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [] });
+      }));
+    }
+    void ensureGlobalProfilePreferenceDocs().catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize universal profile preferences.'));
+  }, []);
+
+  useEffect(() => {
     if (!sessionId || !canReadSharedCollections) return;
     const activeSessionId = sessionId;
     async function ensureProfilePreferenceDocs() {
@@ -199,9 +215,10 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   }, [canReadSharedCollections, sessionId]);
 
   const saveProfilePreference = useCallback((profileName: ProfileName, weights: CriteriaWeights, favoriteVehicleIds: string[]) => {
-    if (!sessionId) return;
-    const activeSessionId = sessionId;
-    void setDoc(doc(db, 'sessions', activeSessionId, 'userPreferences', profileName), { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds }, { merge: true }).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save profile preferences.'));
+    const preferenceDocument = { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds };
+    const writes = [setDoc(doc(db, 'profilePreferences', profileName), preferenceDocument, { merge: true })];
+    if (sessionId) writes.push(setDoc(doc(db, 'sessions', sessionId, 'userPreferences', profileName), preferenceDocument, { merge: true }));
+    void Promise.all(writes).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save universal profile preferences.'));
   }, [sessionId]);
 
   const saveVehicleNote = useCallback((vehicleId: string, patch: Partial<VehicleNoteDocument>) => {
@@ -359,7 +376,7 @@ function Dashboard({ scoredVehicles, quotes, combinedWeights, loading, error, pa
 }
 
 function PriorityComparison({ profileWeights }: { profileWeights: Record<ProfileName, CriteriaWeights> }) {
-  return <section className="card priority-board"><div className="section-heading"><div><p className="eyebrow">Shared priority board</p><h2>See each other's priorities.</h2></div><span>Saved per shared session</span></div><p className="muted">Emily and Nick's sliders are stored in the same shared session, so both devices can see these values after they sync.</p><div className="priority-columns">{profileNames.map((profileName) => <article className={`priority-card profile-${profileName.toLowerCase()}`} key={profileName}><strong>{profileName}</strong>{sliderConfig.map((slider) => <div className="priority-meter" key={`${profileName}-${slider.key}`}><span>{slider.label}</span><b>{profileWeights[profileName][slider.key]}</b><em><i style={{ width: `${profileWeights[profileName][slider.key] * 10}%` }} /></em></div>)}</article>)}</div></section>;
+  return <section className="card priority-board"><div className="section-heading"><div><p className="eyebrow">Shared priority board</p><h2>See each other's priorities.</h2></div><span>Universal profile priorities</span></div><p className="muted">Emily and Nick's sliders are universal profile settings, so any connected session or device can see the same saved values after Firestore syncs.</p><div className="priority-columns">{profileNames.map((profileName) => <article className={`priority-card profile-${profileName.toLowerCase()}`} key={profileName}><strong>{profileName}</strong>{sliderConfig.map((slider) => <div className="priority-meter" key={`${profileName}-${slider.key}`}><span>{slider.label}</span><b>{profileWeights[profileName][slider.key]}</b><em><i style={{ width: `${profileWeights[profileName][slider.key] * 10}%` }} /></em></div>)}</article>)}</div></section>;
 }
 
 function VehicleBrowser({ filters, onFiltersChange, vehicles, quotes, activeProfile, favorites, selectedVehicleIds, notes, onToggleFavorite, onToggleCompare, onSelectVehicle }: { filters: Filters; onFiltersChange: (filters: Filters) => void; vehicles: ScoredVehicle[]; quotes: DealQuoteDocument[]; activeProfile: ProfileName; favorites: string[]; selectedVehicleIds: string[]; notes: Record<string, VehicleNoteDocument>; onToggleFavorite: (vehicleId: string) => void; onToggleCompare: (vehicleId: string) => void; onSelectVehicle: (vehicleId: string) => void; }) {
