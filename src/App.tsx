@@ -15,7 +15,7 @@ import './styles.css';
 
 const sliderConfig: Array<{ key: CriteriaKey; label: string; help: string }> = [
   { key: 'space', label: 'Car Seat & Cabin Space', help: 'Second-row room, cargo access, and family ergonomics.' },
-  { key: 'winterTraction', label: 'Ottawa Winter Traction', help: 'Snow confidence, AWD behavior, and cold-weather stability.' },
+  { key: 'winterTraction', label: 'Winter Traction', help: 'Snow confidence, AWD behavior, and cold-weather stability.' },
   { key: 'valueMSRP', label: 'Value & MSRP Budget', help: 'Purchase price, features per dollar, and resale value.' },
   { key: 'reliability', label: 'Long-Term Reliability', help: 'Dependable ownership and fewer surprise repairs.' },
   { key: 'fuelEfficiency', label: 'Fuel Economy & Hybrid Efficiency', help: 'Lower fuel use and electrified options.' },
@@ -271,6 +271,12 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
     });
   }, [setSelectedVehicleIds]);
 
+  useEffect(() => {
+    if (!compareMessage) return;
+    const timeout = window.setTimeout(() => setCompareMessage(''), 2200);
+    return () => window.clearTimeout(timeout);
+  }, [compareMessage]);
+
   const toggleComparedVehicle = useCallback((vehicleId: string) => {
     setSelectedVehicleIds((current) => {
       if (current.includes(vehicleId)) {
@@ -306,7 +312,8 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
         <button className={activeSection === 'diary' ? 'active' : ''} onClick={() => setActiveSection('diary')}>Test drive diary</button>
       </nav>
 
-      <CompareTray selectedVehicles={selectedVehicles} message={compareMessage} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId))} onReorder={reorderComparedVehicles} />
+      <CompareTray selectedVehicles={selectedVehicles} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} onReorder={reorderComparedVehicles} />
+      {compareMessage && <div className="toast" role="status">✓ {compareMessage}</div>}
 
       {activeSection === 'dashboard' && <section className="grid"><PrioritySliders profileName={activeProfile} currentWeights={profileWeights[activeProfile]} onWeightsChange={handleProfileWeightsChange} /><Dashboard scoredVehicles={filteredVehicles} quotes={dealQuotes} combinedWeights={combinedWeights} loading={!sessionId || preferencesLoading} error={preferencesError?.message} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); setActiveSection('compare'); }} /></section>}
       {activeSection === 'browse' && <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} quotes={dealQuotes} activeProfile={activeProfile} favorites={favoritesByProfile[activeProfile]} selectedVehicleIds={selectedVehicleIds} notes={vehicleNotes} onToggleFavorite={handleToggleFavorite} onToggleCompare={toggleComparedVehicle} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); }} />}
@@ -340,7 +347,38 @@ function Dashboard({ scoredVehicles, quotes, combinedWeights, loading, error, pa
 }
 
 function VehicleBrowser({ filters, onFiltersChange, vehicles, quotes, activeProfile, favorites, selectedVehicleIds, notes, onToggleFavorite, onToggleCompare, onSelectVehicle }: { filters: Filters; onFiltersChange: (filters: Filters) => void; vehicles: ScoredVehicle[]; quotes: DealQuoteDocument[]; activeProfile: ProfileName; favorites: string[]; selectedVehicleIds: string[]; notes: Record<string, VehicleNoteDocument>; onToggleFavorite: (vehicleId: string) => void; onToggleCompare: (vehicleId: string) => void; onSelectVehicle: (vehicleId: string) => void; }) {
-  return <section className="card stack"><div className="section-heading"><p className="eyebrow">Browse models</p><span>{vehicles.length} matches</span></div><div className="filters advanced-filters"><label>Search<input value={filters.query} onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })} placeholder="Make or model" /></label><label>Body style<select value={filters.bodyStyle} onChange={(event) => onFiltersChange({ ...filters, bodyStyle: event.target.value as 'All' | BodyStyle })}>{bodyStyleOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Drivetrain<select value={filters.drivetrain} onChange={(event) => onFiltersChange({ ...filters, drivetrain: event.target.value as 'All' | Drivetrain })}>{drivetrainOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Powertrain<select value={filters.powertrain} onChange={(event) => onFiltersChange({ ...filters, powertrain: event.target.value as 'All' | Powertrain })}>{powertrainOptions.map((option) => <option key={option}>{option}</option>)}</select></label><label>Stage<select value={filters.stage} onChange={(event) => onFiltersChange({ ...filters, stage: event.target.value as 'All' | VehicleStage })}>{(['All', ...stageOptions] as Array<'All' | VehicleStage>).map((option) => <option key={option}>{option}</option>)}</select></label><label>Min seats<input type="number" value={filters.minSeats} onChange={(event) => onFiltersChange({ ...filters, minSeats: Number(event.target.value) })} /></label><label>Max monthly<input type="number" value={filters.maxMonthlyPayment} onChange={(event) => onFiltersChange({ ...filters, maxMonthlyPayment: Number(event.target.value) })} /></label><label>Max price ${filters.maxPrice.toLocaleString('en-CA')}<input type="range" min="30000" max="80000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label><label className="check"><input type="checkbox" checked={filters.mustHaveAwd} onChange={(event) => onFiltersChange({ ...filters, mustHaveAwd: event.target.checked })} /> Must have AWD/4WD</label><label className="check"><input type="checkbox" checked={filters.mustHaveHybrid} onChange={(event) => onFiltersChange({ ...filters, mustHaveHybrid: event.target.checked })} /> Must be hybrid/electric</label><label className="check"><input type="checkbox" checked={filters.mustFitCarSeat} onChange={(event) => onFiltersChange({ ...filters, mustFitCarSeat: event.target.checked })} /> Car seat tested</label></div><div className="vehicle-cards">{vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} actualPrice={actualVehiclePrice(vehicle, quotes)} actualPriceLabel={actualVehiclePriceLabel(vehicle, quotes)} isFavorite={favorites.includes(vehicle.id)} isCompared={selectedVehicleIds.includes(vehicle.id)} activeProfile={activeProfile} note={notes[vehicle.id] ?? emptyVehicleNote(vehicle.id)} onToggleFavorite={() => onToggleFavorite(vehicle.id)} onToggleCompare={() => onToggleCompare(vehicle.id)} onSelect={() => onSelectVehicle(vehicle.id)} />)}</div></section>;
+  return (
+    <section className="card stack browser-panel">
+      <div className="section-heading"><div><p className="eyebrow">Browse models</p><h2>Find the right shortlist.</h2></div><span>{vehicles.length} matches</span></div>
+      <div className="filters advanced-filters">
+        <label className="field-control field-control-wide"><span>Search</span><input value={filters.query} onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })} placeholder="Make or model" /></label>
+        <SelectControl label="Body style" value={filters.bodyStyle} onChange={(value) => onFiltersChange({ ...filters, bodyStyle: value as 'All' | BodyStyle })} options={bodyStyleOptions} />
+        <SelectControl label="Drivetrain" value={filters.drivetrain} onChange={(value) => onFiltersChange({ ...filters, drivetrain: value as 'All' | Drivetrain })} options={drivetrainOptions} />
+        <SelectControl label="Powertrain" value={filters.powertrain} onChange={(value) => onFiltersChange({ ...filters, powertrain: value as 'All' | Powertrain })} options={powertrainOptions} />
+        <SelectControl label="Stage" value={filters.stage} onChange={(value) => onFiltersChange({ ...filters, stage: value as 'All' | VehicleStage })} options={['All', ...stageOptions]} />
+        <label className="field-control"><span>Min seats</span><input type="number" value={filters.minSeats} onChange={(event) => onFiltersChange({ ...filters, minSeats: Number(event.target.value) })} /></label>
+      </div>
+      <div className="budget-panel">
+        <div><p className="eyebrow">Budget preferences</p><strong>Price and payment constraints</strong></div>
+        <label className="field-control"><span>Max monthly</span><input type="number" value={filters.maxMonthlyPayment} onChange={(event) => onFiltersChange({ ...filters, maxMonthlyPayment: Number(event.target.value) })} placeholder="$ / mo" /></label>
+        <label className="range-control"><span>Max total price <b>${filters.maxPrice.toLocaleString('en-CA')}</b></span><input type="range" min="30000" max="80000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label>
+      </div>
+      <div className="toggle-row" aria-label="Requirement filters">
+        <PillToggle checked={filters.mustHaveAwd} onChange={(checked) => onFiltersChange({ ...filters, mustHaveAwd: checked })}>AWD / 4WD required</PillToggle>
+        <PillToggle checked={filters.mustHaveHybrid} onChange={(checked) => onFiltersChange({ ...filters, mustHaveHybrid: checked })}>Hybrid / electric required</PillToggle>
+        <PillToggle checked={filters.mustFitCarSeat} onChange={(checked) => onFiltersChange({ ...filters, mustFitCarSeat: checked })}>Car seat tested</PillToggle>
+      </div>
+      <div className="vehicle-cards">{vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} actualPrice={actualVehiclePrice(vehicle, quotes)} actualPriceLabel={actualVehiclePriceLabel(vehicle, quotes)} isFavorite={favorites.includes(vehicle.id)} isCompared={selectedVehicleIds.includes(vehicle.id)} activeProfile={activeProfile} note={notes[vehicle.id] ?? emptyVehicleNote(vehicle.id)} onToggleFavorite={() => onToggleFavorite(vehicle.id)} onToggleCompare={() => onToggleCompare(vehicle.id)} onSelect={() => onSelectVehicle(vehicle.id)} />)}</div>
+    </section>
+  );
+}
+
+function SelectControl({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+  return <label className="field-control select-control"><span>{label}</span><div className="select-shell"><select value={value} onChange={(event) => onChange(event.target.value)}>{options.map((option) => <option key={option}>{option}</option>)}</select><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div></label>;
+}
+
+function PillToggle({ checked, onChange, children }: { checked: boolean; onChange: (checked: boolean) => void; children: string }) {
+  return <label className={`pill-toggle ${checked ? 'active' : ''}`}><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span aria-hidden="true" />{children}</label>;
 }
 
 function VehicleCard({ vehicle, actualPrice, actualPriceLabel, isFavorite, isCompared, activeProfile, note, onToggleFavorite, onToggleCompare, onSelect }: { vehicle: ScoredVehicle; actualPrice: number; actualPriceLabel: string; isFavorite: boolean; isCompared: boolean; activeProfile: ProfileName; note: VehicleNoteDocument; onToggleFavorite: () => void; onToggleCompare: () => void; onSelect: () => void }) {
