@@ -190,3 +190,101 @@ a { color: var(--accent); font-weight: 700; }
 .compare-label-card:hover, .compare-label-card:hover + .compare-value-card, .compare-value-card:hover { background: rgba(var(--accent-rgb),.07); border-color: rgba(var(--accent-rgb),.16); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 760px) { .comparison-grid { gap: 8px; } .compare-grid-corner, .compare-category, .compare-label-card { position: static; } }
+/* Mobile experience audit: dashboard, browse, compare, calculator, deals, diary, and profile */
+@media (max-width: 980px) {
+  .shell { width: min(100% - 24px, 760px); padding: 24px 0 36px; }
+  .grid, .profile { grid-template-columns: 1fr; gap: 18px; }
+  .profile .vehicle-photo { min-height: 220px; }
+  .filters, .calculator-grid, .diary-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vehicle-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .comparison-grid { grid-template-columns: minmax(112px, .55fr) repeat(var(--compare-count, 3), minmax(185px, 1fr)); }
+  .payment-result strong { font-size: clamp(2rem, 8vw, 2.6rem); }
+}
+
+@media (max-width: 760px) {
+  body { background: #f8fafc; }
+  button, input, select, textarea { min-height: 44px; }
+  input[type='range'] { min-height: 32px; }
+  .shell { width: 100%; padding: 12px 12px 28px; }
+  .card { border-radius: 22px; padding: 18px; box-shadow: 0 10px 32px rgba(15,23,42,.08); }
+  .card:hover { transform: none; box-shadow: 0 10px 32px rgba(15,23,42,.08); }
+  .hero { margin-bottom: 14px; padding: 20px 18px; }
+  .hero h1 { font-size: clamp(2.1rem, 13vw, 3.4rem); line-height: .98; letter-spacing: -.055em; }
+  .hero p:not(.eyebrow) { font-size: .98rem; line-height: 1.55; }
+  .hero-topline { align-items: flex-start; }
+  .profile-switcher { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .profile-switcher button { width: 100%; }
+  .app-menu { position: sticky; top: 0; z-index: 8; display: grid; grid-auto-flow: column; grid-auto-columns: max-content; width: calc(100% + 24px); margin: 0 -12px 16px; padding: 8px 12px; overflow-x: auto; border-width: 0 0 1px; border-radius: 0; background: rgba(248,250,252,.94); backdrop-filter: blur(14px); scroll-snap-type: x mandatory; }
+  .app-menu button { scroll-snap-align: start; min-height: 40px; white-space: nowrap; padding: 9px 13px; }
+  .compare-tray { position: static; margin-bottom: 16px; padding: 10px; border-radius: 20px; }
+  .compare-tray-header { align-items: stretch; }
+  .compare-tray-header > div:first-child, .compare-tray-actions { width: 100%; }
+  .compare-tray-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .compare-tray-actions button { width: 100%; }
+  .compare-tray-list { display: grid; grid-template-columns: 1fr; }
+  .compare-tray-item { min-width: 0; width: 100%; grid-template-columns: auto 54px minmax(0,1fr) auto; }
+  .compare-tray-copy { min-width: 0; }
+  .compare-tray-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .section-heading { align-items: flex-start; }
+  .section-heading > span { font-size: .82rem; }
+  .slider-row { grid-template-columns: 1fr; gap: 10px; padding: 16px 0; }
+  .slider-row b { justify-self: end; }
+  .weight-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 10px; }
+  .vehicle-row { grid-template-columns: 1fr auto; gap: 10px; padding: 12px; background: #fff; border: 1px solid #e8edf7; }
+  .vehicle-row .bar-shell { grid-column: 1 / -1; order: 3; }
+  .filters, .advanced-filters, .calculator-grid, .diary-form, .deal-form { grid-template-columns: 1fr; gap: 12px; }
+  .field-control-wide { grid-column: auto; }
+  .budget-panel { grid-template-columns: 1fr; padding: 14px; border-radius: 18px; }
+  .toggle-row { display: grid; grid-template-columns: 1fr; }
+  .pill-toggle { justify-content: flex-start; width: 100%; }
+  .vehicle-cards { grid-template-columns: 1fr; gap: 14px; }
+  .vehicle-photo { height: 190px; }
+  .star-button, .compare-toggle { top: 16px; }
+  .star-button { right: 16px; }
+  .compare-toggle { left: 16px; }
+  .profile { gap: 16px; }
+  .spec-grid, .mini-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .shared-note textarea, .deal-form textarea, .diary-form textarea { min-height: 120px; }
+  .mode-tabs { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; border-radius: 18px; }
+  .mode-tabs button { width: 100%; border-radius: 14px; padding: 8px 6px; font-size: .86rem; }
+  .payment-result { text-align: center; }
+  .payment-result strong { font-size: 2rem; }
+  .quote-list article { overflow-wrap: anywhere; }
+  .comparison-panel { padding-inline: 12px; }
+  .comparison-grid { margin-inline: -4px; padding: 8px 4px 12px; grid-template-columns: minmax(104px, .5fr) repeat(3, minmax(178px, 1fr)); scroll-snap-type: x proximity; }
+  .compare-column-card, .compare-value-card { scroll-snap-align: start; }
+  .compare-grid-corner { min-height: 196px; padding: 12px; border-radius: 18px; }
+  .compare-column-card { min-height: 196px; padding: 16px 10px 12px; border-radius: 18px; }
+  .compare-column-actions { opacity: 1; top: 8px; right: 8px; }
+  .compare-column-actions button { width: 28px; height: 28px; }
+  .compare-head-card .vehicle-photo { height: 78px; border-radius: 14px; }
+  .stage-select { width: 100%; }
+  .compare-label-card, .compare-value-card { min-height: 44px; padding: 10px; font-size: .8rem; }
+  .compare-category { padding: 8px 10px; border-radius: 12px; }
+  .diary-panel { padding: 14px; border-radius: 18px; }
+  .diary-form button { width: 100%; }
+  .timeline-card { grid-template-columns: 1fr; gap: 12px; padding: 14px; border-radius: 18px; }
+  .timeline-title { grid-template-columns: 1fr; }
+  .photo-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .photo-strip img, .photo-strip span { width: 100%; height: 72px; }
+  .progress-ring { width: 76px; height: 76px; justify-self: start; }
+  .toast { left: 12px; right: 12px; bottom: 12px; text-align: center; border-radius: 18px; }
+}
+
+@media (max-width: 430px) {
+  .shell { padding-inline: 8px; }
+  .card { padding: 15px; border-radius: 20px; }
+  .hero h1 { font-size: 2.05rem; }
+  h2 { font-size: 1.45rem; }
+  .vehicle-photo { height: 165px; }
+  .spec-grid, .mini-summary, .weight-summary { grid-template-columns: 1fr; }
+  .compare-tray-item { grid-template-columns: 46px minmax(0,1fr); }
+  .drag-handle { display: none; }
+  .compare-tray-item img { grid-row: span 2; }
+  .compare-tray-buttons { grid-column: 2; }
+  .comparison-grid { grid-template-columns: minmax(92px, .46fr) repeat(3, minmax(160px, 1fr)); }
+  .compare-column-actions { position: static; order: 4; opacity: 1; }
+  .compare-head-card strong { font-size: .9rem; }
+  .compare-head-card small, .stage-select select { font-size: .72rem; }
+  .photo-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
