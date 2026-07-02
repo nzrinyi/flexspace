@@ -35,9 +35,9 @@ type MustHaveKey = keyof typeof mustHaveLabels;
 type MustHaveSettings = Record<MustHaveKey, boolean>;
 type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 'Nick has not reviewed' | 'Emily marked as finalist' | 'Needs shared note' | 'Deal breaker';
 
-type AppSection = 'decision' | 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary';
+type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary' | 'decision';
 
-const sectionLabels: Record<AppSection, string> = { decision: 'Decision Room', dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary' };
+const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
 interface Filters {
   query: string;
@@ -139,7 +139,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [testDriveEntries, setTestDriveEntries] = useState<TestDriveEntry[]>([]);
   const [dealQuotes, setDealQuotes] = useState<DealQuoteDocument[]>([]);
   const [vehicleNotes, setVehicleNotes] = useState<Record<string, VehicleNoteDocument>>({});
-  const [activeSection, setActiveSection] = useLocalStorageState<AppSection>('carmatch.activeSection', 'decision');
+  const [activeSection, setActiveSection] = useLocalStorageState<AppSection>('carmatch.activeSection', 'dashboard');
   const [compareMessage, setCompareMessage] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeProfile, setActiveProfile] = useState<ProfileName>('Emily');
@@ -357,7 +357,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
         return current;
       }
 
-      setCompareMessage('Added to compare tray. Drag thumbnails to reorder.');
+      setCompareMessage('Added to compare tray. Reorder columns from the Compare page.');
       return [vehicleId, ...current];
     });
   }, [setSelectedVehicleIds]);
@@ -373,17 +373,16 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
 
       <button className="menu-toggle" type="button" aria-expanded={isMenuOpen} aria-controls="primary-app-menu" onClick={() => setIsMenuOpen((open: boolean) => !open)}><span className="menu-icon" aria-hidden="true"><span /><span /><span /></span><span>{activeSectionLabel}</span></button>
       <nav id="primary-app-menu" className={`app-menu ${isMenuOpen ? 'open' : ''}`} aria-label="Primary app sections">
-        <button className={activeSection === 'decision' ? 'active' : ''} onClick={() => setActiveSection('decision')}>Decision Room</button>
         <button className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}>Shared priorities</button>
         <button className={activeSection === 'browse' ? 'active' : ''} onClick={() => setActiveSection('browse')}>Browse vehicles</button>
         <button className={activeSection === 'compare' ? 'active' : ''} onClick={() => setActiveSection('compare')}>Compare</button>
         <button className={activeSection === 'calculator' ? 'active' : ''} onClick={() => setActiveSection('calculator')}>Payment calculator</button>
         <button className={activeSection === 'deals' ? 'active' : ''} onClick={() => setActiveSection('deals')}>Deal tracker</button>
         <button className={activeSection === 'diary' ? 'active' : ''} onClick={() => setActiveSection('diary')}>Test drive diary</button>
+        <button className={activeSection === 'decision' ? 'active' : ''} onClick={() => setActiveSection('decision')}>Decision Room</button>
       </nav>
-      <div className={`active-profile-chip profile-${activeProfile.toLowerCase()}`}>Acting as <strong>{activeProfile}</strong> · edits affect universal {activeProfile} priorities</div>
 
-      {showCompareTray && <CompareTray selectedVehicles={selectedVehicles} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} onReorder={reorderComparedVehicles} />}
+      {showCompareTray && <CompareTray selectedVehicles={selectedVehicles} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} />}
       {compareMessage && <div className="toast" role="status">✓ {compareMessage}</div>}
 
       {activeSection === 'decision' && <DecisionRoom vehicles={scoredVehicles} notes={vehicleNotes} quotes={dealQuotes} readinessByVehicle={readinessByVehicle} favoritesByProfile={favoritesByProfile} budgetLimit={filters.maxMonthlyPayment} />}
@@ -427,14 +426,14 @@ function vehicleReadiness(vehicle: ScoredVehicle, favoritesByProfile: Record<Pro
   const explicitDealBreaker = note.stage === 'Rejected' || /deal\s*breaker|hard no|reject/i.test(note.sharedNote);
   const mustHaveFailures = unmetMustHaves(vehicle, vehicleEntries, maxMonthlyPayment, mustHaves);
   const checklist = [
-    { label: 'Emily reviewed or favourited', complete: emilyReviewed },
-    { label: 'Nick reviewed or favourited', complete: nickReviewed },
-    { label: 'Shared note added', complete: sharedNote },
-    { label: 'Test drive completed', complete: completedDrive },
-    { label: 'Quote received', complete: quoteReceived },
-    { label: 'Payment estimate within budget', complete: withinBudget },
-    { label: 'Car seat and stroller checks complete', complete: carSeatAndStroller },
-    { label: 'No unresolved deal breaker', complete: !explicitDealBreaker && mustHaveFailures.length === 0 },
+    { label: 'Needs Emily review or favourite', complete: emilyReviewed },
+    { label: 'Needs Nick review or favourite', complete: nickReviewed },
+    { label: 'Needs a shared note', complete: sharedNote },
+    { label: 'Needs completed test drive', complete: completedDrive },
+    { label: 'Needs dealer quote', complete: quoteReceived },
+    { label: 'Needs payment within budget', complete: withinBudget },
+    { label: 'Needs car seat and stroller checks', complete: carSeatAndStroller },
+    { label: 'Needs deal-breaker review', complete: !explicitDealBreaker && mustHaveFailures.length === 0 },
   ];
   const missing = checklist.filter((item) => !item.complete).map((item) => item.label).concat(mustHaveFailures);
   const score = Math.round((checklist.filter((item) => item.complete).length / checklist.length) * 100);
@@ -502,29 +501,34 @@ function PriorityComparison({ profileWeights, profileMeta }: { profileWeights: R
 }
 
 function VehicleBrowser({ filters, onFiltersChange, mustHaves, onMustHavesChange, vehicles, readinessByVehicle, quotes, activeProfile, favorites, selectedVehicleIds, notes, onToggleFavorite, onToggleCompare, onSelectVehicle }: { filters: Filters; onFiltersChange: (filters: Filters) => void; mustHaves: MustHaveSettings; onMustHavesChange: (settings: MustHaveSettings) => void; vehicles: ScoredVehicle[]; readinessByVehicle: Record<string, VehicleReadiness>; quotes: DealQuoteDocument[]; activeProfile: ProfileName; favorites: string[]; selectedVehicleIds: string[]; notes: Record<string, VehicleNoteDocument>; onToggleFavorite: (vehicleId: string) => void; onToggleCompare: (vehicleId: string) => void; onSelectVehicle: (vehicleId: string) => void; }) {
+  const activeFilterCount = [filters.bodyStyle !== 'All', filters.drivetrain !== 'All', filters.powertrain !== 'All', filters.stage !== 'All', filters.minSeats > 0, filters.maxMonthlyPayment > 0, filters.hideRejected, ...Object.values(mustHaves)].filter(Boolean).length;
   return (
     <section className="card stack browser-panel">
       <div className="section-heading"><div><p className="eyebrow">Browse models</p><h2>Find the right shortlist.</h2></div><span>{vehicles.length} matches</span></div>
-      <div className="filters advanced-filters">
-        <label className="field-control field-control-wide"><span>Search</span><input value={filters.query} onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })} placeholder="Make or model" /></label>
-        <SelectControl label="Body style" value={filters.bodyStyle} onChange={(value) => onFiltersChange({ ...filters, bodyStyle: value as 'All' | BodyStyle })} options={bodyStyleOptions} />
-        <SelectControl label="Drivetrain" value={filters.drivetrain} onChange={(value) => onFiltersChange({ ...filters, drivetrain: value as 'All' | Drivetrain })} options={drivetrainOptions} />
-        <SelectControl label="Powertrain" value={filters.powertrain} onChange={(value) => onFiltersChange({ ...filters, powertrain: value as 'All' | Powertrain })} options={powertrainOptions} />
-        <SelectControl label="Stage" value={filters.stage} onChange={(value) => onFiltersChange({ ...filters, stage: value as 'All' | VehicleStage })} options={['All', ...stageOptions]} />
-        <label className="field-control"><span>Min seats</span><input type="number" value={filters.minSeats} onChange={(event) => onFiltersChange({ ...filters, minSeats: Number(event.target.value) })} /></label>
-      </div>
-      <div className="budget-panel">
-        <div><p className="eyebrow">Budget preferences</p><strong>Price and payment constraints</strong></div>
-        <label className="field-control"><span>Max monthly</span><input type="number" value={filters.maxMonthlyPayment} onChange={(event) => onFiltersChange({ ...filters, maxMonthlyPayment: Number(event.target.value) })} placeholder="$ / mo" /></label>
-        <label className="range-control"><span>Max total price <b>${filters.maxPrice.toLocaleString('en-CA')}</b></span><input type="range" min="30000" max="80000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label>
-      </div>
+      <label className="field-control browse-search"><span>Search</span><input value={filters.query} onChange={(event) => onFiltersChange({ ...filters, query: event.target.value })} placeholder="Search make or model" /></label>
       <SavedFilterPresets onApply={(patch) => onFiltersChange({ ...filters, ...patch })} />
-      <div className="must-have-panel"><div><p className="eyebrow">Must-haves & deal breakers</p><strong>Mark requirements that can disqualify a vehicle.</strong></div><div className="toggle-row">{(Object.keys(mustHaveLabels) as MustHaveKey[]).map((key) => <PillToggle key={key} checked={mustHaves[key]} onChange={(checked) => onMustHavesChange({ ...mustHaves, [key]: checked })}>{mustHaveLabels[key]}</PillToggle>)}</div></div>
-      <div className="toggle-row" aria-label="Requirement filters">
-        <PillToggle checked={filters.mustHaveAwd} onChange={(checked) => onFiltersChange({ ...filters, mustHaveAwd: checked })}>AWD / 4WD required</PillToggle>
-        <PillToggle checked={filters.mustHaveHybrid} onChange={(checked) => onFiltersChange({ ...filters, mustHaveHybrid: checked })}>Hybrid / electric required</PillToggle>
-        <PillToggle checked={filters.mustFitCarSeat} onChange={(checked) => onFiltersChange({ ...filters, mustFitCarSeat: checked })}>Car seat tested</PillToggle>
-      </div>
+      <details className="filter-drawer">
+        <summary><span>Filters, budget & deal breakers</span><b>{activeFilterCount ? `${activeFilterCount} active` : 'Optional'}</b></summary>
+        <div className="filters advanced-filters">
+          <SelectControl label="Body style" value={filters.bodyStyle} onChange={(value) => onFiltersChange({ ...filters, bodyStyle: value as 'All' | BodyStyle })} options={bodyStyleOptions} />
+          <SelectControl label="Drivetrain" value={filters.drivetrain} onChange={(value) => onFiltersChange({ ...filters, drivetrain: value as 'All' | Drivetrain })} options={drivetrainOptions} />
+          <SelectControl label="Powertrain" value={filters.powertrain} onChange={(value) => onFiltersChange({ ...filters, powertrain: value as 'All' | Powertrain })} options={powertrainOptions} />
+          <SelectControl label="Stage" value={filters.stage} onChange={(value) => onFiltersChange({ ...filters, stage: value as 'All' | VehicleStage })} options={['All', ...stageOptions]} />
+          <label className="field-control"><span>Min seats</span><input type="number" value={filters.minSeats} onChange={(event) => onFiltersChange({ ...filters, minSeats: Number(event.target.value) })} /></label>
+        </div>
+        <div className="budget-panel">
+          <div><p className="eyebrow">Budget preferences</p><strong>Price and payment constraints</strong></div>
+          <label className="field-control"><span>Max monthly</span><input type="number" value={filters.maxMonthlyPayment} onChange={(event) => onFiltersChange({ ...filters, maxMonthlyPayment: Number(event.target.value) })} placeholder="$ / mo" /></label>
+          <label className="range-control"><span>Max total price <b>${filters.maxPrice.toLocaleString('en-CA')}</b></span><input type="range" min="30000" max="95000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label>
+        </div>
+        <div className="must-have-panel"><div><p className="eyebrow">Must-haves & deal breakers</p><strong>Mark requirements that can disqualify a vehicle.</strong></div><div className="toggle-row">{(Object.keys(mustHaveLabels) as MustHaveKey[]).map((key) => <PillToggle key={key} checked={mustHaves[key]} onChange={(checked) => onMustHavesChange({ ...mustHaves, [key]: checked })}>{mustHaveLabels[key]}</PillToggle>)}</div></div>
+        <div className="toggle-row" aria-label="Requirement filters">
+          <PillToggle checked={filters.mustHaveAwd} onChange={(checked) => onFiltersChange({ ...filters, mustHaveAwd: checked })}>AWD / 4WD required</PillToggle>
+          <PillToggle checked={filters.mustHaveHybrid} onChange={(checked) => onFiltersChange({ ...filters, mustHaveHybrid: checked })}>Hybrid / electric required</PillToggle>
+          <PillToggle checked={filters.mustFitCarSeat} onChange={(checked) => onFiltersChange({ ...filters, mustFitCarSeat: checked })}>Car seat tested</PillToggle>
+          <PillToggle checked={filters.hideRejected} onChange={(checked) => onFiltersChange({ ...filters, hideRejected: checked })}>Hide rejected</PillToggle>
+        </div>
+      </details>
       <div className="vehicle-cards">{vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} readiness={readinessByVehicle[vehicle.id]} actualPrice={actualVehiclePrice(vehicle, quotes)} actualPriceLabel={actualVehiclePriceLabel(vehicle, quotes)} isFavorite={favorites.includes(vehicle.id)} isCompared={selectedVehicleIds.includes(vehicle.id)} activeProfile={activeProfile} note={notes[vehicle.id] ?? emptyVehicleNote(vehicle.id)} onToggleFavorite={() => onToggleFavorite(vehicle.id)} onToggleCompare={() => onToggleCompare(vehicle.id)} onSelect={() => onSelectVehicle(vehicle.id)} />)}</div>
     </section>
   );
