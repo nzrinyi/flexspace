@@ -479,13 +479,48 @@
         "No third row despite large footprint"
       ],
       "manufacturerUrl": "https://www.mazda.ca/en/vehicles/cx-70/",
-      "photoCredit": "Wikimedia Commons photo: 2025 Mazda CX-70 PHEV Premium Plus in Soul Red Crystal, front right, 2024-07-14.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2025 Mazda CX-70 PHEV Premium Plus (United States) front view.png",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": false,
       "hasCvt": false,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2025%20Mazda%20CX-70%20PHEV%20Premium%20Plus%20in%20Soul%20Red%20Crystal,%20front%20right,%202024-07-14.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2025%20Mazda%20CX-70%20PHEV%20Premium%20Plus%20(United%20States)%20front%20view.png?width=1200",
+      "trimOptions": [
+        {
+          "name": "GS-L MHEV",
+          "price": 49750,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Standard AWD",
+            "Inline-six mild hybrid",
+            "Heated front seats"
+          ]
+        },
+        {
+          "name": "GT PHEV",
+          "price": 58450,
+          "powertrain": "Plug-in Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Plug-in hybrid range",
+            "Premium audio",
+            "Power liftgate"
+          ]
+        },
+        {
+          "name": "Signature MHEV",
+          "price": 61950,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Nappa leather",
+            "Memory seating",
+            "Heated rear seats"
+          ]
+        }
+      ]
     },
     {
       "id": "cx90",
@@ -518,13 +553,48 @@
         "Premium trims get expensive"
       ],
       "manufacturerUrl": "https://www.mazda.ca/en/vehicles/cx-90/",
-      "photoCredit": "Wikimedia Commons photo: 2024 Mazda CX-90 Turbo S Premium Plus in Rhodium White Metallic, Front Right, 07-15-2023.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2024 Mazda CX-90 PHEV Premium in Rhodium White Metallic, front left.jpg",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": false,
       "hasCvt": false,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2024%20Mazda%20CX-90%20Turbo%20S%20Premium%20Plus%20in%20Rhodium%20White%20Metallic,%20Front%20Right,%2007-15-2023.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2024%20Mazda%20CX-90%20PHEV%20Premium%20in%20Rhodium%20White%20Metallic,%20front%20left.jpg?width=1200",
+      "trimOptions": [
+        {
+          "name": "GS-L MHEV",
+          "price": 49900,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Three-row seating",
+            "Inline-six mild hybrid",
+            "Panoramic display"
+          ]
+        },
+        {
+          "name": "GT PHEV",
+          "price": 59950,
+          "powertrain": "Plug-in Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Plug-in hybrid powertrain",
+            "Captain chairs",
+            "Premium audio"
+          ]
+        },
+        {
+          "name": "Signature MHEV",
+          "price": 63950,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Nappa leather",
+            "Ventilated seats",
+            "Towing package"
+          ]
+        }
+      ]
     },
     {
       "id": "grandhighlander",
@@ -557,13 +627,48 @@
         "Often priced well above compact SUV options"
       ],
       "manufacturerUrl": "https://www.toyota.ca/en/vehicles/grand-highlander/overview/",
-      "photoCredit": "Wikimedia Commons photo: 2024 Toyota Grand Highlander Hybrid MAX Platinum in Storm Cloud, Front Right, 07-15-2023.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2024 Toyota Grand Highlander Platinum Hybrid Max (United States) front view.png",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": true,
       "hasCvt": true,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2024%20Toyota%20Grand%20Highlander%20Hybrid%20MAX%20Platinum%20in%20Storm%20Cloud,%20Front%20Right,%2007-15-2023.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2024%20Toyota%20Grand%20Highlander%20Platinum%20Hybrid%20Max%20(United%20States)%20front%20view.png?width=1200",
+      "trimOptions": [
+        {
+          "name": "XLE AWD",
+          "price": 57600,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Eight seats",
+            "Toyota Safety Sense",
+            "Power liftgate"
+          ]
+        },
+        {
+          "name": "Limited Hybrid AWD",
+          "price": 63200,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Hybrid efficiency",
+            "Heated second row",
+            "Larger touchscreen"
+          ]
+        },
+        {
+          "name": "Platinum Hybrid MAX",
+          "price": 70500,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Most power",
+            "Panoramic roof",
+            "Premium interior"
+          ]
+        }
+      ]
     },
     {
       "id": "pilot",
@@ -596,13 +701,48 @@
         "Fuel economy trails hybrid rivals"
       ],
       "manufacturerUrl": "https://www.honda.ca/en/pilot",
-      "photoCredit": "Wikimedia Commons photo: 2023 Honda Pilot TrailSport in Diffused Sky Blue Pearl, Front Right, 04-16-2023.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2023 Honda Pilot (front view).jpg",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": true,
       "hasCvt": false,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2023%20Honda%20Pilot%20TrailSport%20in%20Diffused%20Sky%20Blue%20Pearl,%20Front%20Right,%2004-16-2023.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2023%20Honda%20Pilot%20(front%20view).jpg?width=1200",
+      "trimOptions": [
+        {
+          "name": "Sport AWD",
+          "price": 55200,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Eight seats",
+            "V6 power",
+            "Honda Sensing"
+          ]
+        },
+        {
+          "name": "TrailSport AWD",
+          "price": 60600,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Off-road tuned AWD",
+            "All-terrain tires",
+            "Skid plates"
+          ]
+        },
+        {
+          "name": "Black Edition AWD",
+          "price": 64800,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Premium cabin",
+            "Memory seats",
+            "Heated second row"
+          ]
+        }
+      ]
     },
     {
       "id": "palisade",
@@ -635,13 +775,48 @@
         "Top trims move into luxury pricing"
       ],
       "manufacturerUrl": "https://www.hyundaicanada.com/en/showroom/2026/palisade",
-      "photoCredit": "Wikimedia Commons photo: 2026 Hyundai Palisade Calligraphy, front 4.19.25.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2025 Hyundai Palisade Calligraphy Hybrid Front.jpg",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": true,
       "hasCvt": false,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2026%20Hyundai%20Palisade%20Calligraphy,%20front%204.19.25.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2025%20Hyundai%20Palisade%20Calligraphy%20Hybrid%20Front.jpg?width=1200",
+      "trimOptions": [
+        {
+          "name": "Preferred AWD",
+          "price": 54560,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Three rows",
+            "Highway driving assist",
+            "Heated front seats"
+          ]
+        },
+        {
+          "name": "Luxury Hybrid AWD",
+          "price": 61500,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Hybrid powertrain",
+            "Heated second row",
+            "Panoramic displays"
+          ]
+        },
+        {
+          "name": "Ultimate Calligraphy AWD",
+          "price": 69500,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Luxury seating",
+            "Memory seats",
+            "Premium audio"
+          ]
+        }
+      ]
     },
     {
       "id": "telluride",
@@ -674,13 +849,48 @@
         "Fuel costs are higher than hybrid rivals"
       ],
       "manufacturerUrl": "https://www.kia.ca/en/vehicles/telluride/2026",
-      "photoCredit": "Wikimedia Commons photo: 2023 Kia Telluride SX X-Pro AWD, front 4.17.23.jpg",
+      "photoCredit": "Wikimedia Commons photo: 23 Kia Telluride SX X-Pro.jpg",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": true,
       "hasCvt": false,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2023%20Kia%20Telluride%20SX%20X-Pro%20AWD,%20front%204.17.23.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/23%20Kia%20Telluride%20SX%20X-Pro.jpg?width=1200",
+      "trimOptions": [
+        {
+          "name": "EX AWD",
+          "price": 53500,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Eight seats",
+            "V6 power",
+            "Highway assist"
+          ]
+        },
+        {
+          "name": "SX X-Line AWD",
+          "price": 59800,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Rugged styling",
+            "Heated second row",
+            "360 camera"
+          ]
+        },
+        {
+          "name": "SX X-Pro AWD",
+          "price": 63500,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "All-terrain tires",
+            "Towing equipment",
+            "Premium interior"
+          ]
+        }
+      ]
     },
     {
       "id": "lexusrx",
@@ -713,13 +923,48 @@
         "Two rows only"
       ],
       "manufacturerUrl": "https://www.lexus.ca/en/vehicles/rx/overview/",
-      "photoCredit": "Wikimedia Commons photo: 2023 Lexus RX 350 Premium Plus in Nori Green Pearl, front right, 2023-04-17.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2023 Lexus RX 350h Premier AWD in Sonic Quartz, 06-24-2024.jpg",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": false,
       "hasCvt": false,
       "physicalClimateControls": true,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2023%20Lexus%20RX%20350%20Premium%20Plus%20in%20Nori%20Green%20Pearl,%20front%20right,%202023-04-17.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2023%20Lexus%20RX%20350h%20Premier%20AWD%20in%20Sonic%20Quartz,%2006-24-2024.jpg?width=1200",
+      "trimOptions": [
+        {
+          "name": "RX 350 AWD",
+          "price": 64298,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Turbo power",
+            "Lexus Safety System+",
+            "Quiet cabin"
+          ]
+        },
+        {
+          "name": "RX 350h AWD",
+          "price": 67500,
+          "powertrain": "Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Hybrid efficiency",
+            "Memory seats",
+            "Heated rear seats"
+          ]
+        },
+        {
+          "name": "RX 450h+ AWD",
+          "price": 82000,
+          "powertrain": "Plug-in Hybrid",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Plug-in hybrid",
+            "Premium luxury features",
+            "Electric commuting"
+          ]
+        }
+      ]
     },
     {
       "id": "audiq5",
@@ -752,13 +997,48 @@
         "Luxury maintenance and option pricing"
       ],
       "manufacturerUrl": "https://www.audi.ca/en/models/q5/q5/2026/overview/",
-      "photoCredit": "Wikimedia Commons photo: 2025 Audi Q5 45 TFSI quattro S line.jpg",
+      "photoCredit": "Wikimedia Commons photo: 2021 Audi Q5 45 TFSI Quattro front.jpg",
       "hasHeatedRearSeats": true,
       "hasMemorySeats": true,
       "hasSpareTire": false,
       "hasCvt": false,
       "physicalClimateControls": false,
-      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2025%20Audi%20Q5%2045%20TFSI%20quattro%20S%20line.jpg?width=1200"
+      "imageUrl": "https://commons.wikimedia.org/wiki/Special:FilePath/2021%20Audi%20Q5%2045%20TFSI%20Quattro%20front.jpg?width=1200",
+      "trimOptions": [
+        {
+          "name": "Komfort 45 TFSI quattro",
+          "price": 52800,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "quattro AWD",
+            "Virtual cockpit",
+            "Heated front seats"
+          ]
+        },
+        {
+          "name": "Progressiv 45 TFSI quattro",
+          "price": 58600,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Driver assistance",
+            "Panoramic roof",
+            "Upgraded lighting"
+          ]
+        },
+        {
+          "name": "Technik 45 TFSI quattro",
+          "price": 65500,
+          "powertrain": "Gas",
+          "drivetrain": "AWD",
+          "keyFeatures": [
+            "Premium audio",
+            "Memory seats",
+            "Top driver assists"
+          ]
+        }
+      ]
     }
   ]
 }

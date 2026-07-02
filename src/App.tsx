@@ -5,7 +5,7 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { auth, db } from './firebase';
 import { averagePartnerWeights, CANADIAN_VEHICLES, DEFAULT_WEIGHTS, scoreVehicles } from './scoring';
-import type { BodyStyle, CriteriaKey, CriteriaWeights, DealQuoteDocument, Drivetrain, Powertrain, ProfileName, ScoredVehicle, SessionDocument, TestDriveEntry, UserPreferenceDocument, UserReaction, VehicleNoteDocument, VehicleStage } from './types';
+import type { BodyStyle, CriteriaKey, CriteriaWeights, DealQuoteDocument, Drivetrain, Powertrain, ProfileName, ScoredVehicle, SessionDocument, TestDriveEntry, UserPreferenceDocument, UserReaction, VehicleNoteDocument, VehicleStage, VehicleTrimOption } from './types';
 import { CompareTray } from './components/CompareTray';
 import { ComparisonTable as EnhancedComparisonTable } from './components/ComparisonTable';
 import { PaymentCalculator as EnhancedPaymentCalculator } from './components/PaymentCalculator';
@@ -223,7 +223,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
       setSession(refreshed.data() as SessionDocument);
       setSessionId(activeSessionId);
       window.history.replaceState({}, '', `/?session=${activeSessionId}`);
-      setSessionStatus('Live session connected. Shared notes, diary entries, and quotes sync in real time.');
+      setSessionStatus('connected');
     }
     void bootstrapSession().catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize the shared session.'));
   }, [activeUser.uid, sessionId]);
@@ -365,9 +365,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>
       <section className="hero card">
-        <div className="hero-topline"><p className="eyebrow">CarMatch</p><span>{sessionStatus}</span></div>
-        <h1>Compare family vehicles together.</h1>
-        <p>Rank priorities, compare finalists, estimate payments, track dealer quotes, and keep test-drive decisions in one shared workspace.</p>
+        <div className="hero-topline"><p className="eyebrow">CarMatch</p><SessionStatusIcon status={sessionStatus} /></div>
         <div className="profile-switcher" aria-label="User profile selector">{profileNames.map((profileName) => <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>)}</div>
       </section>
 
@@ -396,6 +394,14 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
       <VehicleProfile vehicle={selectedVehicle} activeProfile={activeProfile} isFavorite={favoritesByProfile[activeProfile].includes(selectedVehicle.id)} note={vehicleNotes[selectedVehicle.id] ?? emptyVehicleNote(selectedVehicle.id)} quotes={dealQuotes.filter((quote) => quote.vehicleId === selectedVehicle.id)} entries={testDriveEntries.filter((entry) => entry.vehicleId === selectedVehicle.id)} onToggleFavorite={() => handleToggleFavorite(selectedVehicle.id)} onNoteChange={(patch) => saveVehicleNote(selectedVehicle.id, patch)} />
     </main>
   );
+}
+
+
+function SessionStatusIcon({ status }: { status: string }) {
+  const lowerStatus = status.toLowerCase();
+  const state = lowerStatus.includes('unable') || lowerStatus.includes('failed') || lowerStatus.includes('error') ? 'failed' : lowerStatus.includes('connected') ? 'connected' : 'syncing';
+  const label = state === 'connected' ? 'Connected' : state === 'failed' ? 'Sync failed' : 'Syncing';
+  return <span className={`session-icon ${state}`} role="status" aria-label={label} title={status}>{state === 'connected' ? '✓' : state === 'failed' ? '!' : '↻'}</span>;
 }
 
 function DecisionRoom({ vehicles, notes, quotes, readinessByVehicle, favoritesByProfile, budgetLimit }: { vehicles: ScoredVehicle[]; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; readinessByVehicle: Record<string, VehicleReadiness>; favoritesByProfile: Record<ProfileName, string[]>; budgetLimit: number }) {
@@ -552,9 +558,21 @@ function VehicleImage({ vehicle }: { vehicle: ScoredVehicle }) {
   return <div className="vehicle-photo photo-fallback"><strong>{vehicle.make}</strong><span>Open manufacturer gallery</span></div>;
 }
 
+
+function defaultTrimOptions(vehicle: ScoredVehicle): VehicleTrimOption[] {
+  const midPrice = Math.round(vehicle.msrp * 1.1);
+  const topPrice = Math.round(vehicle.msrp * 1.22);
+  return [
+    { name: 'Entry / core trim', price: vehicle.msrp, powertrain: vehicle.powertrain, drivetrain: vehicle.drivetrain, keyFeatures: ['Core safety tech', `${vehicle.seats} seats`, vehicle.fuelEfficiency] },
+    { name: 'Family sweet spot', price: midPrice, powertrain: vehicle.powertrain, drivetrain: vehicle.drivetrain, keyFeatures: ['Convenience package', 'Heated seats', 'Power liftgate or equivalent'] },
+    { name: 'Top comfort trim', price: topPrice, powertrain: vehicle.powertrain, drivetrain: vehicle.drivetrain, keyFeatures: ['Premium cabin upgrades', 'More driver assistance', 'Best audio/comfort options'] },
+  ];
+}
+
 function VehicleProfile({ vehicle, activeProfile, isFavorite, note, quotes, entries, onToggleFavorite, onNoteChange }: { vehicle: ScoredVehicle; activeProfile: ProfileName; isFavorite: boolean; note: VehicleNoteDocument; quotes: DealQuoteDocument[]; entries: TestDriveEntry[]; onToggleFavorite: () => void; onNoteChange: (patch: Partial<VehicleNoteDocument>) => void }) {
   const bestQuote = quotes.sort((a, b) => quoteNetPrice(a) - quoteNetPrice(b))[0];
-  return <section className="card profile"><VehicleImage vehicle={vehicle} /><div><div className="section-heading"><p className="eyebrow">Model profile</p><button className="star-inline" onClick={onToggleFavorite}>{isFavorite ? '★' : '☆'} {activeProfile}'s favourite</button></div><h2>{vehicle.year} {vehicle.name}</h2><div className="spec-grid"><span>{actualVehiclePriceLabel(vehicle, quotes)} <b>${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')}</b></span><span>MSRP <b>${vehicle.msrp.toLocaleString('en-CA')}</b></span><span>Overall <b>{vehicle.overallRecommendationScore}</b></span><span>Confidence <b>{vehicle.confidenceScore}</b></span><span>Test drive <b>{vehicle.testDriveScore}</b></span><span>Deal <b>{vehicle.dealScore}</b></span><span>Est. monthly <b>${estimateMonthlyPayment(vehicle)}</b></span><span>Stage <b>{note.stage}</b></span><span>Best quote <b>{bestQuote ? `$${quoteNetPrice(bestQuote).toLocaleString('en-CA')}` : 'None'}</b></span></div><div className="inline-controls"><label>Stage<select value={note.stage} onChange={(event) => onNoteChange({ stage: event.target.value as VehicleStage })}>{stageOptions.map((stage) => <option key={stage}>{stage}</option>)}</select></label><label>{activeProfile} reaction<select value={note.reactions[activeProfile]} onChange={(event) => onNoteChange({ reactions: { ...note.reactions, [activeProfile]: event.target.value as UserReaction } })}>{reactionOptions.map((reaction) => <option key={reaction}>{reaction}</option>)}</select></label></div><h3>Why it fits</h3><ul>{vehicle.highlights.map((item) => <li key={item}>{item}</li>)}</ul><h3>Watch-outs</h3><ul>{vehicle.tradeoffs.map((item) => <li key={item}>{item}</li>)}</ul><h3>Ownership estimate</h3><p className="muted">Approx. monthly fuel + maintenance planning: ${(estimateOwnershipCost(vehicle)).toLocaleString('en-CA')} / month, before insurance and parking.</p><label className="shared-note">Shared notes<textarea value={note.sharedNote} onChange={(event) => onNoteChange({ sharedNote: event.target.value })} placeholder="Add shared observations, must-have trim notes, dealer quotes, or partner comments..." /></label><a href={vehicle.manufacturerUrl} target="_blank" rel="noreferrer">Open manufacturer page / gallery</a><small>Photo/source: {vehicle.photoCredit}</small><div className="mini-summary"><span>{entries.length} test drives</span><span>{quotes.length} quotes</span><span>Emily: {note.reactions.Emily}</span><span>Nick: {note.reactions.Nick}</span></div></div></section>;
+  const trimOptions = vehicle.trimOptions?.length ? vehicle.trimOptions : defaultTrimOptions(vehicle);
+  return <section className="card profile"><VehicleImage vehicle={vehicle} /><div><div className="section-heading"><p className="eyebrow">Model profile</p><button className="star-inline" onClick={onToggleFavorite}>{isFavorite ? '★' : '☆'} {activeProfile}'s favourite</button></div><h2>{vehicle.year} {vehicle.name}</h2><div className="spec-grid"><span>{actualVehiclePriceLabel(vehicle, quotes)} <b>${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')}</b></span><span>MSRP <b>${vehicle.msrp.toLocaleString('en-CA')}</b></span><span>Overall <b>{vehicle.overallRecommendationScore}</b></span><span>Confidence <b>{vehicle.confidenceScore}</b></span><span>Test drive <b>{vehicle.testDriveScore}</b></span><span>Deal <b>{vehicle.dealScore}</b></span><span>Est. monthly <b>${estimateMonthlyPayment(vehicle)}</b></span><span>Stage <b>{note.stage}</b></span><span>Best quote <b>{bestQuote ? `$${quoteNetPrice(bestQuote).toLocaleString('en-CA')}` : 'None'}</b></span></div><div className="inline-controls"><label>Stage<select value={note.stage} onChange={(event) => onNoteChange({ stage: event.target.value as VehicleStage })}>{stageOptions.map((stage) => <option key={stage}>{stage}</option>)}</select></label><label>{activeProfile} reaction<select value={note.reactions[activeProfile]} onChange={(event) => onNoteChange({ reactions: { ...note.reactions, [activeProfile]: event.target.value as UserReaction } })}>{reactionOptions.map((reaction) => <option key={reaction}>{reaction}</option>)}</select></label></div>{trimOptions.length > 0 && <><h3>Trim options</h3><div className="trim-options">{trimOptions.map((trim) => <article key={trim.name}><div><strong>{trim.name}</strong><span>${trim.price.toLocaleString('en-CA')} MSRP</span></div><small>{trim.drivetrain} • {trim.powertrain}</small><ul>{trim.keyFeatures.map((feature) => <li key={feature}>{feature}</li>)}</ul></article>)}</div></>}<h3>Why it fits</h3><ul>{vehicle.highlights.map((item) => <li key={item}>{item}</li>)}</ul><h3>Watch-outs</h3><ul>{vehicle.tradeoffs.map((item) => <li key={item}>{item}</li>)}</ul><h3>Ownership estimate</h3><p className="muted">Approx. monthly fuel + maintenance planning: ${(estimateOwnershipCost(vehicle)).toLocaleString('en-CA')} / month, before insurance and parking.</p><label className="shared-note">Shared notes<textarea value={note.sharedNote} onChange={(event) => onNoteChange({ sharedNote: event.target.value })} placeholder="Add shared observations, must-have trim notes, dealer quotes, or partner comments..." /></label><a href={vehicle.manufacturerUrl} target="_blank" rel="noreferrer">Open manufacturer page / gallery</a><small>Photo/source: {vehicle.photoCredit}</small><div className="mini-summary"><span>{entries.length} test drives</span><span>{quotes.length} quotes</span><span>Emily: {note.reactions.Emily}</span><span>Nick: {note.reactions.Nick}</span></div></div></section>;
 }
 
 function DealTracker({ vehicles, quotes, onSaveQuote }: { vehicles: ScoredVehicle[]; quotes: DealQuoteDocument[]; onSaveQuote: (quote: DealQuoteDocument) => void }) {

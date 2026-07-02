@@ -348,3 +348,15 @@ a { color: var(--accent); font-weight: 700; }
 .compare-tray-remove svg { width: 18px; height: 18px; }
 .compare-tray-remove:hover { color: #e11d48 !important; background: #ffe4e6 !important; }
 @media (max-width: 760px) { .filter-drawer > :not(summary) { margin: 10px; } .compare-tray-item { grid-template-columns: 54px minmax(0,1fr) auto; } }
+
+/* Compact header status and trim option cards */
+.session-icon { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; font-weight: 1000; border: 1px solid #e8edf7; background: #f8fafc; color: #64748b; }
+.session-icon.connected { background: rgba(101,163,13,.12); color: #3f6212; border-color: rgba(101,163,13,.25); }
+.session-icon.syncing { background: #eef2ff; color: #4f46e5; animation: spin-status 1.2s linear infinite; }
+.session-icon.failed { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+@keyframes spin-status { to { transform: rotate(360deg); } }
+.trim-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; }
+.trim-options article { display: grid; gap: 8px; border: 1px solid #e8edf7; border-radius: 18px; background: #f8fafc; padding: 14px; }
+.trim-options article div { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+.trim-options article span, .trim-options article small { color: #64748b; font-weight: 800; }
+.trim-options ul { margin: 0; padding-left: 18px; color: #475569; }

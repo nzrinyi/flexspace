@@ -80,6 +80,14 @@ export interface TestDriveDocument {
   uploadedPhotos: string[];
 }
 
+export interface VehicleTrimOption {
+  name: string;
+  price: number;
+  powertrain: Powertrain;
+  drivetrain: Drivetrain;
+  keyFeatures: string[];
+}
+
 export interface VehicleReference {
   id: string;
   make: string;
@@ -111,6 +119,7 @@ export interface VehicleReference {
   hasSpareTire?: boolean;
   hasCvt?: boolean;
   physicalClimateControls?: boolean;
+  trimOptions?: VehicleTrimOption[];
 }
 
 export interface ScoredVehicle extends VehicleReference {

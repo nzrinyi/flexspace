@@ -120,8 +120,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 84, efficiencyScore: 82, safetyScore: 88, comfortScore: 91,
     highlights: ['Wide two-row cabin', 'Standard AWD', 'Upscale interior and strong towing'],
     tradeoffs: ['Higher price than compact SUVs', 'No third row despite large footprint'],
-    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-70/', imageUrl: commonsPhoto('2025 Mazda CX-70 PHEV Premium Plus in Soul Red Crystal, front right, 2024-07-14.jpg'), photoCredit: commonsCredit('2025 Mazda CX-70 PHEV Premium Plus in Soul Red Crystal, front right, 2024-07-14.jpg'),
+    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-70/', imageUrl: commonsPhoto('2025 Mazda CX-70 PHEV Premium Plus (United States) front view.png'), photoCredit: commonsCredit('2025 Mazda CX-70 PHEV Premium Plus (United States) front view.png'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: false, hasCvt: false, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'GS-L MHEV', price: 49750, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Standard AWD', 'Inline-six mild hybrid', 'Heated front seats'] },
+      { name: 'GT PHEV', price: 58450, powertrain: 'Plug-in Hybrid', drivetrain: 'AWD', keyFeatures: ['Plug-in hybrid range', 'Premium audio', 'Power liftgate'] },
+      { name: 'Signature MHEV', price: 61950, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Nappa leather', 'Memory seating', 'Heated rear seats'] },
+    ],
   },
   {
     id: 'cx90', make: 'Mazda', model: 'CX-90', name: 'Mazda CX-90', year: 2026, bodyStyle: 'Midsize SUV', msrp: 49900,
@@ -130,8 +135,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 83, efficiencyScore: 83, safetyScore: 89, comfortScore: 91,
     highlights: ['Three rows', 'Premium cabin', 'PHEV option and strong towing'],
     tradeoffs: ['Third row is tighter than Palisade/Telluride', 'Premium trims get expensive'],
-    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-90/', imageUrl: commonsPhoto('2024 Mazda CX-90 Turbo S Premium Plus in Rhodium White Metallic, Front Right, 07-15-2023.jpg'), photoCredit: commonsCredit('2024 Mazda CX-90 Turbo S Premium Plus in Rhodium White Metallic, Front Right, 07-15-2023.jpg'),
+    manufacturerUrl: 'https://www.mazda.ca/en/vehicles/cx-90/', imageUrl: commonsPhoto('2024 Mazda CX-90 PHEV Premium in Rhodium White Metallic, front left.jpg'), photoCredit: commonsCredit('2024 Mazda CX-90 PHEV Premium in Rhodium White Metallic, front left.jpg'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: false, hasCvt: false, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'GS-L MHEV', price: 49900, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Three-row seating', 'Inline-six mild hybrid', 'Panoramic display'] },
+      { name: 'GT PHEV', price: 59950, powertrain: 'Plug-in Hybrid', drivetrain: 'AWD', keyFeatures: ['Plug-in hybrid powertrain', 'Captain chairs', 'Premium audio'] },
+      { name: 'Signature MHEV', price: 63950, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Nappa leather', 'Ventilated seats', 'Towing package'] },
+    ],
   },
   {
     id: 'grandhighlander', make: 'Toyota', model: 'Grand Highlander', name: 'Toyota Grand Highlander', year: 2026, bodyStyle: 'Midsize SUV', msrp: 57600,
@@ -140,8 +150,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 91, efficiencyScore: 88, safetyScore: 90, comfortScore: 92,
     highlights: ['Adult-friendly third row', 'Hybrid efficiency', 'Excellent cargo space'],
     tradeoffs: ['Large exterior footprint', 'Often priced well above compact SUV options'],
-    manufacturerUrl: 'https://www.toyota.ca/en/vehicles/grand-highlander/overview/', imageUrl: commonsPhoto('2024 Toyota Grand Highlander Hybrid MAX Platinum in Storm Cloud, Front Right, 07-15-2023.jpg'), photoCredit: commonsCredit('2024 Toyota Grand Highlander Hybrid MAX Platinum in Storm Cloud, Front Right, 07-15-2023.jpg'),
+    manufacturerUrl: 'https://www.toyota.ca/en/vehicles/grand-highlander/overview/', imageUrl: commonsPhoto('2024 Toyota Grand Highlander Platinum Hybrid Max (United States) front view.png'), photoCredit: commonsCredit('2024 Toyota Grand Highlander Platinum Hybrid Max (United States) front view.png'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: true, hasCvt: true, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'XLE AWD', price: 57600, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Eight seats', 'Toyota Safety Sense', 'Power liftgate'] },
+      { name: 'Limited Hybrid AWD', price: 63200, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Hybrid efficiency', 'Heated second row', 'Larger touchscreen'] },
+      { name: 'Platinum Hybrid MAX', price: 70500, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Most power', 'Panoramic roof', 'Premium interior'] },
+    ],
   },
   {
     id: 'pilot', make: 'Honda', model: 'Pilot', name: 'Honda Pilot', year: 2026, bodyStyle: 'Midsize SUV', msrp: 55200,
@@ -150,8 +165,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 86, efficiencyScore: 72, safetyScore: 90, comfortScore: 92,
     highlights: ['Very practical three-row layout', 'Strong V6', 'Family-friendly storage'],
     tradeoffs: ['No hybrid option', 'Fuel economy trails hybrid rivals'],
-    manufacturerUrl: 'https://www.honda.ca/en/pilot', imageUrl: commonsPhoto('2023 Honda Pilot TrailSport in Diffused Sky Blue Pearl, Front Right, 04-16-2023.jpg'), photoCredit: commonsCredit('2023 Honda Pilot TrailSport in Diffused Sky Blue Pearl, Front Right, 04-16-2023.jpg'),
+    manufacturerUrl: 'https://www.honda.ca/en/pilot', imageUrl: commonsPhoto('2023 Honda Pilot (front view).jpg'), photoCredit: commonsCredit('2023 Honda Pilot (front view).jpg'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: true, hasCvt: false, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'Sport AWD', price: 55200, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Eight seats', 'V6 power', 'Honda Sensing'] },
+      { name: 'TrailSport AWD', price: 60600, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Off-road tuned AWD', 'All-terrain tires', 'Skid plates'] },
+      { name: 'Black Edition AWD', price: 64800, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Premium cabin', 'Memory seats', 'Heated second row'] },
+    ],
   },
   {
     id: 'palisade', make: 'Hyundai', model: 'Palisade', name: 'Hyundai Palisade', year: 2026, bodyStyle: 'Midsize SUV', msrp: 54560,
@@ -160,8 +180,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 84, efficiencyScore: 82, safetyScore: 91, comfortScore: 94,
     highlights: ['Spacious three-row cabin', 'Hybrid now available', 'Upscale family features'],
     tradeoffs: ['Large to park', 'Top trims move into luxury pricing'],
-    manufacturerUrl: 'https://www.hyundaicanada.com/en/showroom/2026/palisade', imageUrl: commonsPhoto('2026 Hyundai Palisade Calligraphy, front 4.19.25.jpg'), photoCredit: commonsCredit('2026 Hyundai Palisade Calligraphy, front 4.19.25.jpg'),
+    manufacturerUrl: 'https://www.hyundaicanada.com/en/showroom/2026/palisade', imageUrl: commonsPhoto('2025 Hyundai Palisade Calligraphy Hybrid Front.jpg'), photoCredit: commonsCredit('2025 Hyundai Palisade Calligraphy Hybrid Front.jpg'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: true, hasCvt: false, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'Preferred AWD', price: 54560, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Three rows', 'Highway driving assist', 'Heated front seats'] },
+      { name: 'Luxury Hybrid AWD', price: 61500, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Hybrid powertrain', 'Heated second row', 'Panoramic displays'] },
+      { name: 'Ultimate Calligraphy AWD', price: 69500, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Luxury seating', 'Memory seats', 'Premium audio'] },
+    ],
   },
   {
     id: 'telluride', make: 'Kia', model: 'Telluride', name: 'Kia Telluride', year: 2026, bodyStyle: 'Midsize SUV', msrp: 53500,
@@ -170,8 +195,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 83, efficiencyScore: 71, safetyScore: 90, comfortScore: 93,
     highlights: ['Excellent three-row packaging', 'Premium-feeling cabin', 'Strong standard equipment'],
     tradeoffs: ['No current hybrid in Canada', 'Fuel costs are higher than hybrid rivals'],
-    manufacturerUrl: 'https://www.kia.ca/en/vehicles/telluride/2026', imageUrl: commonsPhoto('2023 Kia Telluride SX X-Pro AWD, front 4.17.23.jpg'), photoCredit: commonsCredit('2023 Kia Telluride SX X-Pro AWD, front 4.17.23.jpg'),
+    manufacturerUrl: 'https://www.kia.ca/en/vehicles/telluride/2026', imageUrl: commonsPhoto('23 Kia Telluride SX X-Pro.jpg'), photoCredit: commonsCredit('23 Kia Telluride SX X-Pro.jpg'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: true, hasCvt: false, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'EX AWD', price: 53500, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Eight seats', 'V6 power', 'Highway assist'] },
+      { name: 'SX X-Line AWD', price: 59800, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Rugged styling', 'Heated second row', '360 camera'] },
+      { name: 'SX X-Pro AWD', price: 63500, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['All-terrain tires', 'Towing equipment', 'Premium interior'] },
+    ],
   },
   {
     id: 'lexusrx', make: 'Lexus', model: 'RX', name: 'Lexus RX', year: 2026, bodyStyle: 'Midsize SUV', msrp: 64298,
@@ -180,8 +210,13 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 94, efficiencyScore: 86, safetyScore: 92, comfortScore: 96,
     highlights: ['Quiet luxury cabin', 'Excellent reliability reputation', 'Multiple hybrid choices'],
     tradeoffs: ['Expensive compared with mainstream SUVs', 'Two rows only'],
-    manufacturerUrl: 'https://www.lexus.ca/en/vehicles/rx/overview/', imageUrl: commonsPhoto('2023 Lexus RX 350 Premium Plus in Nori Green Pearl, front right, 2023-04-17.jpg'), photoCredit: commonsCredit('2023 Lexus RX 350 Premium Plus in Nori Green Pearl, front right, 2023-04-17.jpg'),
+    manufacturerUrl: 'https://www.lexus.ca/en/vehicles/rx/overview/', imageUrl: commonsPhoto('2023 Lexus RX 350h Premier AWD in Sonic Quartz, 06-24-2024.jpg'), photoCredit: commonsCredit('2023 Lexus RX 350h Premier AWD in Sonic Quartz, 06-24-2024.jpg'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: false, hasCvt: false, physicalClimateControls: true,
+    trimOptions: [
+      { name: 'RX 350 AWD', price: 64298, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Turbo power', 'Lexus Safety System+', 'Quiet cabin'] },
+      { name: 'RX 350h AWD', price: 67500, powertrain: 'Hybrid', drivetrain: 'AWD', keyFeatures: ['Hybrid efficiency', 'Memory seats', 'Heated rear seats'] },
+      { name: 'RX 450h+ AWD', price: 82000, powertrain: 'Plug-in Hybrid', drivetrain: 'AWD', keyFeatures: ['Plug-in hybrid', 'Premium luxury features', 'Electric commuting'] },
+    ],
   },
   {
     id: 'audiq5', make: 'Audi', model: 'Q5', name: 'Audi Q5', year: 2026, bodyStyle: 'Compact SUV', msrp: 52800,
@@ -190,7 +225,12 @@ export const VEHICLES: VehicleReference[] = [
     reliabilityScore: 78, efficiencyScore: 78, safetyScore: 90, comfortScore: 93,
     highlights: ['Standard quattro-style AWD confidence', 'Premium cabin', 'Compact size for city parking'],
     tradeoffs: ['Less cargo room than mainstream compact SUVs', 'Luxury maintenance and option pricing'],
-    manufacturerUrl: 'https://www.audi.ca/en/models/q5/q5/2026/overview/', imageUrl: commonsPhoto('2025 Audi Q5 45 TFSI quattro S line.jpg'), photoCredit: commonsCredit('2025 Audi Q5 45 TFSI quattro S line.jpg'),
+    manufacturerUrl: 'https://www.audi.ca/en/models/q5/q5/2026/overview/', imageUrl: commonsPhoto('2021 Audi Q5 45 TFSI Quattro front.jpg'), photoCredit: commonsCredit('2021 Audi Q5 45 TFSI Quattro front.jpg'),
     hasHeatedRearSeats: true, hasMemorySeats: true, hasSpareTire: false, hasCvt: false, physicalClimateControls: false,
+    trimOptions: [
+      { name: 'Komfort 45 TFSI quattro', price: 52800, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['quattro AWD', 'Virtual cockpit', 'Heated front seats'] },
+      { name: 'Progressiv 45 TFSI quattro', price: 58600, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Driver assistance', 'Panoramic roof', 'Upgraded lighting'] },
+      { name: 'Technik 45 TFSI quattro', price: 65500, powertrain: 'Gas', drivetrain: 'AWD', keyFeatures: ['Premium audio', 'Memory seats', 'Top driver assists'] },
+    ],
   },
 ];
