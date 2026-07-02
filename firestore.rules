@@ -44,6 +44,32 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+
+    match /vehicles/{vehicleId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.id == vehicleId
+        && request.resource.data.name is string
+        && request.resource.data.msrp is number;
+      allow delete: if false;
+
+      match /trims/{trimId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn()
+          && request.resource.data.vehicleId == vehicleId
+          && request.resource.data.name is string;
+        allow delete: if false;
+      }
+    }
+
+    match /marketData/{region}/incentives/{incentiveId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.region == region
+        && request.resource.data.vehicleId is string;
+      allow delete: if false;
+    }
+
     match /sessions/{sessionId} {
       allow create: if signedIn()
         && request.resource.data.id == sessionId

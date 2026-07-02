@@ -32,6 +32,10 @@ export interface UserPreferenceDocument {
   criteriaWeights: CriteriaWeights;
   personalNotes: Record<string, string>;
   favoriteVehicleIds?: string[];
+  updatedAt?: Timestamp;
+  updatedByUid?: string;
+  updatedByProfile?: ProfileName;
+  version?: number;
 }
 
 export interface VehicleNoteDocument {
@@ -102,6 +106,11 @@ export interface VehicleReference {
   manufacturerUrl: string;
   imageUrl?: string;
   photoCredit: string;
+  hasHeatedRearSeats?: boolean;
+  hasMemorySeats?: boolean;
+  hasSpareTire?: boolean;
+  hasCvt?: boolean;
+  physicalClimateControls?: boolean;
 }
 
 export interface ScoredVehicle extends VehicleReference {

@@ -1,6 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { signInAnonymously, type User } from 'firebase/auth';
-import { arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { arrayUnion, collection, doc, getDoc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { auth, db } from './firebase';
@@ -29,10 +29,15 @@ const powertrainOptions: Array<'All' | Powertrain> = ['All', 'Gas', 'Hybrid', 'P
 const profileNames: ProfileName[] = ['Emily', 'Nick'];
 const stageOptions: VehicleStage[] = ['Browsing', 'Shortlisted', 'Test drive booked', 'Test driven', 'Quote received', 'Finalist', 'Rejected', 'Winner'];
 const reactionOptions: UserReaction[] = ['Unrated', 'Love', 'Maybe', 'No'];
+const mustHaveLabels = { mustHaveAwd: 'Must be AWD / 4WD', mustFitCarSeat: 'Must fit rear-facing car seat', mustBeUnderBudget: 'Must be under monthly budget', mustHaveHybrid: 'Must have hybrid/electric option', mustHaveHeatedRearSeats: 'Must have heated rear seats', mustHaveMemorySeats: 'Must have memory seats', mustHaveSpareTire: 'Must have spare tire', mustAvoidCvt: 'Must not be CVT', mustHavePhysicalClimateControls: 'Must have physical climate controls' } as const;
 
-type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary';
+type MustHaveKey = keyof typeof mustHaveLabels;
+type MustHaveSettings = Record<MustHaveKey, boolean>;
+type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 'Nick has not reviewed' | 'Emily marked as finalist' | 'Needs shared note' | 'Deal breaker';
 
-const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary' };
+type AppSection = 'decision' | 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary';
+
+const sectionLabels: Record<AppSection, string> = { decision: 'Decision Room', dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary' };
 
 interface Filters {
   query: string;
@@ -46,12 +51,40 @@ interface Filters {
   mustFitCarSeat: boolean;
   maxMonthlyPayment: number;
   stage: 'All' | VehicleStage;
+  hideRejected: boolean;
 }
 
 const defaultFilters: Filters = {
   query: '', bodyStyle: 'All', drivetrain: 'All', powertrain: 'All', maxPrice: 70000, minSeats: 0,
-  mustHaveAwd: false, mustHaveHybrid: false, mustFitCarSeat: false, maxMonthlyPayment: 0, stage: 'All',
+  mustHaveAwd: false, mustHaveHybrid: false, mustFitCarSeat: false, maxMonthlyPayment: 0, stage: 'All', hideRejected: false,
 };
+
+const defaultMustHaves: MustHaveSettings = {
+  mustHaveAwd: false,
+  mustFitCarSeat: false,
+  mustBeUnderBudget: false,
+  mustHaveHybrid: false,
+  mustHaveHeatedRearSeats: false,
+  mustHaveMemorySeats: false,
+  mustHaveSpareTire: false,
+  mustAvoidCvt: false,
+  mustHavePhysicalClimateControls: false,
+};
+
+interface VehicleReadiness {
+  score: number;
+  status: ReadinessStatus;
+  checklist: Array<{ label: string; complete: boolean }>;
+  missing: string[];
+  blocked: boolean;
+}
+
+interface ProfilePreferenceMeta {
+  updatedByUid?: string;
+  updatedByProfile?: ProfileName;
+  version?: number;
+}
+
 
 function getSessionIdFromUrl() {
   return new URLSearchParams(window.location.search).get('session');
@@ -101,16 +134,18 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [session, setSession] = useState<SessionDocument | null>(null);
   const [sessionStatus, setSessionStatus] = useState('Preparing your shared profile...');
   const [filters, setFilters] = useLocalStorageState<Filters>('carmatch.filters', defaultFilters);
+  const [mustHaves, setMustHaves] = useLocalStorageState<MustHaveSettings>('carmatch.mustHaves', defaultMustHaves);
   const [selectedVehicleIds, setSelectedVehicleIds] = useLocalStorageState<string[]>('carmatch.compareVehicleIds', CANADIAN_VEHICLES.slice(0, 3).map((vehicle) => vehicle.id));
   const [testDriveEntries, setTestDriveEntries] = useState<TestDriveEntry[]>([]);
   const [dealQuotes, setDealQuotes] = useState<DealQuoteDocument[]>([]);
   const [vehicleNotes, setVehicleNotes] = useState<Record<string, VehicleNoteDocument>>({});
-  const [activeSection, setActiveSection] = useLocalStorageState<AppSection>('carmatch.activeSection', 'dashboard');
+  const [activeSection, setActiveSection] = useLocalStorageState<AppSection>('carmatch.activeSection', 'decision');
   const [compareMessage, setCompareMessage] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeProfile, setActiveProfile] = useState<ProfileName>('Emily');
   const [favoritesByProfile, setFavoritesByProfile] = useState<Record<ProfileName, string[]>>({ Emily: [], Nick: [] });
   const [profileWeights, setProfileWeights] = useState<Record<ProfileName, CriteriaWeights>>({ Emily: DEFAULT_WEIGHTS, Nick: DEFAULT_WEIGHTS });
+  const [profileMeta, setProfileMeta] = useState<Record<ProfileName, ProfilePreferenceMeta>>({ Emily: {}, Nick: {} });
 
   const canReadSharedCollections = Boolean(sessionId && session?.partnerIds?.includes(activeUser.uid));
   const preferencesQuery = useMemo(() => (sessionId && canReadSharedCollections ? collection(db, 'sessions', sessionId, 'userPreferences') : null), [canReadSharedCollections, sessionId]);
@@ -132,12 +167,14 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   useEffect(() => {
     const nextWeights: Record<ProfileName, CriteriaWeights> = { Emily: DEFAULT_WEIGHTS, Nick: DEFAULT_WEIGHTS };
     const nextFavorites: Record<ProfileName, string[]> = { Emily: [], Nick: [] };
+    const nextMeta: Record<ProfileName, ProfilePreferenceMeta> = { Emily: {}, Nick: {} };
     const applyPreferenceDocs = (docs?: Array<{ data: () => Partial<UserPreferenceDocument> }>) => {
       docs?.forEach((preferenceDoc) => {
         const data = preferenceDoc.data();
         if (data.userId === 'Emily' || data.userId === 'Nick') {
           nextWeights[data.userId] = { ...DEFAULT_WEIGHTS, ...(data.criteriaWeights ?? {}) };
           nextFavorites[data.userId] = data.favoriteVehicleIds ?? [];
+          nextMeta[data.userId] = { updatedByUid: data.updatedByUid, updatedByProfile: data.updatedByProfile, version: data.version };
         }
       });
     };
@@ -145,6 +182,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
     applyPreferenceDocs(globalPreferencesSnapshot?.docs);
     setProfileWeights(nextWeights);
     setFavoritesByProfile(nextFavorites);
+    setProfileMeta(nextMeta);
   }, [globalPreferencesSnapshot, preferencesSnapshot]);
 
   useEffect(() => {
@@ -195,11 +233,11 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
       await Promise.all(profileNames.map(async (profileName) => {
         const preferenceRef = doc(db, 'profilePreferences', profileName);
         const snapshot = await getDoc(preferenceRef);
-        if (!snapshot.exists()) await setDoc(preferenceRef, { userId: profileName, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [] });
+        if (!snapshot.exists()) await setDoc(preferenceRef, { userId: profileName, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [], updatedAt: serverTimestamp(), updatedByUid: activeUser.uid, updatedByProfile: profileName, version: 1 });
       }));
     }
     void ensureGlobalProfilePreferenceDocs().catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize universal profile preferences.'));
-  }, []);
+  }, [activeUser.uid]);
 
   useEffect(() => {
     if (!sessionId || !canReadSharedCollections) return;
@@ -208,18 +246,18 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
       await Promise.all(profileNames.map(async (profileName) => {
         const preferenceRef = doc(db, 'sessions', activeSessionId, 'userPreferences', profileName);
         const snapshot = await getDoc(preferenceRef);
-        if (!snapshot.exists()) await setDoc(preferenceRef, { userId: profileName, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [] });
+        if (!snapshot.exists()) await setDoc(preferenceRef, { userId: profileName, criteriaWeights: DEFAULT_WEIGHTS, personalNotes: {}, favoriteVehicleIds: [], updatedAt: serverTimestamp(), updatedByUid: activeUser.uid, updatedByProfile: profileName, version: 1 });
       }));
     }
     void ensureProfilePreferenceDocs().catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to initialize saved profile preferences.'));
   }, [canReadSharedCollections, sessionId]);
 
   const saveProfilePreference = useCallback((profileName: ProfileName, weights: CriteriaWeights, favoriteVehicleIds: string[]) => {
-    const preferenceDocument = { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds };
+    const preferenceDocument = { userId: profileName, criteriaWeights: weights, personalNotes: {}, favoriteVehicleIds, updatedAt: serverTimestamp(), updatedByUid: activeUser.uid, updatedByProfile: profileName, version: increment(1) };
     const writes = [setDoc(doc(db, 'profilePreferences', profileName), preferenceDocument, { merge: true })];
     if (sessionId) writes.push(setDoc(doc(db, 'sessions', sessionId, 'userPreferences', profileName), preferenceDocument, { merge: true }));
     void Promise.all(writes).catch((error: unknown) => setSessionStatus(error instanceof Error ? error.message : 'Unable to save universal profile preferences.'));
-  }, [sessionId]);
+  }, [activeUser.uid, sessionId]);
 
   const saveVehicleNote = useCallback((vehicleId: string, patch: Partial<VehicleNoteDocument>) => {
     if (!sessionId) return;
@@ -276,12 +314,14 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
         && (!filters.mustHaveHybrid || isHybrid)
         && (!filters.mustFitCarSeat || hasCarSeatPass)
         && (!filters.maxMonthlyPayment || monthly <= filters.maxMonthlyPayment)
-        && (filters.stage === 'All' || note.stage === filters.stage);
+        && (filters.stage === 'All' || note.stage === filters.stage)
+        && (!filters.hideRejected || note.stage !== 'Rejected');
     });
   }, [dealQuotes, filters, scoredVehicles, testDriveEntries, vehicleNotes]);
 
   const selectedVehicle = scoredVehicles.find((vehicle) => vehicle.id === selectedVehicleIds[0]) ?? scoredVehicles[0]!;
   const selectedVehicles = selectedVehicleIds.map((vehicleId) => scoredVehicles.find((vehicle) => vehicle.id === vehicleId)).filter(Boolean) as ScoredVehicle[];
+  const readinessByVehicle = useMemo(() => Object.fromEntries(scoredVehicles.map((vehicle) => [vehicle.id, vehicleReadiness(vehicle, favoritesByProfile, vehicleNotes[vehicle.id] ?? emptyVehicleNote(vehicle.id), dealQuotes, testDriveEntries, filters.maxMonthlyPayment, mustHaves)])), [dealQuotes, favoritesByProfile, filters.maxMonthlyPayment, mustHaves, scoredVehicles, testDriveEntries, vehicleNotes]);
   const showCompareTray = activeSection === 'browse' || activeSection === 'compare';
   const activeSectionLabel = sectionLabels[activeSection as AppSection];
 
@@ -333,6 +373,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
 
       <button className="menu-toggle" type="button" aria-expanded={isMenuOpen} aria-controls="primary-app-menu" onClick={() => setIsMenuOpen((open: boolean) => !open)}><span className="menu-icon" aria-hidden="true"><span /><span /><span /></span><span>{activeSectionLabel}</span></button>
       <nav id="primary-app-menu" className={`app-menu ${isMenuOpen ? 'open' : ''}`} aria-label="Primary app sections">
+        <button className={activeSection === 'decision' ? 'active' : ''} onClick={() => setActiveSection('decision')}>Decision Room</button>
         <button className={activeSection === 'dashboard' ? 'active' : ''} onClick={() => setActiveSection('dashboard')}>Shared priorities</button>
         <button className={activeSection === 'browse' ? 'active' : ''} onClick={() => setActiveSection('browse')}>Browse vehicles</button>
         <button className={activeSection === 'compare' ? 'active' : ''} onClick={() => setActiveSection('compare')}>Compare</button>
@@ -340,12 +381,14 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
         <button className={activeSection === 'deals' ? 'active' : ''} onClick={() => setActiveSection('deals')}>Deal tracker</button>
         <button className={activeSection === 'diary' ? 'active' : ''} onClick={() => setActiveSection('diary')}>Test drive diary</button>
       </nav>
+      <div className={`active-profile-chip profile-${activeProfile.toLowerCase()}`}>Acting as <strong>{activeProfile}</strong> · edits affect universal {activeProfile} priorities</div>
 
       {showCompareTray && <CompareTray selectedVehicles={selectedVehicles} onCompareNow={() => setActiveSection('compare')} onClear={() => { setSelectedVehicleIds([]); setCompareMessage('Compare tray cleared.'); }} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} onReorder={reorderComparedVehicles} />}
       {compareMessage && <div className="toast" role="status">✓ {compareMessage}</div>}
 
-      {activeSection === 'dashboard' && <section className="grid"><PrioritySliders profileName={activeProfile} currentWeights={profileWeights[activeProfile]} onWeightsChange={handleProfileWeightsChange} /><Dashboard scoredVehicles={filteredVehicles} quotes={dealQuotes} combinedWeights={combinedWeights} loading={!sessionId || preferencesLoading} error={preferencesError?.message} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); setActiveSection('compare'); }} /><PriorityComparison profileWeights={profileWeights} /></section>}
-      {activeSection === 'browse' && <VehicleBrowser filters={filters} onFiltersChange={setFilters} vehicles={filteredVehicles} quotes={dealQuotes} activeProfile={activeProfile} favorites={favoritesByProfile[activeProfile]} selectedVehicleIds={selectedVehicleIds} notes={vehicleNotes} onToggleFavorite={handleToggleFavorite} onToggleCompare={toggleComparedVehicle} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); }} />}
+      {activeSection === 'decision' && <DecisionRoom vehicles={scoredVehicles} notes={vehicleNotes} quotes={dealQuotes} readinessByVehicle={readinessByVehicle} favoritesByProfile={favoritesByProfile} budgetLimit={filters.maxMonthlyPayment} />}
+      {activeSection === 'dashboard' && <section className="grid"><PrioritySliders profileName={activeProfile} currentWeights={profileWeights[activeProfile]} onWeightsChange={handleProfileWeightsChange} /><Dashboard scoredVehicles={filteredVehicles} quotes={dealQuotes} readinessByVehicle={readinessByVehicle} combinedWeights={combinedWeights} loading={!sessionId || preferencesLoading} error={preferencesError?.message} partnerCount={profilePreferences.length} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); setActiveSection('compare'); }} /><PriorityComparison profileWeights={profileWeights} profileMeta={profileMeta} /></section>}
+      {activeSection === 'browse' && <VehicleBrowser filters={filters} onFiltersChange={setFilters} mustHaves={mustHaves} onMustHavesChange={setMustHaves} vehicles={filteredVehicles} readinessByVehicle={readinessByVehicle} quotes={dealQuotes} activeProfile={activeProfile} favorites={favoritesByProfile[activeProfile]} selectedVehicleIds={selectedVehicleIds} notes={vehicleNotes} onToggleFavorite={handleToggleFavorite} onToggleCompare={toggleComparedVehicle} onSelectVehicle={(vehicleId) => { setSelectedVehicleIds([vehicleId, ...selectedVehicleIds.filter((id) => id !== vehicleId)].slice(0, 4)); }} />}
       {activeSection === 'compare' && <EnhancedComparisonTable vehicles={selectedVehicles.length ? selectedVehicles : scoredVehicles.slice(0, 3)} favoritesByProfile={favoritesByProfile} notes={vehicleNotes} quotes={dealQuotes} entries={testDriveEntries} onStageChange={(vehicleId, stage) => saveVehicleNote(vehicleId, { stage })} onReorder={reorderComparedVehicles} onRemove={(vehicleId) => { setSelectedVehicleIds((current) => current.filter((id) => id !== vehicleId)); setCompareMessage('Vehicle removed from comparison.'); }} />}
       {activeSection === 'calculator' && <EnhancedPaymentCalculator vehicle={selectedVehicle} initialPrice={actualVehiclePrice(selectedVehicle, dealQuotes)} budgetLimit={filters.maxMonthlyPayment} onBudgetLimitChange={(maxMonthlyPayment) => setFilters((current) => ({ ...current, maxMonthlyPayment }))} />}
       {activeSection === 'deals' && <DealTracker vehicles={scoredVehicles} quotes={dealQuotes} onSaveQuote={saveDealQuote} />}
@@ -354,6 +397,85 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
       <VehicleProfile vehicle={selectedVehicle} activeProfile={activeProfile} isFavorite={favoritesByProfile[activeProfile].includes(selectedVehicle.id)} note={vehicleNotes[selectedVehicle.id] ?? emptyVehicleNote(selectedVehicle.id)} quotes={dealQuotes.filter((quote) => quote.vehicleId === selectedVehicle.id)} entries={testDriveEntries.filter((entry) => entry.vehicleId === selectedVehicle.id)} onToggleFavorite={() => handleToggleFavorite(selectedVehicle.id)} onNoteChange={(patch) => saveVehicleNote(selectedVehicle.id, patch)} />
     </main>
   );
+}
+
+function DecisionRoom({ vehicles, notes, quotes, readinessByVehicle, favoritesByProfile, budgetLimit }: { vehicles: ScoredVehicle[]; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; readinessByVehicle: Record<string, VehicleReadiness>; favoritesByProfile: Record<ProfileName, string[]>; budgetLimit: number }) {
+  const topThree = vehicles.slice(0, 3);
+  const bestEmily = vehicles.find((vehicle) => favoritesByProfile.Emily.includes(vehicle.id)) ?? topThree[0];
+  const bestNick = vehicles.find((vehicle) => favoritesByProfile.Nick.includes(vehicle.id)) ?? topThree[0];
+  const bestDeal = [...vehicles].sort((a, b) => actualVehiclePrice(a, quotes) - actualVehiclePrice(b, quotes))[0];
+  const bestTestDrive = [...vehicles].sort((a, b) => b.testDriveScore - a.testDriveScore)[0];
+  const lowestMonthly = [...vehicles].sort((a, b) => estimateMonthlyPayment(a) - estimateMonthlyPayment(b))[0];
+  const mostComplete = [...vehicles].sort((a, b) => (readinessByVehicle[b.id]?.score ?? 0) - (readinessByVehicle[a.id]?.score ?? 0))[0];
+  const openTasks = topThree.flatMap((vehicle) => (readinessByVehicle[vehicle.id]?.missing ?? []).slice(0, 3).map((task) => `${vehicle.name}: ${task}`)).slice(0, 7);
+  return <section className="card stack decision-room"><div className="section-heading"><div><p className="eyebrow">Decision Room</p><h2>What is ready, and what still needs work?</h2></div><span>{budgetLimit ? `Budget guardrail $${budgetLimit}/mo` : 'No monthly guardrail set'}</span></div><div className="decision-grid"><DecisionWidget label="Top Recommendation" vehicle={topThree[0]} detail={`${readinessByVehicle[topThree[0]?.id ?? '']?.score ?? 0}% ready`} /><DecisionWidget label="Best for Emily" vehicle={bestEmily} detail={bestEmily ? notes[bestEmily.id]?.reactions?.Emily ?? 'No reaction yet' : '—'} /><DecisionWidget label="Best for Nick" vehicle={bestNick} detail={bestNick ? notes[bestNick.id]?.reactions?.Nick ?? 'No reaction yet' : '—'} /><DecisionWidget label="Best Deal" vehicle={bestDeal} detail={bestDeal ? `$${actualVehiclePrice(bestDeal, quotes).toLocaleString('en-CA')}` : '—'} /><DecisionWidget label="Best Test Drive" vehicle={bestTestDrive} detail={bestTestDrive ? `${bestTestDrive.testDriveScore}/100` : '—'} /><DecisionWidget label="Lowest Monthly" vehicle={lowestMonthly} detail={lowestMonthly ? `$${estimateMonthlyPayment(lowestMonthly).toLocaleString('en-CA')}/mo` : '—'} /><DecisionWidget label="Most Complete Evidence" vehicle={mostComplete} detail={mostComplete ? `${readinessByVehicle[mostComplete.id]?.status}` : '—'} /></div><div className="finalist-strip">{topThree.map((vehicle) => <article key={vehicle.id}><strong>{vehicle.name}</strong><span className={`readiness-badge ${readinessByVehicle[vehicle.id]?.blocked ? 'blocked' : readinessByVehicle[vehicle.id]?.score >= 85 ? 'ready' : ''}`}>{readinessByVehicle[vehicle.id]?.status}</span><ul>{readinessByVehicle[vehicle.id]?.missing.slice(0, 4).map((item) => <li key={item}>{item}</li>)}</ul></article>)}</div><div className="open-tasks"><strong>Open tasks</strong>{openTasks.length ? <ul>{openTasks.map((task) => <li key={task}>{task}</li>)}</ul> : <p className="muted">No major blockers for the current finalists.</p>}</div></section>;
+}
+
+function DecisionWidget({ label, vehicle, detail }: { label: string; vehicle?: ScoredVehicle; detail: string }) {
+  return <article className="decision-widget"><span>{label}</span><strong>{vehicle?.name ?? 'Not enough data'}</strong><small>{detail}</small></article>;
+}
+
+function vehicleReadiness(vehicle: ScoredVehicle, favoritesByProfile: Record<ProfileName, string[]>, note: VehicleNoteDocument, quotes: DealQuoteDocument[], entries: TestDriveEntry[], maxMonthlyPayment: number, mustHaves: MustHaveSettings): VehicleReadiness {
+  const vehicleEntries = entries.filter((entry) => entry.vehicleId === vehicle.id);
+  const completedDrive = vehicleEntries.some((entry) => entry.status === 'Completed');
+  const carSeatAndStroller = vehicleEntries.some((entry) => entry.carSeatFits && entry.strollerFits);
+  const quoteReceived = quotes.some((quote) => quote.vehicleId === vehicle.id);
+  const emilyReviewed = favoritesByProfile.Emily.includes(vehicle.id) || note.reactions.Emily !== 'Unrated';
+  const nickReviewed = favoritesByProfile.Nick.includes(vehicle.id) || note.reactions.Nick !== 'Unrated';
+  const sharedNote = note.sharedNote.trim().length > 0;
+  const withinBudget = !maxMonthlyPayment || estimateMonthlyPayment(vehicle) <= maxMonthlyPayment;
+  const explicitDealBreaker = note.stage === 'Rejected' || /deal\s*breaker|hard no|reject/i.test(note.sharedNote);
+  const mustHaveFailures = unmetMustHaves(vehicle, vehicleEntries, maxMonthlyPayment, mustHaves);
+  const checklist = [
+    { label: 'Emily reviewed or favourited', complete: emilyReviewed },
+    { label: 'Nick reviewed or favourited', complete: nickReviewed },
+    { label: 'Shared note added', complete: sharedNote },
+    { label: 'Test drive completed', complete: completedDrive },
+    { label: 'Quote received', complete: quoteReceived },
+    { label: 'Payment estimate within budget', complete: withinBudget },
+    { label: 'Car seat and stroller checks complete', complete: carSeatAndStroller },
+    { label: 'No unresolved deal breaker', complete: !explicitDealBreaker && mustHaveFailures.length === 0 },
+  ];
+  const missing = checklist.filter((item) => !item.complete).map((item) => item.label).concat(mustHaveFailures);
+  const score = Math.round((checklist.filter((item) => item.complete).length / checklist.length) * 100);
+  const blocked = explicitDealBreaker || mustHaveFailures.length > 0;
+  let status: ReadinessStatus = 'Ready to decide';
+  if (blocked) status = 'Deal breaker';
+  else if (note.stage === 'Finalist' && score >= 75) status = 'Emily marked as finalist';
+  else if (!nickReviewed) status = 'Nick has not reviewed';
+  else if (!completedDrive) status = 'Needs test drive';
+  else if (!quoteReceived) status = 'Needs quote';
+  else if (!sharedNote) status = 'Needs shared note';
+  return { score, status, checklist, missing, blocked };
+}
+
+function unmetMustHaves(vehicle: ScoredVehicle, entries: TestDriveEntry[], maxMonthlyPayment: number, mustHaves: MustHaveSettings) {
+  const failures: string[] = [];
+  const hasCarSeat = entries.some((entry) => entry.carSeatFits);
+  const isHybrid = vehicle.powertrain === 'Hybrid' || vehicle.powertrain === 'Plug-in Hybrid' || vehicle.powertrain === 'Electric';
+  if (mustHaves.mustHaveAwd && vehicle.drivetrain !== 'AWD' && vehicle.drivetrain !== '4WD') failures.push('Deal breaker: AWD / 4WD required');
+  if (mustHaves.mustFitCarSeat && !hasCarSeat) failures.push('Deal breaker: car-seat fit not confirmed');
+  if (mustHaves.mustBeUnderBudget && maxMonthlyPayment && estimateMonthlyPayment(vehicle) > maxMonthlyPayment) failures.push('Deal breaker: over monthly budget');
+  if (mustHaves.mustHaveHybrid && !isHybrid) failures.push('Deal breaker: hybrid/electric required');
+  if (mustHaves.mustHaveHeatedRearSeats && !vehicle.hasHeatedRearSeats) failures.push('Deal breaker: heated rear seats required');
+  if (mustHaves.mustHaveMemorySeats && !vehicle.hasMemorySeats) failures.push('Deal breaker: memory seats required');
+  if (mustHaves.mustHaveSpareTire && vehicle.hasSpareTire === false) failures.push('Deal breaker: spare tire required');
+  if (mustHaves.mustAvoidCvt && vehicle.hasCvt) failures.push('Deal breaker: CVT avoided');
+  if (mustHaves.mustHavePhysicalClimateControls && vehicle.physicalClimateControls === false) failures.push('Deal breaker: physical climate controls required');
+  return failures;
+}
+
+function SavedFilterPresets({ onApply }: { onApply: (patch: Partial<Filters>) => void }) {
+  const presets: Array<{ label: string; patch: Partial<Filters> }> = [
+    { label: 'Budget-friendly', patch: { maxPrice: 38000, maxMonthlyPayment: 650 } },
+    { label: 'Best for winter', patch: { drivetrain: 'AWD', mustHaveAwd: true } },
+    { label: 'Hybrid only', patch: { powertrain: 'Hybrid', mustHaveHybrid: true } },
+    { label: '3-row options', patch: { bodyStyle: 'Midsize SUV', minSeats: 6 } },
+    { label: 'Shortlist', patch: { stage: 'Shortlisted' } },
+    { label: 'Rejected hidden', patch: { stage: 'All', hideRejected: true } },
+    { label: 'Needs test drive', patch: { stage: 'Browsing' } },
+  ];
+  return <div className="saved-views"><span>Saved views</span>{presets.map((preset) => <button type="button" key={preset.label} onClick={() => onApply(preset.patch)}>{preset.label}</button>)}</div>;
 }
 
 interface PrioritySlidersProps { profileName: ProfileName; currentWeights: CriteriaWeights; onWeightsChange: (profileName: ProfileName, weights: CriteriaWeights) => void; }
@@ -368,18 +490,18 @@ function PrioritySliders({ profileName, currentWeights, onWeightsChange }: Prior
     const timeout = window.setTimeout(() => { onWeightsChange(profileName, draftWeights); setHasUserEdited(false); setSaveState(`${profileName}'s priorities applied`); }, 250);
     return () => window.clearTimeout(timeout);
   }, [draftWeights, hasUserEdited, onWeightsChange, profileName]);
-  return <form className="card sliders" onSubmit={(event: FormEvent) => event.preventDefault()}><div className="section-heading"><p className="eyebrow">{profileName}'s priorities</p><span>{saveState}</span></div><h2>Balance what matters most for {profileName}.</h2>{sliderConfig.map((slider) => <label className="slider-row" key={slider.key}><span className="slider-label"><strong>{slider.label}</strong><small>{slider.help}</small></span><input type="range" min="1" max="10" value={draftWeights[slider.key]} onChange={(event) => { setHasUserEdited(true); setDraftWeights((current) => ({ ...current, [slider.key]: Number(event.target.value) })); }} /><b>{draftWeights[slider.key]}</b></label>)}</form>;
+  return <form className="card sliders" onSubmit={(event: FormEvent) => event.preventDefault()}><div className="section-heading"><p className="eyebrow">{profileName}'s priorities</p><span>{saveState}</span></div><h2>Balance what matters most for {profileName}.</h2><p className="edit-warning">You are editing {profileName}'s universal priorities. These values are visible across sessions and devices.</p>{sliderConfig.map((slider) => <label className="slider-row" key={slider.key}><span className="slider-label"><strong>{slider.label}</strong><small>{slider.help}</small></span><input type="range" min="1" max="10" value={draftWeights[slider.key]} onChange={(event) => { setHasUserEdited(true); setDraftWeights((current) => ({ ...current, [slider.key]: Number(event.target.value) })); }} /><b>{draftWeights[slider.key]}</b></label>)}</form>;
 }
 
-function Dashboard({ scoredVehicles, quotes, combinedWeights, loading, error, partnerCount, onSelectVehicle }: { scoredVehicles: ScoredVehicle[]; quotes: DealQuoteDocument[]; combinedWeights: CriteriaWeights; loading: boolean; error?: string; partnerCount: number; onSelectVehicle: (vehicleId: string) => void; }) {
-  return <section className="card dashboard"><div className="section-heading"><p className="eyebrow">Live ranking</p><span>{partnerCount} partner profiles connected</span></div><h2>Recommendation Score</h2>{loading && <p className="muted">Preparing shared profile scoring...</p>}{error && <p className="error-text">Preference stream error: {error}</p>}<div className="weight-summary"><span>Space {combinedWeights.space.toFixed(1)}</span><span>Winter {combinedWeights.winterTraction.toFixed(1)}</span><span>Value {combinedWeights.valueMSRP.toFixed(1)}</span><span>Reliability {combinedWeights.reliability.toFixed(1)}</span><span>Efficiency {combinedWeights.fuelEfficiency.toFixed(1)}</span><span>Safety {combinedWeights.safetyTech.toFixed(1)}</span><span>Comfort {combinedWeights.comfort.toFixed(1)}</span></div><div className="bars">{scoredVehicles.slice(0, 8).map((vehicle) => <button className="vehicle-row" key={vehicle.id} onClick={() => onSelectVehicle(vehicle.id)}><span><strong>{vehicle.name}</strong><small>{actualVehiclePriceLabel(vehicle, quotes)} ${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')} • match {vehicle.familyCompatibilityScore} • confidence {vehicle.confidenceScore}</small></span><span className="bar-shell"><span className="bar-fill" style={{ width: `${vehicle.overallRecommendationScore}%` }} /></span><b>{vehicle.overallRecommendationScore}</b></button>)}</div></section>;
+function Dashboard({ scoredVehicles, quotes, readinessByVehicle, combinedWeights, loading, error, partnerCount, onSelectVehicle }: { scoredVehicles: ScoredVehicle[]; quotes: DealQuoteDocument[]; readinessByVehicle: Record<string, VehicleReadiness>; combinedWeights: CriteriaWeights; loading: boolean; error?: string; partnerCount: number; onSelectVehicle: (vehicleId: string) => void; }) {
+  return <section className="card dashboard"><div className="section-heading"><p className="eyebrow">Live ranking</p><span>{partnerCount} partner profiles connected</span></div><h2>Recommendation Score</h2>{loading && <p className="muted">Preparing shared profile scoring...</p>}{error && <p className="error-text">Preference stream error: {error}</p>}<div className="weight-summary"><span>Space {combinedWeights.space.toFixed(1)}</span><span>Winter {combinedWeights.winterTraction.toFixed(1)}</span><span>Value {combinedWeights.valueMSRP.toFixed(1)}</span><span>Reliability {combinedWeights.reliability.toFixed(1)}</span><span>Efficiency {combinedWeights.fuelEfficiency.toFixed(1)}</span><span>Safety {combinedWeights.safetyTech.toFixed(1)}</span><span>Comfort {combinedWeights.comfort.toFixed(1)}</span></div><div className="bars">{scoredVehicles.slice(0, 8).map((vehicle) => <button className="vehicle-row" key={vehicle.id} onClick={() => onSelectVehicle(vehicle.id)}><span><strong>{vehicle.name}</strong><small>{actualVehiclePriceLabel(vehicle, quotes)} ${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')} • match {vehicle.familyCompatibilityScore} • confidence {vehicle.confidenceScore}</small><small className="readiness-inline">{readinessByVehicle[vehicle.id]?.status ?? 'Needs evidence'} • {readinessByVehicle[vehicle.id]?.score ?? 0}% ready</small></span><span className="bar-shell"><span className="bar-fill" style={{ width: `${vehicle.overallRecommendationScore}%` }} /></span><b>{vehicle.overallRecommendationScore}</b></button>)}</div></section>;
 }
 
-function PriorityComparison({ profileWeights }: { profileWeights: Record<ProfileName, CriteriaWeights> }) {
-  return <section className="card priority-board"><div className="section-heading"><div><p className="eyebrow">Shared priority board</p><h2>See each other's priorities.</h2></div><span>Universal profile priorities</span></div><p className="muted">Emily and Nick's sliders are universal profile settings, so any connected session or device can see the same saved values after Firestore syncs.</p><div className="priority-columns">{profileNames.map((profileName) => <article className={`priority-card profile-${profileName.toLowerCase()}`} key={profileName}><strong>{profileName}</strong>{sliderConfig.map((slider) => <div className="priority-meter" key={`${profileName}-${slider.key}`}><span>{slider.label}</span><b>{profileWeights[profileName][slider.key]}</b><em><i style={{ width: `${profileWeights[profileName][slider.key] * 10}%` }} /></em></div>)}</article>)}</div></section>;
+function PriorityComparison({ profileWeights, profileMeta }: { profileWeights: Record<ProfileName, CriteriaWeights>; profileMeta: Record<ProfileName, ProfilePreferenceMeta> }) {
+  return <section className="card priority-board"><div className="section-heading"><div><p className="eyebrow">Shared priority board</p><h2>See each other's priorities.</h2></div><span>Universal profile priorities</span></div><p className="muted">Emily and Nick's sliders are universal profile settings, so any connected session or device can see the same saved values after Firestore syncs.</p><div className="priority-columns">{profileNames.map((profileName) => <article className={`priority-card profile-${profileName.toLowerCase()}`} key={profileName}><strong>{profileName}</strong><small>Last updated by {profileMeta[profileName].updatedByProfile ?? 'unknown'}{profileMeta[profileName].version ? ` • v${profileMeta[profileName].version}` : ''}</small>{sliderConfig.map((slider) => <div className="priority-meter" key={`${profileName}-${slider.key}`}><span>{slider.label}</span><b>{profileWeights[profileName][slider.key]}</b><em><i style={{ width: `${profileWeights[profileName][slider.key] * 10}%` }} /></em></div>)}</article>)}</div></section>;
 }
 
-function VehicleBrowser({ filters, onFiltersChange, vehicles, quotes, activeProfile, favorites, selectedVehicleIds, notes, onToggleFavorite, onToggleCompare, onSelectVehicle }: { filters: Filters; onFiltersChange: (filters: Filters) => void; vehicles: ScoredVehicle[]; quotes: DealQuoteDocument[]; activeProfile: ProfileName; favorites: string[]; selectedVehicleIds: string[]; notes: Record<string, VehicleNoteDocument>; onToggleFavorite: (vehicleId: string) => void; onToggleCompare: (vehicleId: string) => void; onSelectVehicle: (vehicleId: string) => void; }) {
+function VehicleBrowser({ filters, onFiltersChange, mustHaves, onMustHavesChange, vehicles, readinessByVehicle, quotes, activeProfile, favorites, selectedVehicleIds, notes, onToggleFavorite, onToggleCompare, onSelectVehicle }: { filters: Filters; onFiltersChange: (filters: Filters) => void; mustHaves: MustHaveSettings; onMustHavesChange: (settings: MustHaveSettings) => void; vehicles: ScoredVehicle[]; readinessByVehicle: Record<string, VehicleReadiness>; quotes: DealQuoteDocument[]; activeProfile: ProfileName; favorites: string[]; selectedVehicleIds: string[]; notes: Record<string, VehicleNoteDocument>; onToggleFavorite: (vehicleId: string) => void; onToggleCompare: (vehicleId: string) => void; onSelectVehicle: (vehicleId: string) => void; }) {
   return (
     <section className="card stack browser-panel">
       <div className="section-heading"><div><p className="eyebrow">Browse models</p><h2>Find the right shortlist.</h2></div><span>{vehicles.length} matches</span></div>
@@ -396,12 +518,14 @@ function VehicleBrowser({ filters, onFiltersChange, vehicles, quotes, activeProf
         <label className="field-control"><span>Max monthly</span><input type="number" value={filters.maxMonthlyPayment} onChange={(event) => onFiltersChange({ ...filters, maxMonthlyPayment: Number(event.target.value) })} placeholder="$ / mo" /></label>
         <label className="range-control"><span>Max total price <b>${filters.maxPrice.toLocaleString('en-CA')}</b></span><input type="range" min="30000" max="80000" step="1000" value={filters.maxPrice} onChange={(event) => onFiltersChange({ ...filters, maxPrice: Number(event.target.value) })} /></label>
       </div>
+      <SavedFilterPresets onApply={(patch) => onFiltersChange({ ...filters, ...patch })} />
+      <div className="must-have-panel"><div><p className="eyebrow">Must-haves & deal breakers</p><strong>Mark requirements that can disqualify a vehicle.</strong></div><div className="toggle-row">{(Object.keys(mustHaveLabels) as MustHaveKey[]).map((key) => <PillToggle key={key} checked={mustHaves[key]} onChange={(checked) => onMustHavesChange({ ...mustHaves, [key]: checked })}>{mustHaveLabels[key]}</PillToggle>)}</div></div>
       <div className="toggle-row" aria-label="Requirement filters">
         <PillToggle checked={filters.mustHaveAwd} onChange={(checked) => onFiltersChange({ ...filters, mustHaveAwd: checked })}>AWD / 4WD required</PillToggle>
         <PillToggle checked={filters.mustHaveHybrid} onChange={(checked) => onFiltersChange({ ...filters, mustHaveHybrid: checked })}>Hybrid / electric required</PillToggle>
         <PillToggle checked={filters.mustFitCarSeat} onChange={(checked) => onFiltersChange({ ...filters, mustFitCarSeat: checked })}>Car seat tested</PillToggle>
       </div>
-      <div className="vehicle-cards">{vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} actualPrice={actualVehiclePrice(vehicle, quotes)} actualPriceLabel={actualVehiclePriceLabel(vehicle, quotes)} isFavorite={favorites.includes(vehicle.id)} isCompared={selectedVehicleIds.includes(vehicle.id)} activeProfile={activeProfile} note={notes[vehicle.id] ?? emptyVehicleNote(vehicle.id)} onToggleFavorite={() => onToggleFavorite(vehicle.id)} onToggleCompare={() => onToggleCompare(vehicle.id)} onSelect={() => onSelectVehicle(vehicle.id)} />)}</div>
+      <div className="vehicle-cards">{vehicles.map((vehicle) => <VehicleCard key={vehicle.id} vehicle={vehicle} readiness={readinessByVehicle[vehicle.id]} actualPrice={actualVehiclePrice(vehicle, quotes)} actualPriceLabel={actualVehiclePriceLabel(vehicle, quotes)} isFavorite={favorites.includes(vehicle.id)} isCompared={selectedVehicleIds.includes(vehicle.id)} activeProfile={activeProfile} note={notes[vehicle.id] ?? emptyVehicleNote(vehicle.id)} onToggleFavorite={() => onToggleFavorite(vehicle.id)} onToggleCompare={() => onToggleCompare(vehicle.id)} onSelect={() => onSelectVehicle(vehicle.id)} />)}</div>
     </section>
   );
 }
@@ -414,8 +538,8 @@ function PillToggle({ checked, onChange, children }: { checked: boolean; onChang
   return <label className={`pill-toggle ${checked ? 'active' : ''}`}><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span aria-hidden="true" />{children}</label>;
 }
 
-function VehicleCard({ vehicle, actualPrice, actualPriceLabel, isFavorite, isCompared, activeProfile, note, onToggleFavorite, onToggleCompare, onSelect }: { vehicle: ScoredVehicle; actualPrice: number; actualPriceLabel: string; isFavorite: boolean; isCompared: boolean; activeProfile: ProfileName; note: VehicleNoteDocument; onToggleFavorite: () => void; onToggleCompare: () => void; onSelect: () => void }) {
-  return <article className="vehicle-card"><button className="star-button" onClick={onToggleFavorite} aria-label={`${isFavorite ? 'Remove from' : 'Add to'} ${activeProfile}'s favourites`}>{isFavorite ? '★' : '☆'}</button><button className="compare-toggle" onClick={onToggleCompare}>{isCompared ? '✓ Compare' : '+ Compare'}</button><button className="vehicle-card-main" onClick={onSelect}><VehicleImage vehicle={vehicle} /><strong>{vehicle.name}</strong><span>{actualPriceLabel} ${actualPrice.toLocaleString('en-CA')} • {vehicle.drivetrain} • {vehicle.powertrain}</span><span>{note.stage} • {activeProfile}: {note.reactions[activeProfile]}</span><b>{vehicle.overallRecommendationScore}/100</b></button></article>;
+function VehicleCard({ vehicle, readiness, actualPrice, actualPriceLabel, isFavorite, isCompared, activeProfile, note, onToggleFavorite, onToggleCompare, onSelect }: { vehicle: ScoredVehicle; readiness?: VehicleReadiness; actualPrice: number; actualPriceLabel: string; isFavorite: boolean; isCompared: boolean; activeProfile: ProfileName; note: VehicleNoteDocument; onToggleFavorite: () => void; onToggleCompare: () => void; onSelect: () => void }) {
+  return <article className="vehicle-card"><button className="star-button" onClick={onToggleFavorite} aria-label={`${isFavorite ? 'Remove from' : 'Add to'} ${activeProfile}'s favourites`}>{isFavorite ? '★' : '☆'}</button><button className="compare-toggle" onClick={onToggleCompare}>{isCompared ? '✓ Compare' : '+ Compare'}</button><button className="vehicle-card-main" onClick={onSelect}><VehicleImage vehicle={vehicle} /><strong>{vehicle.name}</strong><span>{actualPriceLabel} ${actualPrice.toLocaleString('en-CA')} • {vehicle.drivetrain} • {vehicle.powertrain}</span><span>{note.stage} • {activeProfile}: {note.reactions[activeProfile]}</span><b>{vehicle.overallRecommendationScore}/100</b>{readiness && <span className={`readiness-badge ${readiness.blocked ? 'blocked' : readiness.score >= 85 ? 'ready' : ''}`}>{readiness.status} • {readiness.score}%</span>}</button></article>;
 }
 
 function VehicleImage({ vehicle }: { vehicle: ScoredVehicle }) {
