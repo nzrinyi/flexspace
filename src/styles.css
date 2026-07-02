@@ -360,3 +360,16 @@ a { color: var(--accent); font-weight: 700; }
 .trim-options article div { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
 .trim-options article span, .trim-options article small { color: #64748b; font-weight: 800; }
 .trim-options ul { margin: 0; padding-left: 18px; color: #475569; }
+
+/* Header alignment and recommendation score chips */
+.hero-topline { align-items: center; }
+.brand-status { display: inline-flex; align-items: center; gap: 12px; }
+.hero .eyebrow { font-size: 1rem; letter-spacing: .16em; }
+.hero .profile-switcher { margin-top: 0; margin-left: auto; }
+.weight-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: 10px; align-items: stretch; padding: 0; background: transparent; }
+.weight-chip { display: grid; gap: 7px; border: 1px solid #e8edf7; border-radius: 16px; background: linear-gradient(180deg,#fff,#f8fafc); padding: 12px; box-shadow: 0 8px 20px rgba(15,23,42,.05); }
+.weight-chip small { color: #64748b; font-size: .72rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.weight-chip strong { color: #0f172a; font-size: 1.25rem; line-height: 1; }
+.weight-chip em { display: block; overflow: hidden; height: 7px; border-radius: 999px; background: #e8edf7; }
+.weight-chip i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--accent),var(--accent-2)); }
+@media (max-width: 760px) { .hero-topline { gap: 14px; } .hero .profile-switcher { width: auto; margin-left: auto; } .weight-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
