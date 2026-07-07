@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover - surfaced by main logging in CI
 
 REPRESENT_BASE_URL = "https://represent.opennorth.ca"
 SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/proactive/summary/"
+SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
 DEFAULT_USER_AGENT = "SenStats-Data-Sync/1.0 (Contact: configure-SENSTATS_CONTACT_EMAIL)"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
 
@@ -148,8 +149,68 @@ def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
         if senators:
             LOGGER.info("Fetched %s senators from %s", len(senators), first_url)
             return senators
-    LOGGER.error("No senator metadata could be fetched from Represent endpoints.")
-    return []
+    LOGGER.warning("No senator metadata could be fetched from Represent endpoints; falling back to official Senate list.")
+    return fetch_senate_website_senators(http)
+
+
+def party_label(value: str) -> str:
+    labels = {
+        "C": "Conservative Party of Canada",
+        "CSG": "Canadian Senators Group",
+        "GRO": "Government Representative's Office",
+        "ISG": "Independent Senators Group",
+        "PSG": "Progressive Senate Group",
+        "Non-affiliated": "Non-affiliated",
+    }
+    return labels.get(value.strip(), value.strip() or "Independent/Unknown")
+
+
+def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]:
+    """Fallback to the official Senate current-senators AJAX endpoint.
+
+    Open North does not always expose Canadian senators as a representative set.
+    The official Senate endpoint is therefore used as a resilient fallback so the
+    Firestore collection is populated instead of showing 0 synced senators.
+    """
+    response = safe_get(http, SENATE_SENATORS_AJAX_URL)
+    if response is None:
+        return []
+    try:
+        soup = BeautifulSoup(response.text, "html.parser")
+        rows = soup.find_all("tr")
+        senators: list[SenatorRecord] = []
+        for row in rows:
+            cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
+            if len(cells) < 6 or cells[0].lower() == "name":
+                continue
+            anchor = row.find("a", href=True)
+            name, party, province, nominated, retirement, appointed_by = cells[:6]
+            if not name or not province:
+                continue
+            senators.append(
+                SenatorRecord(
+                    senator_id=stable_id(name),
+                    name=name,
+                    party=party_label(party),
+                    province=province,
+                    office_details=[{
+                        "type": "senate-profile",
+                        "nominatedDate": nominated,
+                        "retirementDate": retirement,
+                        "appointedOnAdviceOf": appointed_by,
+                    }],
+                    source_url=urljoin(SENATE_SENATORS_AJAX_URL, str(anchor["href"])) if anchor else SENATE_SENATORS_AJAX_URL,
+                    photo_url=None,
+                )
+            )
+        if senators:
+            LOGGER.info("Fetched %s senators from official Senate AJAX endpoint", len(senators))
+        else:
+            LOGGER.warning("Official Senate endpoint returned no parseable senator rows; structure may have changed.")
+        return senators
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("Official Senate senator parse failed: %s", exc, exc_info=True)
+        return []
 
 
 def parse_money(value: str) -> float | None:
