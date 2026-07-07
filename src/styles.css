@@ -511,3 +511,21 @@ a { color: var(--accent); font-weight: 700; }
 .drilldown-header strong { color: #0f172a; font-size: 1.05rem; }
 .drilldown-header button { border: 0; border-radius: 999px; background: #eef2ff; color: #3730a3; padding: 8px 12px; font-weight: 900; }
 @media (max-width: 640px) { .senator-list-full { grid-template-columns: 1fr; } .senator-drilldown { padding: 10px; } }
+
+/* SenStats spreadsheet-style senator table and right-side drilldown */
+.senator-workspace { grid-template-columns: 1fr; align-items: start; }
+.senator-workspace.with-details { grid-template-columns: minmax(340px, .9fr) minmax(360px, 1.1fr); }
+.senator-list-panel { overflow: auto; border: 1px solid #e8edf7; border-radius: 22px; background: #fff; box-shadow: 0 12px 28px rgba(15,23,42,.06); }
+.senator-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+.senator-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #64748b; padding: 10px 12px; text-align: left; font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid #e8edf7; }
+.senator-table td { padding: 9px 12px; border-bottom: 1px solid #edf2f7; color: #25324a; font-weight: 800; vertical-align: middle; }
+.senator-table tr { border-left: 7px solid var(--group-color, transparent); cursor: pointer; }
+.senator-table tbody tr:hover, .senator-table tbody tr.active { background: color-mix(in srgb, var(--group-color, #64748b) 8%, #fff); }
+.senator-table strong { color: #0f172a; }
+.senator-table em { display: inline-flex; width: fit-content; border-radius: 999px; background: #f1f5f9; color: #334155; padding: 4px 8px; font-size: .72rem; font-style: normal; font-weight: 900; }
+.senator-table .senator-avatar { width: 36px; height: 36px; border-radius: 12px; }
+.senator-workspace.with-details .senator-table { min-width: 420px; }
+.senator-workspace.with-details .optional-col { display: none; }
+.senator-workspace.with-details .history-col { text-align: center; }
+@media (max-width: 980px) { .senator-workspace.with-details { grid-template-columns: 1fr; } .senator-workspace.with-details .optional-col { display: table-cell; } }
+@media (max-width: 640px) { .senator-table { min-width: 560px; } .senator-workspace.with-details .senator-table { min-width: 560px; } }
