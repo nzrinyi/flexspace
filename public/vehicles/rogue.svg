@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600" role="img" aria-label="Nissan Rogue vehicle image">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eef4ff"/><stop offset="1" stop-color="#dbeafe"/></linearGradient>
+    <linearGradient id="car" x1="180" y1="210" x2="735" y2="410" gradientUnits="userSpaceOnUse"><stop stop-color="#14b8a6"/><stop offset="1" stop-color="#14213d"/></linearGradient>
+  </defs>
+  <rect width="900" height="600" rx="44" fill="url(#bg)"/>
+  <circle cx="735" cy="120" r="130" fill="#14b8a6" opacity="0.14"/>
+  <path d="M146 373h606c18 0 32 14 32 32v30H116v-30c0-18 14-32 30-32Z" fill="#d7def5"/>
+  <path d="M164 342h572l-57-112c-18-35-52-56-91-56H337c-40 0-75 22-92 58l-81 110Z" fill="url(#car)"/>
+  <path d="M306 209h132v92H240l45-72c5-12 12-20 21-20Zm171 0h114c24 0 42 12 54 34l28 58H477v-92Z" fill="#f8faff" opacity="0.9"/>
+  <circle cx="271" cy="412" r="58" fill="#14213d"/><circle cx="271" cy="412" r="25" fill="#f8faff"/>
+  <circle cx="629" cy="412" r="58" fill="#14213d"/><circle cx="629" cy="412" r="25" fill="#f8faff"/>
+  <text x="70" y="92" font-family="Inter, Arial, sans-serif" font-size="52" font-weight="800" fill="#14213d">Nissan</text>
+  <text x="70" y="150" font-family="Inter, Arial, sans-serif" font-size="40" font-weight="700" fill="#14b8a6">Rogue</text>
+</svg>
