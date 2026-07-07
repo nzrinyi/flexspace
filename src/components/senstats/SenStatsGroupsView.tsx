@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { SenStatsSenatorDocument } from '../../types';
-import { groupClassName } from './SenStatsHelpers';
+import { groupClassName, groupLabel } from './SenStatsHelpers';
 
 interface SenStatsGroupsViewProps {
   groups: Array<{ group: string; senators: SenStatsSenatorDocument[] }>;
@@ -30,7 +30,7 @@ export function SenStatsGroupsView({ groups, recentlyChangedSenatorIds }: SenSta
           <article key={group} className={`group-accordion-item ${expanded ? 'expanded' : 'collapsed'} ${groupClassName(group)}`}>
             <button type="button" className="group-accordion-header" onClick={() => toggleGroup(group)} aria-expanded={expanded}>
               <span className="group-accordion-title">
-                <strong>{group}</strong>
+                <strong>{groupLabel(group)}</strong>
                 <small>{expanded ? `${visibleSenators.length} of ${senators.length} senators shown` : `${senators.length} senators`}</small>
               </span>
               <span className="group-accordion-meta">

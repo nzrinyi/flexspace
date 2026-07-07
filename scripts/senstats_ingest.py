@@ -36,7 +36,8 @@ except ImportError:  # pragma: no cover - surfaced by main logging in CI
     firestore = None
 
 REPRESENT_BASE_URL = "https://represent.opennorth.ca"
-SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/proactive/summary/"
+SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/ProActive/Summary"
+SENATE_DISCLOSURE_DETAILS_URL = "https://sencanada.ca/en/ProActive/Summary/Details"
 SENATE_PROACTIVE_URL = "https://sencanada.ca/en/proactive/"
 SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
@@ -291,11 +292,11 @@ def enrich_with_senate_profiles(http: requests.Session, senators: list[SenatorRe
 
 def party_label(value: str) -> str:
     labels = {
-        "C": "Conservative Party of Canada",
-        "CSG": "Canadian Senators Group",
-        "GRO": "Government Representative's Office",
-        "ISG": "Independent Senators Group",
-        "PSG": "Progressive Senate Group",
+        "C": "CPC",
+        "CSG": "CSG",
+        "GRO": "GRO",
+        "ISG": "ISG",
+        "PSG": "PSG",
         "Non-affiliated": "Non-affiliated",
     }
     return labels.get(value.strip(), value.strip() or "Independent/Unknown")
@@ -416,7 +417,7 @@ def infer_quarter(text: str, fallback_year: int | None = None) -> str:
 
 def disclosure_links(http: requests.Session) -> list[str]:
     links: list[str] = []
-    for index_url in [SENATE_PROACTIVE_URL, SENATE_DISCLOSURE_URL]:
+    for index_url in [SENATE_DISCLOSURE_URL, SENATE_DISCLOSURE_DETAILS_URL, SENATE_PROACTIVE_URL]:
         response = safe_get(http, index_url)
         if response is None:
             continue
