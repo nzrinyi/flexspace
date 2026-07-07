@@ -407,6 +407,25 @@ def firestore_client() -> Any:
     return firestore.client()
 
 
+def write_party_affiliation_history(db: Any, senators: Iterable[SenatorRecord]) -> None:
+    count = 0
+    for senator in senators:
+        ref = db.collection("senstats_senators").document(senator.senator_id)
+        existing = ref.get()
+        previous_party = existing.to_dict().get("party") if existing.exists else None
+        if previous_party and previous_party != senator.party:
+            history_id = hashlib.sha1(f"{senator.senator_id}|{previous_party}|{senator.party}".encode("utf-8")).hexdigest()
+            ref.collection("party_affiliation_history").document(history_id).set({
+                "senatorId": senator.senator_id,
+                "previousParty": previous_party,
+                "newParty": senator.party,
+                "sourceUrl": senator.source_url,
+                "changedAt": firestore.SERVER_TIMESTAMP,
+            }, merge=True)
+            count += 1
+    LOGGER.info("Wrote %s party affiliation history records", count)
+
+
 def write_senators(db: Any, senators: Iterable[SenatorRecord]) -> None:
     batch = db.batch()
     count = 0
@@ -495,6 +514,7 @@ def main() -> int:
     committees = fetch_committee_records(http, senators)
     try:
         db = firestore_client()
+        write_party_affiliation_history(db, senators)
         write_senators(db, senators)
         write_expenses(db, expenses)
         write_committees(db, committees)

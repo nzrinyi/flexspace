@@ -192,3 +192,11 @@ export interface SenStatsCommitteeDocument {
   members: SenStatsCommitteeMember[];
   updatedAt?: Timestamp;
 }
+
+export interface SenStatsAffiliationHistoryDocument {
+  senatorId: string;
+  previousParty: string;
+  newParty: string;
+  sourceUrl?: string;
+  changedAt?: Timestamp;
+}

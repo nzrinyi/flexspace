@@ -1,7 +1,11 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, collectionGroup, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../types';
+import type { SenStatsAffiliationHistoryDocument, SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../types';
+import { SenStatsCommitteesView } from './senstats/SenStatsCommitteesView';
+import { SenStatsGroupsView } from './senstats/SenStatsGroupsView';
+import { SenStatsLoadingSkeleton } from './senstats/SenStatsLoadingSkeleton';
+import { SenStatsSenatorsView } from './senstats/SenStatsSenatorsView';
 
 type SenStatsSenator = SenStatsSenatorDocument;
 type SenStatsExpense = SenStatsExpenseDocument & { id: string };
@@ -23,26 +27,13 @@ class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: 
   }
 }
 
-function currency(amount: number) {
-  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(amount || 0);
-}
-
-function groupClassName(group: string) {
-  const normalized = group.toLowerCase();
-  if (normalized.includes('independent')) return 'group-isg';
-  if (normalized.includes('conservative')) return 'group-conservative';
-  if (normalized.includes('canadian senators')) return 'group-csg';
-  if (normalized.includes('progressive')) return 'group-psg';
-  if (normalized.includes('government')) return 'group-gro';
-  return 'group-na';
-}
-
 function SenStatsDashboardContent() {
   const [activeTab, setActiveTab] = useState<SenStatsTab>('senators');
   const [senators, setSenators] = useState<SenStatsSenator[]>([]);
   const [committees, setCommittees] = useState<SenStatsCommittee[]>([]);
   const [selectedSenatorId, setSelectedSenatorId] = useState<string | null>(null);
   const [expenses, setExpenses] = useState<SenStatsExpense[]>([]);
+  const [recentlyChangedSenatorIds, setRecentlyChangedSenatorIds] = useState<Set<string>>(new Set());
   const [groupFilter, setGroupFilter] = useState('All');
   const [provinceFilter, setProvinceFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,6 +63,17 @@ function SenStatsDashboardContent() {
   }, []);
 
   useEffect(() => {
+    return onSnapshot(collectionGroup(db, 'party_affiliation_history'), (snapshot) => {
+      const changedIds = new Set<string>();
+      snapshot.docs.forEach((docSnapshot) => {
+        const history = docSnapshot.data() as SenStatsAffiliationHistoryDocument;
+        if (history.senatorId) changedIds.add(history.senatorId);
+      });
+      setRecentlyChangedSenatorIds(changedIds);
+    }, (snapshotError) => setError(snapshotError.message));
+  }, []);
+
+  useEffect(() => {
     if (!selectedSenatorId) {
       setExpenses([]);
       return undefined;
@@ -97,9 +99,8 @@ function SenStatsDashboardContent() {
   }), [groupFilter, provinceFilter, searchTerm, senators]);
   const senatorsByGroup = useMemo(() => groupOptions.filter((group) => group !== 'All').map((group) => ({ group, senators: senators.filter((senator) => senator.party === group) })), [groupOptions, senators]);
   const selectedSenator = senators.find((senator) => senator.id === selectedSenatorId) ?? filteredSenators[0] ?? senators[0];
-  const totalExpenses = useMemo(() => expenses.reduce((total, expense) => total + (Number(expense.amount) || 0), 0), [expenses]);
 
-  if (loading) return <section className="card blank-app"><p className="eyebrow">SenStats</p><h2>Loading senators…</h2></section>;
+  if (loading) return <SenStatsLoadingSkeleton />;
   if (error) return <section className="card blank-app"><p className="eyebrow">Realtime listener failed</p><h2>Unable to load SenStats data.</h2><p className="muted">{error}</p></section>;
 
   return (
@@ -113,26 +114,9 @@ function SenStatsDashboardContent() {
         {(['senators', 'groups', 'committees'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'groups' ? 'Groups' : 'Committees'}</button>)}
       </div>
 
-      {activeTab === 'senators' && <>
-        <div className="senstats-filters">
-          <label><span>Search</span><input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search senator, province, group…" /></label>
-          <label><span>Group / affiliation</span><select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}>{groupOptions.map((group) => <option key={group}>{group}</option>)}</select></label>
-          <label><span>Province / territory</span><select value={provinceFilter} onChange={(event) => setProvinceFilter(event.target.value)}>{provinceOptions.map((province) => <option key={province}>{province}</option>)}</select></label>
-        </div>
-        <div className="senstats-grid">
-          <aside className="senator-list" aria-label="Canadian senators">
-            {filteredSenators.length === 0 && <p className="muted">No senators match those filters.</p>}
-            {filteredSenators.map((senator) => <button key={senator.id} type="button" className={senator.id === selectedSenator?.id ? `active ${groupClassName(senator.party)}` : groupClassName(senator.party)} onClick={() => setSelectedSenatorId(senator.id)}><strong>{senator.name}</strong><span>{senator.province}</span><em>{senator.party}</em></button>)}
-          </aside>
-          <div className="expense-panel">
-            {selectedSenator ? <><div className={`senstats-stat ${groupClassName(selectedSenator.party)}`}><span>Selected senator</span><strong>{selectedSenator.name}</strong><small>{selectedSenator.province} · {selectedSenator.party}</small></div><div className="senstats-stat"><span>Visible expenses</span><strong>{currency(totalExpenses)}</strong><small>{expenseLoading ? 'Syncing expense records…' : `${expenses.length} quarterly records`}</small></div><div className="expense-list">{expenses.length === 0 && <p className="muted">No expense records are available for this senator yet.</p>}{expenses.map((expense) => <article key={expense.id}><div><strong>{expense.quarter}</strong><span>{expense.category}</span></div><b>{currency(expense.amount)}</b></article>)}</div></> : <p className="muted">Choose a senator to inspect expenses.</p>}
-          </div>
-        </div>
-      </>}
-
-      {activeTab === 'groups' && <div className="groups-grid">{senatorsByGroup.map(({ group, senators: groupSenators }) => <article key={group} className={`group-card ${groupClassName(group)}`}><div><strong>{group}</strong><span>{groupSenators.length} senators</span></div><ul>{groupSenators.map((senator) => <li key={senator.id}>{senator.name}<small>{senator.province}</small></li>)}</ul></article>)}</div>}
-
-      {activeTab === 'committees' && <div className="committees-grid">{committees.length === 0 && <p className="muted">No committee documents yet. The next SenStats sync will attempt to read current committee pages and membership from the Senate website.</p>}{committees.map((committee) => <article key={committee.id} className="committee-card"><div><strong>{committee.name}</strong><span>{committee.code} · {committee.type || 'Committee'}</span></div><p className="muted">{committee.session || 'Current session'}</p><div className="committee-members">{(committee.members || []).length === 0 && <span>No members parsed yet</span>}{(committee.members || []).map((member) => <span key={`${committee.id}-${member.name}-${member.role}`}>{member.name}{member.role ? ` · ${member.role}` : ''}</span>)}</div></article>)}</div>}
+      {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
+      {activeTab === 'groups' && <SenStatsGroupsView groups={senatorsByGroup} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />}
+      {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
     </section>
   );
 }

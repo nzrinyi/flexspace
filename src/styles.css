@@ -432,3 +432,29 @@ a { color: var(--accent); font-weight: 700; }
 .committee-members { display: flex; flex-wrap: wrap; gap: 8px; }
 .committee-members span { border-radius: 999px; background: #eef2ff; color: #3730a3; padding: 6px 9px; font-size: .78rem; }
 @media (max-width: 820px) { .senstats-filters { grid-template-columns: 1fr; } .senstats-tabs { width: 100%; } .senstats-tabs button { flex: 1; } }
+
+/* SenStats visualization and progressive disclosure */
+.senstats-chart { min-height: 240px; border: 1px solid #e8edf7; border-radius: 20px; background: #fff; padding: 12px; }
+.senstats-chart-empty { display: grid; place-items: center; gap: 8px; min-height: 220px; border: 1px dashed #cbd5e1; border-radius: 20px; background: linear-gradient(180deg,#fff,#f8fafc); text-align: center; color: #475569; padding: 22px; }
+.senstats-chart-empty strong { color: #0f172a; font-size: 1.05rem; }
+.empty-graphic { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 20px; background: #eef2ff; color: #4338ca; font-size: 1.5rem; font-weight: 950; }
+.empty-graphic.pulse { animation: skeleton-pulse 1.3s ease-in-out infinite; }
+.senstats-group-key { display: flex; flex-wrap: wrap; gap: 8px; }
+.senstats-group-key span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e8edf7; border-radius: 999px; background: #fff; color: #334155; padding: 6px 9px; font-size: .75rem; font-weight: 900; }
+.senstats-group-key i { width: 9px; height: 9px; border-radius: 50%; background: var(--group-color, #64748b); }
+.history-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; margin-left: 6px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: .75rem; font-weight: 950; }
+.group-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 0; background: transparent; color: #0f172a; padding: 0; text-align: left; }
+.group-card-header span { display: grid; gap: 3px; }
+.group-card-header b { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 999px; background: #f1f5f9; color: #334155; }
+.senator-list button > span, .senstats-stat small, .group-card small, .committee-card .muted { color: #334155; }
+.senstats-skeleton-card, .senstats-skeleton-block { display: grid; gap: 10px; border: 1px solid #e8edf7; border-radius: 18px; background: #fff; padding: 16px; }
+.senstats-skeleton-block { min-height: 110px; }
+.senstats-skeleton-block.tall { min-height: 260px; }
+.skeleton-line, .senstats-skeleton-card span, .senstats-skeleton-card strong, .senstats-skeleton-card em { display: block; border-radius: 999px; background: linear-gradient(90deg,#e2e8f0,#f8fafc,#e2e8f0); background-size: 200% 100%; animation: skeleton-pulse 1.3s ease-in-out infinite; }
+.skeleton-line.short { width: 120px; height: 12px; }
+.skeleton-line.title { width: 240px; height: 30px; }
+.skeleton-line.badge { width: 160px; height: 24px; }
+.senstats-skeleton-card span { width: 52%; height: 12px; }
+.senstats-skeleton-card strong { width: 82%; height: 18px; }
+.senstats-skeleton-card em { width: 42%; height: 12px; }
+@keyframes skeleton-pulse { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
