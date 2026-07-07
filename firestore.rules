@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function sessionExists(sessionId) {
+      return exists(/databases/$(database)/documents/sessions/$(sessionId));
+    }
+
+    function sessionData(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId)).data;
+    }
+
+    function isSessionPartner(sessionId) {
+      return signedIn()
+        && sessionExists(sessionId)
+        && request.auth.uid in sessionData(sessionId).partnerIds;
+    }
+
+    function isSharedProfile(userId) {
+      return userId in ['Emily', 'Nick'];
+    }
+
+    function isJoiningExistingSession() {
+      return signedIn()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['partnerIds', 'dynamicShareLink'])
+        && request.resource.data.partnerIds.hasAll(resource.data.partnerIds)
+        && request.auth.uid in request.resource.data.partnerIds
+        && request.resource.data.partnerIds.size() <= 2
+        && request.resource.data.dynamicShareLink is string;
+    }
+
+
+    match /profilePreferences/{profileName} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && isSharedProfile(profileName)
+        && request.resource.data.userId == profileName
+        && request.resource.data.criteriaWeights is map
+        && request.resource.data.personalNotes is map
+        && request.resource.data.favoriteVehicleIds is list;
+      allow delete: if false;
+    }
+
+
+    match /vehicles/{vehicleId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.id == vehicleId
+        && request.resource.data.name is string
+        && request.resource.data.msrp is number;
+      allow delete: if false;
+
+      match /trims/{trimId} {
+        allow read: if signedIn();
+        allow create, update: if signedIn()
+          && request.resource.data.vehicleId == vehicleId
+          && request.resource.data.name is string;
+        allow delete: if false;
+      }
+    }
+
+    match /marketData/{region}/incentives/{incentiveId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && request.resource.data.region == region
+        && request.resource.data.vehicleId is string;
+      allow delete: if false;
+    }
+
+    match /senstats_senators/{senatorId} {
+      allow read: if signedIn();
+      allow write: if false;
+
+      match /expenses/{expenseId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+
+    match /sessions/{sessionId} {
+      allow create: if signedIn()
+        && request.resource.data.id == sessionId
+        && request.resource.data.dynamicShareLink is string
+        && request.resource.data.partnerIds is list
+        && request.resource.data.partnerIds.size() == 1
+        && request.resource.data.partnerIds[0] == request.auth.uid
+        && request.resource.data.vehiclesShortlist is list;
+
+      // Signed-in anonymous users may read a session by invite ID so they can join.
+      // Nested user preferences and test-drive records remain partner-only below.
+      allow read: if signedIn();
+      allow update: if isJoiningExistingSession();
+      allow delete: if false;
+
+      match /userPreferences/{userId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && signedIn()
+          && (userId == request.auth.uid || isSharedProfile(userId))
+          && request.resource.data.userId == userId
+          && request.resource.data.criteriaWeights is map
+          && request.resource.data.personalNotes is map
+          && request.resource.data.favoriteVehicleIds is list;
+        allow delete: if false;
+      }
+
+
+      match /vehicleNotes/{vehicleId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId == vehicleId
+          && request.resource.data.sharedNote is string
+          && request.resource.data.stage is string
+          && request.resource.data.reactions is map;
+        allow delete: if false;
+      }
+
+      match /testDriveDiary/{entryId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId is string
+          && request.resource.data.date is string
+          && request.resource.data.notes is string;
+        allow delete: if false;
+      }
+
+      match /dealQuotes/{quoteId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId is string
+          && request.resource.data.dealer is string
+          && request.resource.data.price is number;
+        allow delete: if false;
+      }
+
+      match /testDrives/{vehicleId} {
+        allow read: if isSessionPartner(sessionId);
+        allow create, update: if isSessionPartner(sessionId)
+          && request.resource.data.vehicleId == vehicleId
+          && request.resource.data.physicalChecklist is map
+          && request.resource.data.thumbsUpCount is int
+          && request.resource.data.uploadedPhotos is list;
+        allow delete: if false;
+      }
+    }
+  }
+}
