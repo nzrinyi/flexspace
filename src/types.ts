@@ -161,6 +161,10 @@ export interface SenStatsSenatorDocument {
   officeDetails: Array<Record<string, unknown>>;
   sourceUrl?: string;
   photoUrl?: string | null;
+  contactDetails?: Array<Record<string, unknown>>;
+  extraDetails?: Record<string, unknown>;
+  profileDetails?: Record<string, unknown>;
+  rawData?: Record<string, unknown>;
   updatedAt?: Timestamp;
 }
 

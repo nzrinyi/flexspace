@@ -58,6 +58,10 @@ class SenatorRecord:
     office_details: list[dict[str, Any]]
     source_url: str
     photo_url: str | None = None
+    contact_details: list[dict[str, Any]] | None = None
+    extra_details: dict[str, Any] | None = None
+    profile_details: dict[str, Any] | None = None
+    raw_data: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -113,6 +117,87 @@ def stable_id(value: str) -> str:
     return cleaned or hashlib.sha1(value.encode("utf-8")).hexdigest()[:12]
 
 
+def firestore_safe(value: Any) -> Any:
+    """Convert scraper/API payloads into Firestore-safe primitive values."""
+    if isinstance(value, dict):
+        return {str(key): firestore_safe(item) for key, item in value.items() if item is not None}
+    if isinstance(value, list):
+        return [firestore_safe(item) for item in value]
+    if isinstance(value, tuple):
+        return [firestore_safe(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def first_present(*values: Any) -> str | None:
+    for value in values:
+        if value:
+            return str(value)
+    return None
+
+
+def extract_image_url(container: Any, base_url: str) -> str | None:
+    if container is None:
+        return None
+    image = container.find("img") if hasattr(container, "find") else None
+    if not image:
+        return None
+    for attr in ["src", "data-src", "data-original", "data-lazy-src"]:
+        value = image.get(attr)
+        if value:
+            return urljoin(base_url, str(value))
+    srcset = image.get("srcset")
+    if srcset:
+        first = str(srcset).split(",")[0].strip().split(" ")[0]
+        if first:
+            return urljoin(base_url, first)
+    return None
+
+
+def parse_profile_details(html: str, source_url: str) -> dict[str, Any]:
+    """Extract best-effort public fields from a Senate profile page."""
+    soup = BeautifulSoup(html, "html.parser")
+    details: dict[str, Any] = {}
+    heading = soup.find("h1")
+    if heading:
+        details["heading"] = heading.get_text(" ", strip=True)
+    image_url = extract_image_url(soup, source_url)
+    if image_url:
+        details["photoUrl"] = image_url
+    meta_description = soup.find("meta", attrs={"name": "description"})
+    if meta_description and meta_description.get("content"):
+        details["description"] = meta_description.get("content")
+    og_image = soup.find("meta", property="og:image")
+    if og_image and og_image.get("content"):
+        details["photoUrl"] = urljoin(source_url, str(og_image.get("content")))
+    for row in soup.select("dl, table"):
+        for term in row.find_all(["dt", "th"]):
+            label = term.get_text(" ", strip=True).strip(":")
+            value_node = term.find_next_sibling(["dd", "td"])
+            if label and value_node:
+                details[stable_id(label)] = value_node.get_text(" ", strip=True)
+    contact_links: list[dict[str, str]] = []
+    for anchor in soup.find_all("a", href=True):
+        href = str(anchor["href"])
+        if href.startswith(("mailto:", "tel:")):
+            contact_links.append({"label": anchor.get_text(" ", strip=True), "href": href})
+    if contact_links:
+        details["contactLinks"] = contact_links
+    return details
+
+
+def fetch_profile_details(http: requests.Session, source_url: str) -> dict[str, Any]:
+    response = safe_get(http, source_url)
+    if response is None:
+        return {}
+    try:
+        return parse_profile_details(response.text, source_url)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("Senator profile parse failed for %s: %s", source_url, exc, exc_info=True)
+        return {}
+
+
 def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
     """Fetch current Canadian senators from Represent.
 
@@ -144,15 +229,20 @@ def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
                 if not name:
                     LOGGER.warning("Skipping senator row without name: %s", item)
                     continue
+                raw_item = firestore_safe(item)
+                offices = list(item.get("offices") or [])
                 senators.append(
                     SenatorRecord(
                         senator_id=stable_id(name),
                         name=name,
-                        party=str(item.get("party_name") or "Independent/Unknown"),
-                        province=str(item.get("district_name") or item.get("extra", {}).get("province") or "Unknown"),
-                        office_details=list(item.get("offices") or []),
+                        party=str(item.get("party_name") or item.get("party") or "Independent/Unknown"),
+                        province=str(item.get("district_name") or item.get("extra", {}).get("province") or item.get("province") or "Unknown"),
+                        office_details=firestore_safe(offices),
                         source_url=str(item.get("source_url") or item.get("url") or REPRESENT_BASE_URL),
-                        photo_url=item.get("photo_url"),
+                        photo_url=first_present(item.get("photo_url"), item.get("personal_url"), item.get("image")),
+                        contact_details=firestore_safe(offices),
+                        extra_details=firestore_safe(item.get("extra") or {}),
+                        raw_data=raw_item if isinstance(raw_item, dict) else {"value": raw_item},
                     )
                 )
             meta = payload.get("meta") or {}
@@ -199,20 +289,29 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
             name, party, province, nominated, retirement, appointed_by = cells[:6]
             if not name or not province:
                 continue
+            source_url = urljoin("https://sencanada.ca", str(anchor["href"])) if anchor else SENATE_SENATORS_AJAX_URL
+            row_photo_url = extract_image_url(row, "https://sencanada.ca")
+            profile_details = fetch_profile_details(http, source_url) if anchor else {}
+            profile_photo_url = profile_details.get("photoUrl") if isinstance(profile_details.get("photoUrl"), str) else None
+            office_details = {
+                "type": "senate-profile",
+                "nominatedDate": nominated,
+                "retirementDate": retirement,
+                "appointedOnAdviceOf": appointed_by,
+            }
             senators.append(
                 SenatorRecord(
                     senator_id=stable_id(name),
                     name=name,
                     party=party_label(party),
                     province=province,
-                    office_details=[{
-                        "type": "senate-profile",
-                        "nominatedDate": nominated,
-                        "retirementDate": retirement,
-                        "appointedOnAdviceOf": appointed_by,
-                    }],
-                    source_url=urljoin(SENATE_SENATORS_AJAX_URL, str(anchor["href"])) if anchor else SENATE_SENATORS_AJAX_URL,
-                    photo_url=None,
+                    office_details=[office_details],
+                    source_url=source_url,
+                    photo_url=profile_photo_url or row_photo_url,
+                    contact_details=firestore_safe(profile_details.get("contactLinks", [])),
+                    extra_details={"nominatedDate": nominated, "retirementDate": retirement, "appointedOnAdviceOf": appointed_by},
+                    profile_details=firestore_safe(profile_details),
+                    raw_data=firestore_safe({"cells": cells, "rowAttributes": dict(row.attrs), "profileDetails": profile_details}),
                 )
             )
         if senators:
@@ -437,9 +536,13 @@ def write_senators(db: Any, senators: Iterable[SenatorRecord]) -> None:
             "name": senator.name,
             "party": senator.party,
             "province": senator.province,
-            "officeDetails": senator.office_details,
+            "officeDetails": firestore_safe(senator.office_details),
             "sourceUrl": senator.source_url,
             "photoUrl": senator.photo_url,
+            "contactDetails": firestore_safe(senator.contact_details or []),
+            "extraDetails": firestore_safe(senator.extra_details or {}),
+            "profileDetails": firestore_safe(senator.profile_details or {}),
+            "rawData": firestore_safe(senator.raw_data or {}),
             "updatedAt": now,
         }, merge=True)
         count += 1
