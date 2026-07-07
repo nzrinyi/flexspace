@@ -373,3 +373,18 @@ a { color: var(--accent); font-weight: 700; }
 .weight-chip em { display: block; overflow: hidden; height: 7px; border-radius: 999px; background: #e8edf7; }
 .weight-chip i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,var(--accent),var(--accent-2)); }
 @media (max-width: 760px) { .hero-topline { gap: 14px; } .hero .profile-switcher { width: auto; margin-left: auto; } .weight-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Multi-app launcher */
+.app-name { border: 0; background: transparent; color: var(--accent); padding: 0; font-size: 1.05rem; font-weight: 950; letter-spacing: .16em; text-transform: uppercase; }
+.app-name:hover { text-decoration: underline; text-underline-offset: 5px; }
+.app-selector-shell, .senstats-shell { min-height: 100vh; display: grid; align-content: start; }
+.app-selector { margin-top: clamp(24px, 8vh, 96px); }
+.app-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.app-tiles button { display: grid; gap: 10px; text-align: left; border: 1px solid #e8edf7; border-radius: 22px; background: linear-gradient(180deg,#fff,#f8fafc); color: #14213d; padding: 22px; box-shadow: 0 12px 28px rgba(15,23,42,.06); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.app-tiles button:hover { transform: translateY(-2px); border-color: rgba(var(--accent-rgb),.35); box-shadow: 0 18px 38px rgba(15,23,42,.1); }
+.app-tiles strong { font-size: 1.35rem; letter-spacing: -.03em; }
+.app-tiles span { color: #53627c; line-height: 1.55; }
+.app-tiles small { color: var(--accent); font-weight: 900; }
+.secondary-action { border: 1px solid #d7def5; border-radius: 999px; background: #fff; color: #26395f; padding: 10px 15px; font-weight: 900; }
+.blank-app { display: grid; gap: 8px; }
+.senstats-name { --accent: #7c3aed; color: #7c3aed; }

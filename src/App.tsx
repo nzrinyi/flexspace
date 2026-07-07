@@ -36,6 +36,7 @@ type MustHaveSettings = Record<MustHaveKey, boolean>;
 type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 'Nick has not reviewed' | 'Emily marked as finalist' | 'Needs shared note' | 'Deal breaker';
 
 type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary' | 'decision';
+type WorkspaceApp = 'CarMatch' | 'SenStats' | 'AppSelection';
 
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
@@ -129,6 +130,15 @@ function App() {
   return <AuthenticatedSession activeUser={user} />;
 }
 
+
+function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) => void }) {
+  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open existing app</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Blank workspace ready for the next app build-out.</span><small>Open blank app</small></button></div></section></main>;
+}
+
+function SenStatsApp({ onOpenAppSelection, onBackToCarMatch }: { onOpenAppSelection: () => void; onBackToCarMatch: () => void }) {
+  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="secondary-action" type="button" onClick={onBackToCarMatch}>Back to CarMatch</button></div></section><section className="card blank-app"><p className="eyebrow">Blank app</p><h2>SenStats is ready for setup.</h2><p className="muted">This placeholder is intentionally empty. Send the SenStats requirements next and this workspace can be built out without disturbing CarMatch.</p></section></main>;
+}
+
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [sessionId, setSessionId] = useState<string | null>(getSessionIdFromUrl);
   const [session, setSession] = useState<SessionDocument | null>(null);
@@ -140,6 +150,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [dealQuotes, setDealQuotes] = useState<DealQuoteDocument[]>([]);
   const [vehicleNotes, setVehicleNotes] = useState<Record<string, VehicleNoteDocument>>({});
   const [activeSection, setActiveSection] = useLocalStorageState<AppSection>('carmatch.activeSection', 'dashboard');
+  const [activeWorkspaceApp, setActiveWorkspaceApp] = useLocalStorageState<WorkspaceApp>('carmatch.workspaceApp', 'CarMatch');
   const [compareMessage, setCompareMessage] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeProfile, setActiveProfile] = useState<ProfileName>('Emily');
@@ -367,10 +378,13 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
     });
   }, [setSelectedVehicleIds]);
 
+  if (activeWorkspaceApp === 'AppSelection') return <AppSelectionPage onSelectApp={setActiveWorkspaceApp} />;
+  if (activeWorkspaceApp === 'SenStats') return <SenStatsApp onOpenAppSelection={() => setActiveWorkspaceApp('AppSelection')} onBackToCarMatch={() => setActiveWorkspaceApp('CarMatch')} />;
+
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>
       <section className="hero card">
-        <div className="hero-topline"><div className="brand-status"><p className="eyebrow">CarMatch</p><SessionStatusIcon status={sessionStatus} /></div><div className="profile-switcher" aria-label="User profile selector">{profileNames.map((profileName) => <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>)}</div></div>
+        <div className="hero-topline"><div className="brand-status"><button className="app-name" type="button" onDoubleClick={() => setActiveWorkspaceApp('AppSelection')} title="Double-click to switch apps">CarMatch</button><SessionStatusIcon status={sessionStatus} /></div><div className="profile-switcher" aria-label="User profile selector">{profileNames.map((profileName) => <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>)}</div></div>
       </section>
 
       <button className="menu-toggle" type="button" aria-expanded={isMenuOpen} aria-controls="primary-app-menu" onClick={() => setIsMenuOpen((open: boolean) => !open)}><span className="menu-icon" aria-hidden="true"><span /><span /><span /></span><span>{activeSectionLabel}</span></button>
