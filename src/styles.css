@@ -487,7 +487,9 @@ a { color: var(--accent); font-weight: 700; }
 
 /* SenStats senator photos and richer profile metadata */
 .senator-list button { grid-template-columns: auto 1fr; align-items: center; }
-.senator-list button img, .senator-list button > i { grid-row: span 3; width: 42px; height: 42px; border-radius: 14px; object-fit: cover; background: #eef2ff; color: #4338ca; display: grid; place-items: center; font-style: normal; font-weight: 950; }
+.senator-avatar { grid-row: span 3; position: relative; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; overflow: hidden; background: #eef2ff; color: #4338ca !important; font-weight: 950; }
+.senator-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.senator-avatar i { font-style: normal; }
 .selected-senator-card { align-items: start; }
 .selected-senator-card img { width: min(150px, 45vw); aspect-ratio: 4 / 5; object-fit: cover; border-radius: 18px; border: 1px solid #e8edf7; box-shadow: 0 12px 28px rgba(15,23,42,.1); }
 .selected-senator-card a { width: fit-content; border-radius: 999px; background: #eef2ff; color: #3730a3; padding: 6px 10px; font-size: .78rem; font-weight: 900; }

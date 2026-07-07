@@ -17,7 +17,7 @@ import random
 import re
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
@@ -250,9 +250,41 @@ def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
             next_url = urljoin(REPRESENT_BASE_URL, next_path) if next_path else None
         if senators:
             LOGGER.info("Fetched %s senators from %s", len(senators), first_url)
-            return senators
+            return enrich_with_senate_profiles(http, senators)
     LOGGER.warning("No senator metadata could be fetched from Represent endpoints; falling back to official Senate list.")
     return fetch_senate_website_senators(http)
+
+
+def enrich_with_senate_profiles(http: requests.Session, senators: list[SenatorRecord]) -> list[SenatorRecord]:
+    """Merge official Senate profile photos/details into API records when available."""
+    senate_records = fetch_senate_website_senators(http)
+    if not senate_records:
+        return senators
+    senate_by_id = {record.senator_id: record for record in senate_records}
+    enriched: list[SenatorRecord] = []
+    seen: set[str] = set()
+    for senator in senators:
+        official = senate_by_id.get(senator.senator_id)
+        if official is None:
+            enriched.append(senator)
+            seen.add(senator.senator_id)
+            continue
+        seen.add(senator.senator_id)
+        enriched.append(replace(
+            senator,
+            party=official.party or senator.party,
+            province=official.province or senator.province,
+            photo_url=senator.photo_url or official.photo_url,
+            contact_details=senator.contact_details or official.contact_details,
+            extra_details={**(official.extra_details or {}), **(senator.extra_details or {})},
+            profile_details={**(official.profile_details or {}), **(senator.profile_details or {})},
+            raw_data={"api": senator.raw_data or {}, "senate": official.raw_data or {}},
+        ))
+    for official in senate_records:
+        if official.senator_id not in seen:
+            enriched.append(official)
+    LOGGER.info("Enriched %s senator records with official Senate profile data", len(enriched))
+    return enriched
 
 
 def party_label(value: str) -> str:
