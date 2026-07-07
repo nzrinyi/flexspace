@@ -17,6 +17,7 @@ import random
 import re
 import sys
 import time
+import unicodedata
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -36,6 +37,7 @@ except ImportError:  # pragma: no cover - surfaced by main logging in CI
 
 REPRESENT_BASE_URL = "https://represent.opennorth.ca"
 SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/proactive/summary/"
+SENATE_PROACTIVE_URL = "https://sencanada.ca/en/proactive/"
 SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
 DEFAULT_USER_AGENT = "SenStats-Data-Sync/1.0 (Contact: configure-SENSTATS_CONTACT_EMAIL)"
@@ -374,6 +376,29 @@ def first_money(values: Iterable[str]) -> float | None:
     return None
 
 
+def normalize_text(value: str) -> str:
+    without_accents = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"[^a-z0-9]+", " ", without_accents.lower()).strip()
+
+
+def senator_name_aliases(name: str) -> set[str]:
+    normalized = normalize_text(name)
+    parts = normalized.split()
+    aliases = {normalized}
+    if len(parts) >= 2:
+        aliases.add(" ".join([parts[-1], *parts[:-1]]))
+        aliases.add(f"{parts[-1]} {' '.join(parts[:-1])}")
+    return {alias for alias in aliases if alias}
+
+
+def match_senator_from_text(text: str, senators_by_name: dict[str, SenatorRecord]) -> SenatorRecord | None:
+    normalized = normalize_text(text)
+    for name, senator in senators_by_name.items():
+        if any(alias in normalized for alias in senator_name_aliases(name)):
+            return senator
+    return None
+
+
 def infer_quarter(text: str, fallback_year: int | None = None) -> str:
     normalized = " ".join(text.split())
     year_match = re.search(r"20\d{2}", normalized)
@@ -390,22 +415,26 @@ def infer_quarter(text: str, fallback_year: int | None = None) -> str:
 
 
 def disclosure_links(http: requests.Session) -> list[str]:
-    response = safe_get(http, SENATE_DISCLOSURE_URL)
-    if response is None:
-        return []
-    soup = BeautifulSoup(response.text, "html.parser")
     links: list[str] = []
-    for anchor in soup.find_all("a", href=True):
-        label = anchor.get_text(" ", strip=True).lower()
-        href = str(anchor["href"])
-        if any(token in label for token in ["csv", "senator", "expenditure", "expense", "quarterly"]):
-            links.append(urljoin(SENATE_DISCLOSURE_URL, href))
-        elif any(href.lower().endswith(ext) for ext in [".csv", ".html", ".htm"]):
-            links.append(urljoin(SENATE_DISCLOSURE_URL, href))
+    for index_url in [SENATE_PROACTIVE_URL, SENATE_DISCLOSURE_URL]:
+        response = safe_get(http, index_url)
+        if response is None:
+            continue
+        soup = BeautifulSoup(response.text, "html.parser")
+        links.append(index_url)
+        for anchor in soup.find_all("a", href=True):
+            label = anchor.get_text(" ", strip=True).lower()
+            href = str(anchor["href"])
+            absolute = urljoin(index_url, href)
+            lower_href = absolute.lower()
+            if any(token in label for token in ["csv", "senator", "expenditure", "expense", "quarterly", "office", "travel", "hospitality"]):
+                links.append(absolute)
+            elif "/proactive" in lower_href or any(lower_href.endswith(ext) for ext in [".csv", ".html", ".htm", ".xlsx", ".xls"]):
+                links.append(absolute)
     unique = list(dict.fromkeys(links))
     if not unique:
-        LOGGER.warning("No disclosure links found on %s; HTML structure may have changed.", SENATE_DISCLOSURE_URL)
-    return unique[:20]
+        LOGGER.warning("No disclosure links found on Senate proactive disclosure pages; HTML structure may have changed.")
+    return unique[:60]
 
 
 def parse_expenses_from_html(html: str, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
@@ -419,13 +448,14 @@ def parse_expenses_from_html(html: str, source_url: str, senators_by_name: dict[
             cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
             if len(cells) < 3:
                 continue
-            haystack = " | ".join(cells).lower()
-            matched = next((senator for name, senator in senators_by_name.items() if name.lower() in haystack), None)
+            row_values = dict(zip(headers, cells, strict=False))
+            haystack = " | ".join(cells)
+            matched = match_senator_from_text(haystack, senators_by_name)
             amount = first_money(reversed(cells))
             if not matched or amount is None:
                 continue
-            category = next((cell for cell in cells if "expense" in cell.lower() or "travel" in cell.lower() or "hospitality" in cell.lower()), "Uncategorized")
-            records.append(ExpenseRecord(matched.senator_id, matched.name, infer_quarter(source_url + " " + table.get_text(" ", strip=True)), amount, category, source_url, {"cells": cells}))
+            category = next((cell for cell in cells + headers if "office" in cell.lower() or "travel" in cell.lower() or "hospitality" in cell.lower() or "living" in cell.lower() or "contract" in cell.lower()), "Uncategorized")
+            records.append(ExpenseRecord(matched.senator_id, matched.name, infer_quarter(source_url + " " + table.get_text(" ", strip=True)), amount, category, source_url, {"cells": cells, "row": row_values}))
     return records
 
 
@@ -433,12 +463,12 @@ def parse_expenses_from_csv(text: str, source_url: str, senators_by_name: dict[s
     records: list[ExpenseRecord] = []
     for row in csv.DictReader(io.StringIO(text)):
         values = {str(k or "").strip(): str(v or "").strip() for k, v in row.items()}
-        joined = " | ".join(values.values()).lower()
-        matched = next((senator for name, senator in senators_by_name.items() if name.lower() in joined), None)
+        joined = " | ".join(values.values())
+        matched = match_senator_from_text(joined, senators_by_name)
         amount = first_money(value for key, value in values.items() if "amount" in key.lower() or "$" in value)
         if not matched or amount is None:
             continue
-        category = next((value for key, value in values.items() if "category" in key.lower() or "type" in key.lower()), "Uncategorized")
+        category = next((value for key, value in values.items() if "category" in key.lower() or "type" in key.lower() or "expense" in key.lower()), "Uncategorized")
         quarter = next((infer_quarter(value) for key, value in values.items() if "quarter" in key.lower() or "period" in key.lower()), infer_quarter(source_url))
         records.append(ExpenseRecord(matched.senator_id, matched.name, quarter, amount, category, source_url, values))
     return records
@@ -598,6 +628,8 @@ def write_expenses(db: Any, expenses: Iterable[ExpenseRecord]) -> None:
     for expense in expenses:
         ref = db.collection("senstats_senators").document(expense.senator_id).collection("expenses").document(expense_doc_id(expense))
         batch.set(ref, {
+            "senatorId": expense.senator_id,
+            "senatorName": expense.senator_name,
             "quarter": expense.quarter,
             "amount": expense.amount,
             "category": expense.category,

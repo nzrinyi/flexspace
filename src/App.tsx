@@ -136,8 +136,8 @@ function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) =>
   return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open existing app</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Blank workspace ready for the next app build-out.</span><small>Open blank app</small></button></div></section></main>;
 }
 
-function SenStatsApp({ onOpenAppSelection, onBackToCarMatch }: { onOpenAppSelection: () => void; onBackToCarMatch: () => void }) {
-  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="secondary-action" type="button" onClick={onBackToCarMatch}>Back to CarMatch</button></div></section><section className="card blank-app"><p className="eyebrow">Blank app</p><h2>SenStats is ready for setup.</h2><p className="muted">Daily ingestion writes senator metadata to <code>senstats_senators</code> and quarterly records to each senator's <code>expenses</code> subcollection.</p><SenStatsDashboard /></section></main>;
+function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
+  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button></div></section><SenStatsDashboard /></main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {
@@ -380,7 +380,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   }, [setSelectedVehicleIds]);
 
   if (activeWorkspaceApp === 'AppSelection') return <AppSelectionPage onSelectApp={setActiveWorkspaceApp} />;
-  if (activeWorkspaceApp === 'SenStats') return <SenStatsApp onOpenAppSelection={() => setActiveWorkspaceApp('AppSelection')} onBackToCarMatch={() => setActiveWorkspaceApp('CarMatch')} />;
+  if (activeWorkspaceApp === 'SenStats') return <SenStatsApp onOpenAppSelection={() => setActiveWorkspaceApp('AppSelection')} />;
 
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>

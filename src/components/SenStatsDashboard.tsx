@@ -106,7 +106,7 @@ function SenStatsDashboardContent() {
   return (
     <section className="card senstats-dashboard">
       <div className="section-heading">
-        <div><p className="eyebrow">Realtime Firestore dashboard</p><h2>Senators, groups, and committees</h2></div>
+        <div><h2>Senators, groups, and committees</h2></div>
         <span>{senators.length} senators synced · daily at 09:17 UTC</span>
       </div>
 
