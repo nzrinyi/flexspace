@@ -83,3 +83,14 @@ The deployed site will be available at:
 
 - `https://flexspace-1.web.app`
 - `https://flexspace-1.firebaseapp.com`
+
+## SenStats daily data sync
+
+SenStats data ingestion runs from `.github/workflows/senstats-data-sync.yml` and calls `scripts/senstats_ingest.py` on a daily schedule or manual dispatch.
+
+Required secrets/environment values:
+
+- `FIREBASE_SERVICE_ACCOUNT`: Firebase service-account JSON used by the Python Admin SDK. The script also accepts `GOOGLE_APPLICATION_CREDENTIALS_JSON` or `FIREBASE_SERVICE_ACCOUNT_JSON` when running locally.
+- `SENSTATS_CONTACT_EMAIL`: Contact email included in the scraper User-Agent, e.g. `SenStats-Data-Sync/1.0 (Contact: you@example.com)`.
+
+The pipeline writes senator master records to `/senstats_senators/{senatorId}` and quarterly expense records to `/senstats_senators/{senatorId}/expenses/{expenseId}`. Failed requests, parsing issues, and suspected HTML structure changes are logged to `senstats_ingest_errors.log` and uploaded as a workflow artifact.

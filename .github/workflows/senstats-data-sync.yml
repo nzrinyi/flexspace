@@ -1,0 +1,40 @@
+name: SenStats Daily Data Sync
+
+on:
+  schedule:
+    - cron: '17 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync-senstats:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/requirements-senstats.txt
+
+      - name: Install ingestion dependencies
+        run: pip install -r scripts/requirements-senstats.txt
+
+      - name: Run SenStats ingestion
+        run: python scripts/senstats_ingest.py
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SENSTATS_CONTACT_EMAIL: ${{ secrets.SENSTATS_CONTACT_EMAIL }}
+
+      - name: Upload ingestion error log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: senstats-ingestion-log
+          path: senstats_ingest_errors.log
+          if-no-files-found: ignore

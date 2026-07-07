@@ -152,3 +152,24 @@ export interface TestDriveEntry {
   status?: TestDriveStatus;
   createdAt?: Timestamp;
 }
+
+export interface SenStatsSenatorDocument {
+  id: string;
+  name: string;
+  party: string;
+  province: string;
+  officeDetails: Array<Record<string, unknown>>;
+  sourceUrl?: string;
+  photoUrl?: string | null;
+  updatedAt?: Timestamp;
+}
+
+export interface SenStatsExpenseDocument {
+  id?: string;
+  quarter: string;
+  amount: number;
+  category: string;
+  sourceUrl?: string;
+  raw?: Record<string, unknown>;
+  createdAt?: Timestamp;
+}

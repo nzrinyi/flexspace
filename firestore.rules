@@ -70,6 +70,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /senstats_senators/{senatorId} {
+      allow read: if signedIn();
+      allow write: if false;
+
+      match /expenses/{expenseId} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+    }
+
+
     match /sessions/{sessionId} {
       allow create: if signedIn()
         && request.resource.data.id == sessionId

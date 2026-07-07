@@ -10,6 +10,7 @@ import { CompareTray } from './components/CompareTray';
 import { ComparisonTable as EnhancedComparisonTable } from './components/ComparisonTable';
 import { PaymentCalculator as EnhancedPaymentCalculator } from './components/PaymentCalculator';
 import { TestDriveDiary as EnhancedTestDriveDiary } from './components/TestDriveDiary';
+import { SenStatsDashboard } from './components/SenStatsDashboard';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import './styles.css';
 
@@ -136,7 +137,7 @@ function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) =>
 }
 
 function SenStatsApp({ onOpenAppSelection, onBackToCarMatch }: { onOpenAppSelection: () => void; onBackToCarMatch: () => void }) {
-  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="secondary-action" type="button" onClick={onBackToCarMatch}>Back to CarMatch</button></div></section><section className="card blank-app"><p className="eyebrow">Blank app</p><h2>SenStats is ready for setup.</h2><p className="muted">This placeholder is intentionally empty. Send the SenStats requirements next and this workspace can be built out without disturbing CarMatch.</p></section></main>;
+  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="secondary-action" type="button" onClick={onBackToCarMatch}>Back to CarMatch</button></div></section><section className="card blank-app"><p className="eyebrow">Blank app</p><h2>SenStats is ready for setup.</h2><p className="muted">Daily ingestion writes senator metadata to <code>senstats_senators</code> and quarterly records to each senator's <code>expenses</code> subcollection.</p><SenStatsDashboard /></section></main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {
