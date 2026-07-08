@@ -528,3 +528,137 @@ a { color: var(--accent); font-weight: 700; }
 .senator-workspace.with-details .optional-col, .senator-workspace.with-details .history-col { display: none; }
 @media (max-width: 980px) { .senator-workspace.with-details { grid-template-columns: 1fr; } .senator-workspace.with-details .optional-col, .senator-workspace.with-details .history-col { display: table-cell; } }
 @media (max-width: 640px) { .senator-table { min-width: 560px; } .senator-workspace.with-details .senator-table { min-width: 560px; } }
+
+/* End-to-end mobile hardening pass for CarMatch and SenStats */
+html { max-width: 100%; overflow-x: hidden; }
+body { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
+img, svg, video, canvas { max-width: 100%; }
+input, select, textarea { max-width: 100%; }
+
+@media (max-width: 900px) {
+  .senstats-dashboard .section-heading,
+  .browser-panel .section-heading,
+  .comparison-panel .section-heading { align-items: flex-start; }
+  .senstats-grid,
+  .senator-workspace.with-details { grid-template-columns: 1fr; }
+  .senator-list-panel { max-width: 100%; }
+  .senator-drilldown { position: static; }
+  .expense-list article { align-items: flex-start; }
+}
+
+@media (max-width: 760px) {
+  .shell { max-width: 100%; }
+  .hero-topline { display: grid; grid-template-columns: 1fr; }
+  .brand-status { width: 100%; justify-content: space-between; }
+  .hero .profile-switcher { width: 100%; margin-left: 0; }
+  .app-name { font-size: .98rem; letter-spacing: .12em; text-align: left; }
+  .section-heading { display: grid; grid-template-columns: 1fr; }
+  .section-heading h2 { margin-bottom: 4px; }
+  .app-selector { margin-top: 12px; }
+  .app-tiles { grid-template-columns: 1fr; }
+  .app-tiles button { min-height: 132px; }
+  .compare-tray-list { width: 100%; }
+  .compare-tray-item { grid-template-columns: 54px minmax(0,1fr) 38px; min-width: 0; }
+  .compare-tray-item img { grid-row: auto; width: 54px; height: 42px; }
+  .compare-tray-remove { width: 34px; height: 34px; }
+  .saved-views { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 14px; scroll-snap-type: x proximity; }
+  .saved-views span, .saved-views button { flex: 0 0 auto; scroll-snap-align: start; }
+  .filter-drawer summary { min-height: 52px; }
+  .must-have-panel { padding: 14px; }
+  .vehicle-card-main { min-height: 100%; }
+  .vehicle-card-main > strong { font-size: 1.05rem; }
+  .profile .vehicle-photo { width: 100%; height: auto; min-height: 210px; max-height: 260px; }
+  .trim-options { grid-template-columns: 1fr; }
+  .inline-controls { grid-template-columns: 1fr; }
+  .inline-controls label, .calculator-grid label, .diary-form label { min-width: 0; }
+  .decision-grid { grid-template-columns: 1fr; }
+  .finalist-strip { grid-template-columns: 1fr; }
+  .open-tasks ul, .finalist-strip ul { padding-left: 18px; }
+  .comparison-panel { overflow: hidden; }
+  .comparison-grid { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; }
+  .compare-grid-corner, .compare-category, .compare-label-card { position: static; }
+  .compare-column-card { min-width: 178px; }
+  .compare-value-card { min-width: 150px; overflow-wrap: anywhere; }
+  .compare-label-card { min-width: 108px; }
+  .senstats-tabs { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); border-radius: 18px; }
+  .senstats-tabs button { padding: 10px 8px; }
+  .senstats-filters { grid-template-columns: 1fr; }
+  .senstats-group-key { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; }
+  .senstats-group-key span { flex: 0 0 auto; }
+  .groups-accordion { gap: 10px; }
+  .group-accordion-header { align-items: center; }
+  .group-senator-row { align-items: flex-start; flex-direction: column; }
+  .committees-grid { grid-template-columns: 1fr; }
+  .senstats-chart { overflow-x: auto; }
+  .senstats-profile-data { padding: 14px; }
+  .expense-list article { display: grid; grid-template-columns: 1fr; }
+  .expense-list b { justify-self: start; }
+}
+
+@media (max-width: 560px) {
+  .card { padding: 14px; }
+  .hero { padding: 16px 14px; }
+  .profile-switcher button,
+  .menu-toggle,
+  .app-menu button,
+  .compare-tray-actions button,
+  .diary-form button,
+  .deal-form button { min-height: 48px; }
+  .weight-summary,
+  .spec-grid,
+  .mini-summary,
+  .decision-grid { grid-template-columns: 1fr; }
+  .vehicle-row { grid-template-columns: 1fr; }
+  .vehicle-row b { justify-self: start; }
+  .vehicle-row .bar-shell { grid-column: auto; width: 100%; }
+  .vehicle-photo { height: 172px; }
+  .star-button { width: 42px; height: 42px; }
+  .compare-toggle { min-height: 38px; }
+  .payment-result { overflow-wrap: anywhere; }
+  .timeline-heading { display: grid; }
+  .timeline-card { padding: 12px; }
+  .diary-chips { display: grid; grid-template-columns: 1fr 1fr; }
+  .progress-ring { justify-self: center; }
+  .senator-list-panel { border-radius: 18px; }
+  .senator-table { min-width: 0; table-layout: fixed; }
+  .senator-table th, .senator-table td { padding: 8px 7px; font-size: .78rem; }
+  .senator-table th:first-child, .senator-table td:first-child { width: 48px; }
+  .senator-table .optional-col,
+  .senator-table .history-col,
+  .senator-workspace.with-details .optional-col,
+  .senator-workspace.with-details .history-col { display: none; }
+  .senator-table strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .senator-table em { max-width: 68px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .senator-table .senator-avatar { width: 34px; height: 34px; }
+  .selected-senator-card img { width: min(130px, 60vw); justify-self: center; }
+  .drilldown-header { align-items: flex-start; }
+}
+
+@media (max-width: 380px) {
+  .shell { padding-left: 6px; padding-right: 6px; }
+  .card { padding: 12px; border-radius: 18px; }
+  .app-menu, .menu-toggle { width: calc(100% + 12px); margin-left: -6px; margin-right: -6px; }
+  .mode-tabs button, .senstats-tabs button { font-size: .78rem; }
+  .diary-chips { grid-template-columns: 1fr; }
+  .compare-tray-item { grid-template-columns: 46px minmax(0,1fr) 34px; gap: 8px; }
+  .compare-tray-item img { width: 46px; height: 38px; }
+}
+
+/* Native responsive SenStats expense chart (no third-party canvas dependency) */
+.native-expense-chart { display: grid; gap: 14px; min-width: 0; }
+.expense-chart-legend { display: flex; flex-wrap: wrap; gap: 8px; }
+.expense-chart-legend span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e8edf7; border-radius: 999px; background: #fff; color: #475569; padding: 6px 9px; font-size: .76rem; font-weight: 900; }
+.expense-chart-legend i { width: 9px; height: 9px; border-radius: 999px; }
+.expense-chart-bars { display: grid; gap: 10px; }
+.expense-chart-row { display: grid; grid-template-columns: minmax(74px,.4fr) minmax(120px,1fr) minmax(82px,.45fr); gap: 10px; align-items: center; }
+.expense-chart-row > span { color: #475569; font-size: .78rem; font-weight: 950; }
+.expense-chart-row strong { justify-self: end; color: #0f172a; font-size: .86rem; }
+.expense-chart-stack { display: flex; height: 22px; overflow: hidden; border-radius: 999px; background: #edf2f7; box-shadow: inset 0 0 0 1px #e2e8f0; }
+.expense-chart-stack i { display: block; min-width: 3px; height: 100%; }
+@media (max-width: 560px) {
+  .expense-chart-legend { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 3px; }
+  .expense-chart-legend span { flex: 0 0 auto; }
+  .expense-chart-row { grid-template-columns: 1fr; gap: 6px; padding: 10px 0; border-top: 1px solid #edf2f7; }
+  .expense-chart-row:first-child { border-top: 0; }
+  .expense-chart-row strong { justify-self: start; }
+}
