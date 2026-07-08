@@ -3,6 +3,7 @@ import { collection, collectionGroup, onSnapshot, orderBy, query } from 'firebas
 import { db } from '../firebase';
 import type { SenStatsAffiliationHistoryDocument, SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../types';
 import { SenStatsCommitteesView } from './senstats/SenStatsCommitteesView';
+import { SenStatsDataSourcesView } from './senstats/SenStatsDataSourcesView';
 import { SenStatsGroupsView } from './senstats/SenStatsGroupsView';
 import { SenStatsLoadingSkeleton } from './senstats/SenStatsLoadingSkeleton';
 import { SenStatsSenatorsView } from './senstats/SenStatsSenatorsView';
@@ -10,7 +11,7 @@ import { SenStatsSenatorsView } from './senstats/SenStatsSenatorsView';
 type SenStatsSenator = SenStatsSenatorDocument;
 type SenStatsExpense = SenStatsExpenseDocument & { id: string };
 type SenStatsCommittee = SenStatsCommitteeDocument & { id: string };
-type SenStatsTab = 'senators' | 'groups' | 'committees';
+type SenStatsTab = 'senators' | 'groups' | 'committees' | 'sources';
 
 class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -111,12 +112,13 @@ function SenStatsDashboardContent() {
       </div>
 
       <div className="senstats-tabs" role="tablist" aria-label="SenStats sections">
-        {(['senators', 'groups', 'committees'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'groups' ? 'Groups' : 'Committees'}</button>)}
+        {(['senators', 'groups', 'committees', 'sources'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'groups' ? 'Groups' : tab === 'committees' ? 'Committees' : 'Data sources'}</button>)}
       </div>
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
       {activeTab === 'groups' && <SenStatsGroupsView groups={senatorsByGroup} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />}
       {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
+      {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} selectedSenator={selectedSenator} expenses={expenses} committees={committees} />}
     </section>
   );
 }
