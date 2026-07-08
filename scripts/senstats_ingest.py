@@ -18,7 +18,7 @@ import re
 import sys
 import time
 import unicodedata
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
@@ -40,9 +40,11 @@ SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/ProActive/Summary"
 SENATE_DISCLOSURE_DETAILS_URL = "https://sencanada.ca/en/ProActive/Summary/Details"
 SENATE_DISCLOSURE_SENATORS_URL = "https://sencanada.ca/en/ProActive/Summary/Senators"
 SENATE_PROACTIVE_URL = "https://sencanada.ca/en/proactive/"
+SENATE_ATTENDANCE_URL = "https://sencanada.ca/en/attendance/"
+SENATE_EXPENSE_SUMMARY_FILTER_URL = "https://sencanada.ca/en/proactive/summary/#?Year=2026&Quarter=1&Member=Senators"
 SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
-DEFAULT_USER_AGENT = "SenStats-Data-Sync/1.0 (Contact: configure-SENSTATS_CONTACT_EMAIL)"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: configure-SENSTATS_CONTACT_EMAIL)"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
 
 logging.basicConfig(
@@ -90,6 +92,22 @@ class CommitteeRecord:
     members: list[dict[str, str]]
 
 
+@dataclass(frozen=True)
+class AttendanceRecord:
+    senator_id: str
+    senator_name: str
+    party: str
+    sitting_days: int
+    present: int
+    other_public_business: int
+    illness: int
+    leave: int
+    session: str
+    as_of: str
+    source_url: str
+    raw: dict[str, Any]
+
+
 def polite_delay() -> None:
     """Randomized 2-5 second delay to avoid hammering public sites."""
     time.sleep(random.uniform(2, 5))
@@ -97,7 +115,7 @@ def polite_delay() -> None:
 
 def session() -> requests.Session:
     contact_email = os.getenv("SENSTATS_CONTACT_EMAIL", "configure-SENSTATS_CONTACT_EMAIL")
-    user_agent = os.getenv("SENSTATS_USER_AGENT", f"SenStats-Data-Sync/1.0 (Contact: {contact_email})")
+    user_agent = os.getenv("SENSTATS_USER_AGENT", f"Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: {contact_email})")
     http = requests.Session()
     http.headers.update({"User-Agent": user_agent or DEFAULT_USER_AGENT, "Accept": "application/json,text/html,*/*"})
     return http
@@ -166,136 +184,14 @@ def extract_image_url(container: Any, base_url: str) -> str | None:
     return None
 
 
-def parse_profile_details(html: str, source_url: str) -> dict[str, Any]:
-    """Extract best-effort public fields from a Senate profile page."""
-    soup = BeautifulSoup(html, "html.parser")
-    details: dict[str, Any] = {}
-    heading = soup.find("h1")
-    if heading:
-        details["heading"] = heading.get_text(" ", strip=True)
-    image_url = extract_image_url(soup, source_url)
-    if image_url:
-        details["photoUrl"] = image_url
-    meta_description = soup.find("meta", attrs={"name": "description"})
-    if meta_description and meta_description.get("content"):
-        details["description"] = meta_description.get("content")
-    og_image = soup.find("meta", property="og:image")
-    if og_image and og_image.get("content"):
-        details["photoUrl"] = urljoin(source_url, str(og_image.get("content")))
-    for row in soup.select("dl, table"):
-        for term in row.find_all(["dt", "th"]):
-            label = term.get_text(" ", strip=True).strip(":")
-            value_node = term.find_next_sibling(["dd", "td"])
-            if label and value_node:
-                details[stable_id(label)] = value_node.get_text(" ", strip=True)
-    contact_links: list[dict[str, str]] = []
-    for anchor in soup.find_all("a", href=True):
-        href = str(anchor["href"])
-        if href.startswith(("mailto:", "tel:")):
-            contact_links.append({"label": anchor.get_text(" ", strip=True), "href": href})
-    if contact_links:
-        details["contactLinks"] = contact_links
-    return details
-
-
-def fetch_profile_details(http: requests.Session, source_url: str) -> dict[str, Any]:
-    response = safe_get(http, source_url)
-    if response is None:
-        return {}
-    try:
-        return parse_profile_details(response.text, source_url)
-    except Exception as exc:  # noqa: BLE001
-        LOGGER.error("Senator profile parse failed for %s: %s", source_url, exc, exc_info=True)
-        return {}
-
-
 def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
-    """Fetch current Canadian senators from Represent.
+    """Fetch current senators from the official directory in one request.
 
-    Represent exposes paginated JSON endpoints and supports filtering by
-    `elected_office`; the fallback endpoint keeps the sync resilient if a
-    Senate-specific representative set is absent.
+    The Senate directory endpoint is the same XHR-backed table used by the
+    public senators directory. Parsing this single response avoids the previous
+    timeout-prone behavior of opening every individual senator profile page.
     """
-    candidates = [
-        f"{REPRESENT_BASE_URL}/representatives/senate/?limit=1000",
-        f"{REPRESENT_BASE_URL}/representatives/?elected_office=Senator&limit=1000",
-    ]
-    for first_url in candidates:
-        senators: list[SenatorRecord] = []
-        next_url: str | None = first_url
-        while next_url:
-            response = safe_get(http, next_url, expect_json=True)
-            if response is None:
-                break
-            try:
-                payload = response.json()
-            except json.JSONDecodeError as exc:
-                LOGGER.error("Represent JSON parse failed for %s: %s", next_url, exc, exc_info=True)
-                break
-            for item in payload.get("objects", []):
-                office = str(item.get("elected_office", ""))
-                if office and "senator" not in office.lower() and "senate" not in first_url:
-                    continue
-                name = str(item.get("name") or "").strip()
-                if not name:
-                    LOGGER.warning("Skipping senator row without name: %s", item)
-                    continue
-                raw_item = firestore_safe(item)
-                offices = list(item.get("offices") or [])
-                senators.append(
-                    SenatorRecord(
-                        senator_id=stable_id(name),
-                        name=name,
-                        party=str(item.get("party_name") or item.get("party") or "Independent/Unknown"),
-                        province=str(item.get("district_name") or item.get("extra", {}).get("province") or item.get("province") or "Unknown"),
-                        office_details=firestore_safe(offices),
-                        source_url=str(item.get("source_url") or item.get("url") or REPRESENT_BASE_URL),
-                        photo_url=first_present(item.get("photo_url"), item.get("image")),
-                        contact_details=firestore_safe(offices),
-                        extra_details=firestore_safe(item.get("extra") or {}),
-                        raw_data=raw_item if isinstance(raw_item, dict) else {"value": raw_item},
-                    )
-                )
-            meta = payload.get("meta") or {}
-            next_path = meta.get("next")
-            next_url = urljoin(REPRESENT_BASE_URL, next_path) if next_path else None
-        if senators:
-            LOGGER.info("Fetched %s senators from %s", len(senators), first_url)
-            return enrich_with_senate_profiles(http, senators)
-    LOGGER.warning("No senator metadata could be fetched from Represent endpoints; falling back to official Senate list.")
     return fetch_senate_website_senators(http)
-
-
-def enrich_with_senate_profiles(http: requests.Session, senators: list[SenatorRecord]) -> list[SenatorRecord]:
-    """Merge official Senate profile photos/details into API records when available."""
-    senate_records = fetch_senate_website_senators(http)
-    if not senate_records:
-        return senators
-    senate_by_id = {record.senator_id: record for record in senate_records}
-    enriched: list[SenatorRecord] = []
-    seen: set[str] = set()
-    for senator in senators:
-        official = senate_by_id.get(senator.senator_id)
-        if official is None:
-            enriched.append(senator)
-            seen.add(senator.senator_id)
-            continue
-        seen.add(senator.senator_id)
-        enriched.append(replace(
-            senator,
-            party=official.party or senator.party,
-            province=official.province or senator.province,
-            photo_url=senator.photo_url if is_probably_image_url(senator.photo_url) else official.photo_url or senator.photo_url,
-            contact_details=senator.contact_details or official.contact_details,
-            extra_details={**(official.extra_details or {}), **(senator.extra_details or {})},
-            profile_details={**(official.profile_details or {}), **(senator.profile_details or {})},
-            raw_data={"api": senator.raw_data or {}, "senate": official.raw_data or {}},
-        ))
-    for official in senate_records:
-        if official.senator_id not in seen:
-            enriched.append(official)
-    LOGGER.info("Enriched %s senator records with official Senate profile data", len(enriched))
-    return enriched
 
 
 def party_label(value: str) -> str:
@@ -332,10 +228,10 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
             name, party, province, nominated, retirement, appointed_by = cells[:6]
             if not name or not province:
                 continue
-            source_url = urljoin("https://sencanada.ca", str(anchor["href"])) if anchor else SENATE_SENATORS_AJAX_URL
+            source_url = SENATE_SENATORS_AJAX_URL
+            profile_url = urljoin("https://sencanada.ca", str(anchor["href"])) if anchor else ""
             row_photo_url = extract_image_url(row, "https://sencanada.ca")
-            profile_details = fetch_profile_details(http, source_url) if anchor else {}
-            profile_photo_url = profile_details.get("photoUrl") if isinstance(profile_details.get("photoUrl"), str) else None
+            profile_details: dict[str, Any] = {"profileUrl": profile_url} if profile_url else {}
             office_details = {
                 "type": "senate-profile",
                 "nominatedDate": nominated,
@@ -350,11 +246,11 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
                     province=province,
                     office_details=[office_details],
                     source_url=source_url,
-                    photo_url=profile_photo_url or row_photo_url,
-                    contact_details=firestore_safe(profile_details.get("contactLinks", [])),
+                    photo_url=row_photo_url if is_probably_image_url(row_photo_url) else None,
+                    contact_details=[],
                     extra_details={"nominatedDate": nominated, "retirementDate": retirement, "appointedOnAdviceOf": appointed_by},
                     profile_details=firestore_safe(profile_details),
-                    raw_data=firestore_safe({"cells": cells, "rowAttributes": dict(row.attrs), "profileDetails": profile_details}),
+                    raw_data=firestore_safe({"cells": cells, "rowAttributes": dict(row.attrs), "profileUrl": profile_url}),
                 )
             )
         if senators:
@@ -423,34 +319,22 @@ def infer_quarter(text: str, fallback_year: int | None = None) -> str:
     return f"Unknown-{year}"
 
 
-def disclosure_links(http: requests.Session) -> list[str]:
-    links: list[str] = []
-    for index_url in [SENATE_DISCLOSURE_URL, SENATE_DISCLOSURE_SENATORS_URL, SENATE_DISCLOSURE_DETAILS_URL, SENATE_PROACTIVE_URL]:
-        response = safe_get(http, index_url)
-        if response is None:
-            continue
-        soup = BeautifulSoup(response.text, "html.parser")
-        links.append(index_url)
-        for anchor in soup.find_all("a", href=True):
-            label = anchor.get_text(" ", strip=True).lower()
-            href = str(anchor["href"])
-            absolute = urljoin(index_url, href)
-            lower_href = absolute.lower()
-            if any(token in label for token in ["csv", "senator", "expenditure", "expense", "quarterly", "office", "travel", "hospitality"]):
-                links.append(absolute)
-            elif "/proactive" in lower_href or any(lower_href.endswith(ext) for ext in [".csv", ".html", ".htm", ".xlsx", ".xls"]):
-                links.append(absolute)
-        for script in soup.find_all("script"):
-            script_text = script.get_text(" ", strip=True)
-            for match in re.finditer(r"(?:https?://sencanada\.ca)?/en/ProActive/[^\"\'\s<>]+", script_text, flags=re.IGNORECASE):
-                links.append(urljoin(index_url, match.group(0)))
-            for match in re.finditer(r"[^\"\'\s<>]+\.(?:csv|xlsx?|html?)", script_text, flags=re.IGNORECASE):
-                links.append(urljoin(index_url, match.group(0)))
-    unique = list(dict.fromkeys(links))
-    if not unique:
-        LOGGER.warning("No disclosure links found on Senate proactive disclosure pages; HTML structure may have changed.")
-    return unique[:60]
+DISCLOSURE_SUMMARY_URLS = [
+    SENATE_EXPENSE_SUMMARY_FILTER_URL,
+    SENATE_DISCLOSURE_URL,
+    SENATE_DISCLOSURE_SENATORS_URL,
+    SENATE_DISCLOSURE_DETAILS_URL,
+]
 
+
+def disclosure_summary_pages() -> list[str]:
+    """Return only top-level proactive disclosure summary pages.
+
+    Expense ingestion intentionally does not crawl detail pages or nested
+    disclosure links. The summary pages contain the primary static tables we
+    need and are much less likely to trigger connection timeouts.
+    """
+    return DISCLOSURE_SUMMARY_URLS
 
 def parse_expenses_from_html(html: str, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
     soup = BeautifulSoup(html, "html.parser")
@@ -530,7 +414,7 @@ def parse_expenses_from_csv(text: str, source_url: str, senators_by_name: dict[s
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     records: list[ExpenseRecord] = []
-    for link in disclosure_links(http):
+    for link in disclosure_summary_pages():
         response = safe_get(http, link)
         if response is None:
             continue
@@ -622,6 +506,102 @@ def firestore_client() -> Any:
     return firestore.client()
 
 
+
+
+def existing_senator_snapshot(db: Any) -> dict[str, dict[str, Any]]:
+    """Read the previous senator roster for sync status and change detection."""
+    try:
+        return {doc.id: firestore_safe(doc.to_dict() or {}) for doc in db.collection("senstats_senators").stream()}
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("Unable to read existing senator roster for change detection: %s", exc, exc_info=True)
+        return {}
+
+
+def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterable[SenatorRecord], sync_id: str) -> list[dict[str, Any]]:
+    current = {senator.senator_id: senator for senator in senators}
+    changes: list[dict[str, Any]] = []
+    for senator_id, senator in current.items():
+        previous = existing.get(senator_id)
+        if previous is None:
+            changes.append({
+                "type": "new_senator",
+                "senatorId": senator_id,
+                "senatorName": senator.name,
+                "newParty": senator.party,
+                "newProvince": senator.province,
+                "sourceUrl": senator.source_url,
+                "syncId": sync_id,
+            })
+            continue
+        previous_party = str(previous.get("party") or "")
+        if previous_party and previous_party != senator.party:
+            changes.append({
+                "type": "group_change",
+                "senatorId": senator_id,
+                "senatorName": senator.name,
+                "previousParty": previous_party,
+                "newParty": senator.party,
+                "previousProvince": str(previous.get("province") or ""),
+                "newProvince": senator.province,
+                "sourceUrl": senator.source_url,
+                "syncId": sync_id,
+            })
+    for senator_id, previous in existing.items():
+        if senator_id not in current:
+            changes.append({
+                "type": "retired_senator",
+                "senatorId": senator_id,
+                "senatorName": str(previous.get("name") or senator_id),
+                "previousParty": str(previous.get("party") or ""),
+                "previousProvince": str(previous.get("province") or ""),
+                "sourceUrl": str(previous.get("sourceUrl") or ""),
+                "syncId": sync_id,
+            })
+    return changes
+
+
+def write_change_log(db: Any, changes: Iterable[dict[str, Any]]) -> int:
+    batch = db.batch()
+    count = 0
+    now = firestore.SERVER_TIMESTAMP
+    for change in changes:
+        raw = f"{change.get('syncId')}|{change.get('type')}|{change.get('senatorId')}|{change.get('previousParty')}|{change.get('newParty')}"
+        change_id = hashlib.sha1(raw.encode("utf-8")).hexdigest()
+        ref = db.collection("senstats_change_log").document(change_id)
+        batch.set(ref, {**firestore_safe(change), "detectedAt": now}, merge=True)
+        count += 1
+        if count % 450 == 0:
+            batch.commit()
+            batch = db.batch()
+    if count % 450:
+        batch.commit()
+    LOGGER.info("Wrote %s SenStats change log records", count)
+    return count
+
+
+def write_sync_status(db: Any, *, sync_id: str, started_at: datetime, senators: list[SenatorRecord], expenses: list[ExpenseRecord], committees: list[CommitteeRecord], attendance: list[AttendanceRecord], change_count: int, errors: list[str]) -> None:
+    photo_count = sum(1 for senator in senators if senator.photo_url)
+    status = "success" if not errors else "partial"
+    payload = {
+        "latestRunId": sync_id,
+        "status": status,
+        "startedAt": started_at,
+        "finishedAt": firestore.SERVER_TIMESTAMP,
+        "senatorCount": len(senators),
+        "expenseCount": len(expenses),
+        "committeeCount": len(committees),
+        "attendanceCount": len(attendance),
+        "changeCount": change_count,
+        "errorCount": len(errors),
+        "errors": errors[:20],
+        "photoCount": photo_count,
+        "missingPhotoCount": max(len(senators) - photo_count, 0),
+        "workaround": "If live pages time out, manually export public Senate roster/proactive disclosure tables as CSV. If photos are missing or hotlink-blocked, run a separate low-frequency image mirror from official profile pages into a stable image store.",
+    }
+    db.collection("senstats_sync").document("latest").set(payload, merge=True)
+    db.collection("senstats_sync_runs").document(sync_id).set(payload, merge=True)
+    LOGGER.info("Wrote SenStats latest sync status for run %s", sync_id)
+
 def write_party_affiliation_history(db: Any, senators: Iterable[SenatorRecord]) -> None:
     count = 0
     for senator in senators:
@@ -700,6 +680,92 @@ def write_expenses(db: Any, expenses: Iterable[ExpenseRecord]) -> None:
     LOGGER.info("Wrote %s expense documents", count)
 
 
+
+
+def parse_int(value: str) -> int:
+    parsed = re.sub(r"[^0-9]", "", value or "")
+    return int(parsed) if parsed else 0
+
+
+def parse_attendance_records(html: str, senators_by_name: dict[str, SenatorRecord]) -> list[AttendanceRecord]:
+    soup = BeautifulSoup(html, "html.parser")
+    page_text = soup.get_text(" ", strip=True)
+    session_match = re.search(r"(\d{2}-\d).*?(\d{2}(?:st|nd|rd|th) Parliament, \d(?:st|nd|rd|th) Session)", page_text)
+    session = " ".join(session_match.group(0).split()) if session_match else "Current session"
+    as_of_match = re.search(r"Information as of\s+([A-Za-z]+\s+\d{4})", page_text)
+    as_of = as_of_match.group(1) if as_of_match else ""
+    records: list[AttendanceRecord] = []
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        for row in rows:
+            cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
+            if len(cells) < 7 or cells[0].lower() in {"name", "a", "b", "c", "d", "f", "g", "h", "i", "k", "l", "m", "o", "p", "q", "r", "s", "t", "v", "w", "y"}:
+                continue
+            name, party = cells[0], cells[1]
+            if not name or not any(char.isdigit() for char in " ".join(cells[2:])):
+                continue
+            matched = match_senator_from_text(name, senators_by_name)
+            senator_id = matched.senator_id if matched else stable_id(name)
+            records.append(AttendanceRecord(
+                senator_id=senator_id,
+                senator_name=matched.name if matched else name,
+                party=party_label(party),
+                sitting_days=parse_int(cells[2]),
+                present=parse_int(cells[3]),
+                other_public_business=parse_int(cells[4]),
+                illness=parse_int(cells[5]),
+                leave=parse_int(cells[6]),
+                session=session,
+                as_of=as_of,
+                source_url=SENATE_ATTENDANCE_URL,
+                raw={"cells": cells},
+            ))
+    return records
+
+
+def fetch_attendance_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[AttendanceRecord]:
+    senators_by_name = {senator.name: senator for senator in senators}
+    response = safe_get(http, SENATE_ATTENDANCE_URL)
+    if response is None:
+        return []
+    try:
+        records = parse_attendance_records(response.text, senators_by_name)
+        LOGGER.info("Parsed %s attendance records", len(records))
+        return records
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("Attendance parse failed for %s: %s", SENATE_ATTENDANCE_URL, exc, exc_info=True)
+        return []
+
+
+def write_attendance(db: Any, attendance: Iterable[AttendanceRecord]) -> None:
+    batch = db.batch()
+    count = 0
+    now = firestore.SERVER_TIMESTAMP
+    for record in attendance:
+        ref = db.collection("senstats_attendance").document(record.senator_id)
+        batch.set(ref, {
+            "senatorId": record.senator_id,
+            "senatorName": record.senator_name,
+            "party": record.party,
+            "sittingDays": record.sitting_days,
+            "present": record.present,
+            "otherPublicBusiness": record.other_public_business,
+            "illness": record.illness,
+            "leave": record.leave,
+            "session": record.session,
+            "asOf": record.as_of,
+            "sourceUrl": record.source_url,
+            "raw": firestore_safe(record.raw),
+            "updatedAt": now,
+        }, merge=True)
+        count += 1
+        if count % 450 == 0:
+            batch.commit()
+            batch = db.batch()
+    if count % 450:
+        batch.commit()
+    LOGGER.info("Wrote %s attendance documents", count)
+
 def write_committees(db: Any, committees: Iterable[CommitteeRecord]) -> None:
     batch = db.batch()
     count = 0
@@ -726,19 +792,42 @@ def write_committees(db: Any, committees: Iterable[CommitteeRecord]) -> None:
 
 
 def main() -> int:
+    started_at = datetime.now(timezone.utc)
+    sync_id = started_at.strftime("%Y%m%dT%H%M%SZ")
+    errors: list[str] = []
     http = session()
     senators = fetch_current_senators(http)
     if not senators:
-        LOGGER.error("Aborting Firestore writes because senator metadata is empty.")
+        LOGGER.error("Aborting senator/expense/committee writes because senator metadata is empty.")
+        try:
+            db = firestore_client()
+            write_sync_status(db, sync_id=sync_id, started_at=started_at, senators=[], expenses=[], committees=[], attendance=[], change_count=0, errors=["No senator metadata was parsed from the public Senate roster."])
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error("Failed to write empty-sync status: %s", exc, exc_info=True)
+            return 1
         return 0
     expenses = fetch_expense_records(http, senators)
     committees = fetch_committee_records(http, senators)
+    attendance = fetch_attendance_records(http, senators)
     try:
         db = firestore_client()
+        existing = existing_senator_snapshot(db)
+        changes = detect_roster_changes(existing, senators, sync_id)
         write_party_affiliation_history(db, senators)
         write_senators(db, senators)
         write_expenses(db, expenses)
         write_committees(db, committees)
+        write_attendance(db, attendance)
+        change_count = write_change_log(db, changes)
+        if not expenses:
+            errors.append("No expense rows were parsed from the public proactive disclosure summary pages.")
+        if not committees:
+            errors.append("No committee rows were parsed from the public committees directory.")
+        if not attendance:
+            errors.append("No attendance rows were parsed from the public attendance register.")
+        if not any(senator.photo_url for senator in senators):
+            errors.append("The public roster response did not expose usable senator photo URLs.")
+        write_sync_status(db, sync_id=sync_id, started_at=started_at, senators=senators, expenses=expenses, committees=committees, attendance=attendance, change_count=change_count, errors=errors)
     except Exception as exc:  # noqa: BLE001
         LOGGER.error("Firestore write failed: %s", exc, exc_info=True)
         return 1
