@@ -204,3 +204,33 @@ export interface SenStatsAffiliationHistoryDocument {
   sourceUrl?: string;
   changedAt?: Timestamp;
 }
+
+export interface SenStatsSyncStatusDocument {
+  id?: string;
+  status: 'success' | 'partial' | 'failed' | string;
+  startedAt?: Timestamp;
+  finishedAt?: Timestamp;
+  senatorCount?: number;
+  expenseCount?: number;
+  committeeCount?: number;
+  changeCount?: number;
+  errorCount?: number;
+  errors?: string[];
+  photoCount?: number;
+  missingPhotoCount?: number;
+  workaround?: string;
+}
+
+export interface SenStatsChangeLogDocument {
+  id?: string;
+  type: 'new_senator' | 'retired_senator' | 'group_change' | string;
+  senatorId: string;
+  senatorName: string;
+  previousParty?: string;
+  newParty?: string;
+  previousProvince?: string;
+  newProvince?: string;
+  sourceUrl?: string;
+  detectedAt?: Timestamp;
+  syncId?: string;
+}

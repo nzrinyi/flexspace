@@ -1,7 +1,9 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { collection, collectionGroup, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { SenStatsAffiliationHistoryDocument, SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../types';
+import type { SenStatsAffiliationHistoryDocument, SenStatsChangeLogDocument, SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument, SenStatsSyncStatusDocument } from '../types';
+import { SenStatsAdminView } from './senstats/SenStatsAdminView';
+import { SenStatsChangeLogView } from './senstats/SenStatsChangeLogView';
 import { SenStatsCommitteesView } from './senstats/SenStatsCommitteesView';
 import { SenStatsDataSourcesView } from './senstats/SenStatsDataSourcesView';
 import { SenStatsGroupsView } from './senstats/SenStatsGroupsView';
@@ -11,7 +13,9 @@ import { SenStatsSenatorsView } from './senstats/SenStatsSenatorsView';
 type SenStatsSenator = SenStatsSenatorDocument;
 type SenStatsExpense = SenStatsExpenseDocument & { id: string };
 type SenStatsCommittee = SenStatsCommitteeDocument & { id: string };
-type SenStatsTab = 'senators' | 'groups' | 'committees' | 'sources';
+type SenStatsSyncStatus = SenStatsSyncStatusDocument;
+type SenStatsChange = SenStatsChangeLogDocument & { id: string };
+type SenStatsTab = 'senators' | 'groups' | 'committees' | 'sources' | 'admin' | 'changes';
 
 class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -35,6 +39,8 @@ function SenStatsDashboardContent() {
   const [selectedSenatorId, setSelectedSenatorId] = useState<string | null>(null);
   const [expenses, setExpenses] = useState<SenStatsExpense[]>([]);
   const [recentlyChangedSenatorIds, setRecentlyChangedSenatorIds] = useState<Set<string>>(new Set());
+  const [syncStatus, setSyncStatus] = useState<SenStatsSyncStatus | null>(null);
+  const [changeLog, setChangeLog] = useState<SenStatsChange[]>([]);
   const [groupFilter, setGroupFilter] = useState('All');
   const [provinceFilter, setProvinceFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +77,20 @@ function SenStatsDashboardContent() {
         if (history.senatorId) changedIds.add(history.senatorId);
       });
       setRecentlyChangedSenatorIds(changedIds);
+    }, (snapshotError) => setError(snapshotError.message));
+  }, []);
+
+
+  useEffect(() => {
+    return onSnapshot(doc(db, 'senstats_sync', 'latest'), (snapshot) => {
+      setSyncStatus(snapshot.exists() ? snapshot.data() as SenStatsSyncStatus : null);
+    }, (snapshotError) => setError(snapshotError.message));
+  }, []);
+
+  useEffect(() => {
+    const changesQuery = query(collection(db, 'senstats_change_log'), orderBy('detectedAt', 'desc'), limit(50));
+    return onSnapshot(changesQuery, (snapshot) => {
+      setChangeLog(snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }) as SenStatsChange));
     }, (snapshotError) => setError(snapshotError.message));
   }, []);
 
@@ -112,13 +132,15 @@ function SenStatsDashboardContent() {
       </div>
 
       <div className="senstats-tabs" role="tablist" aria-label="SenStats sections">
-        {(['senators', 'groups', 'committees', 'sources'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'groups' ? 'Groups' : tab === 'committees' ? 'Committees' : 'Data sources'}</button>)}
+        {(['senators', 'groups', 'committees', 'sources', 'admin', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'groups' ? 'Groups' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : tab === 'admin' ? 'Admin' : 'Change log'}</button>)}
       </div>
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
       {activeTab === 'groups' && <SenStatsGroupsView groups={senatorsByGroup} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />}
       {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
       {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} selectedSenator={selectedSenator} expenses={expenses} committees={committees} />}
+      {activeTab === 'admin' && <SenStatsAdminView status={syncStatus} />}
+      {activeTab === 'changes' && <SenStatsChangeLogView changes={changeLog} />}
     </section>
   );
 }

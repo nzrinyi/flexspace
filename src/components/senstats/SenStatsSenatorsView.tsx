@@ -49,6 +49,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
   const [detailsOpen, setDetailsOpen] = useState(Boolean(selectedSenator));
   const totalExpenses = expenses.reduce((total, expense) => total + (Number(expense.amount) || 0), 0);
   const selectedPhotoUrl = senatorPhotoUrl(selectedSenator);
+  const selectedProfileUrl = typeof selectedSenator?.profileDetails?.profileUrl === 'string' ? selectedSenator.profileDetails.profileUrl : selectedSenator?.sourceUrl;
   const appointedBy = detailValue(selectedSenator, ['appointedOnAdviceOf', 'appointed-by', 'appointedBy', 'appointed on advice of']);
   const appointedDate = detailValue(selectedSenator, ['nominatedDate', 'appointed-date', 'appointedDate', 'summoned-to-the-senate', 'date-of-appointment']);
   const retirementDate = detailValue(selectedSenator, ['retirementDate', 'retirement-date', 'mandatory-retirement-date', 'retirement']);
@@ -87,7 +88,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
       </section>
       {selectedSenator && detailsOpen && <aside className="expense-panel senator-drilldown" aria-live="polite">
         <div className="drilldown-header"><div><span>Senator details</span><strong>{selectedSenator.name}</strong></div><button type="button" onClick={() => setDetailsOpen(false)}>Close</button></div>
-        <div className={`senstats-stat selected-senator-card ${groupClassName(selectedSenator.party)}`}>{selectedPhotoUrl && <img src={selectedPhotoUrl} alt={`${selectedSenator.name} portrait`} referrerPolicy="no-referrer" />}<span>Profile</span><small>{selectedSenator.province} · {groupLabel(selectedSenator.party)}</small>{selectedSenator.sourceUrl && <a href={selectedSenator.sourceUrl} target="_blank" rel="noreferrer">Official profile</a>}</div>
+        <div className={`senstats-stat selected-senator-card ${groupClassName(selectedSenator.party)}`}>{selectedPhotoUrl && <img src={selectedPhotoUrl} alt={`${selectedSenator.name} portrait`} referrerPolicy="no-referrer" />}<span>Profile</span><small>{selectedSenator.province} · {groupLabel(selectedSenator.party)}</small>{selectedProfileUrl && <a href={selectedProfileUrl} target="_blank" rel="noreferrer">Official profile</a>}</div>
         <div className="senstats-detail-grid" aria-label="Appointment details">
           <p><span>Appointed / nominated</span><strong>{appointedDate || 'Not synced yet'}</strong></p>
           <p><span>Appointed by</span><strong>{appointedBy || 'Not synced yet'}</strong></p>

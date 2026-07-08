@@ -487,6 +487,101 @@ def firestore_client() -> Any:
     return firestore.client()
 
 
+
+
+def existing_senator_snapshot(db: Any) -> dict[str, dict[str, Any]]:
+    """Read the previous senator roster for sync status and change detection."""
+    try:
+        return {doc.id: firestore_safe(doc.to_dict() or {}) for doc in db.collection("senstats_senators").stream()}
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("Unable to read existing senator roster for change detection: %s", exc, exc_info=True)
+        return {}
+
+
+def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterable[SenatorRecord], sync_id: str) -> list[dict[str, Any]]:
+    current = {senator.senator_id: senator for senator in senators}
+    changes: list[dict[str, Any]] = []
+    for senator_id, senator in current.items():
+        previous = existing.get(senator_id)
+        if previous is None:
+            changes.append({
+                "type": "new_senator",
+                "senatorId": senator_id,
+                "senatorName": senator.name,
+                "newParty": senator.party,
+                "newProvince": senator.province,
+                "sourceUrl": senator.source_url,
+                "syncId": sync_id,
+            })
+            continue
+        previous_party = str(previous.get("party") or "")
+        if previous_party and previous_party != senator.party:
+            changes.append({
+                "type": "group_change",
+                "senatorId": senator_id,
+                "senatorName": senator.name,
+                "previousParty": previous_party,
+                "newParty": senator.party,
+                "previousProvince": str(previous.get("province") or ""),
+                "newProvince": senator.province,
+                "sourceUrl": senator.source_url,
+                "syncId": sync_id,
+            })
+    for senator_id, previous in existing.items():
+        if senator_id not in current:
+            changes.append({
+                "type": "retired_senator",
+                "senatorId": senator_id,
+                "senatorName": str(previous.get("name") or senator_id),
+                "previousParty": str(previous.get("party") or ""),
+                "previousProvince": str(previous.get("province") or ""),
+                "sourceUrl": str(previous.get("sourceUrl") or ""),
+                "syncId": sync_id,
+            })
+    return changes
+
+
+def write_change_log(db: Any, changes: Iterable[dict[str, Any]]) -> int:
+    batch = db.batch()
+    count = 0
+    now = firestore.SERVER_TIMESTAMP
+    for change in changes:
+        raw = f"{change.get('syncId')}|{change.get('type')}|{change.get('senatorId')}|{change.get('previousParty')}|{change.get('newParty')}"
+        change_id = hashlib.sha1(raw.encode("utf-8")).hexdigest()
+        ref = db.collection("senstats_change_log").document(change_id)
+        batch.set(ref, {**firestore_safe(change), "detectedAt": now}, merge=True)
+        count += 1
+        if count % 450 == 0:
+            batch.commit()
+            batch = db.batch()
+    if count % 450:
+        batch.commit()
+    LOGGER.info("Wrote %s SenStats change log records", count)
+    return count
+
+
+def write_sync_status(db: Any, *, sync_id: str, started_at: datetime, senators: list[SenatorRecord], expenses: list[ExpenseRecord], committees: list[CommitteeRecord], change_count: int, errors: list[str]) -> None:
+    photo_count = sum(1 for senator in senators if senator.photo_url)
+    status = "success" if not errors else "partial"
+    payload = {
+        "latestRunId": sync_id,
+        "status": status,
+        "startedAt": started_at,
+        "finishedAt": firestore.SERVER_TIMESTAMP,
+        "senatorCount": len(senators),
+        "expenseCount": len(expenses),
+        "committeeCount": len(committees),
+        "changeCount": change_count,
+        "errorCount": len(errors),
+        "errors": errors[:20],
+        "photoCount": photo_count,
+        "missingPhotoCount": max(len(senators) - photo_count, 0),
+        "workaround": "If live pages time out, manually export public Senate roster/proactive disclosure tables as CSV. If photos are missing or hotlink-blocked, run a separate low-frequency image mirror from official profile pages into a stable image store.",
+    }
+    db.collection("senstats_sync").document("latest").set(payload, merge=True)
+    db.collection("senstats_sync_runs").document(sync_id).set(payload, merge=True)
+    LOGGER.info("Wrote SenStats latest sync status for run %s", sync_id)
+
 def write_party_affiliation_history(db: Any, senators: Iterable[SenatorRecord]) -> None:
     count = 0
     for senator in senators:
@@ -591,19 +686,38 @@ def write_committees(db: Any, committees: Iterable[CommitteeRecord]) -> None:
 
 
 def main() -> int:
+    started_at = datetime.now(timezone.utc)
+    sync_id = started_at.strftime("%Y%m%dT%H%M%SZ")
+    errors: list[str] = []
     http = session()
     senators = fetch_current_senators(http)
     if not senators:
-        LOGGER.error("Aborting Firestore writes because senator metadata is empty.")
+        LOGGER.error("Aborting senator/expense/committee writes because senator metadata is empty.")
+        try:
+            db = firestore_client()
+            write_sync_status(db, sync_id=sync_id, started_at=started_at, senators=[], expenses=[], committees=[], change_count=0, errors=["No senator metadata was parsed from the public Senate roster."])
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error("Failed to write empty-sync status: %s", exc, exc_info=True)
+            return 1
         return 0
     expenses = fetch_expense_records(http, senators)
     committees = fetch_committee_records(http, senators)
     try:
         db = firestore_client()
+        existing = existing_senator_snapshot(db)
+        changes = detect_roster_changes(existing, senators, sync_id)
         write_party_affiliation_history(db, senators)
         write_senators(db, senators)
         write_expenses(db, expenses)
         write_committees(db, committees)
+        change_count = write_change_log(db, changes)
+        if not expenses:
+            errors.append("No expense rows were parsed from the public proactive disclosure summary pages.")
+        if not committees:
+            errors.append("No committee rows were parsed from the public committees directory.")
+        if not any(senator.photo_url for senator in senators):
+            errors.append("The public roster response did not expose usable senator photo URLs.")
+        write_sync_status(db, sync_id=sync_id, started_at=started_at, senators=senators, expenses=expenses, committees=committees, change_count=change_count, errors=errors)
     except Exception as exc:  # noqa: BLE001
         LOGGER.error("Firestore write failed: %s", exc, exc_info=True)
         return 1
