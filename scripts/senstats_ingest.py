@@ -38,7 +38,6 @@ except ImportError:  # pragma: no cover - surfaced by main logging in CI
 REPRESENT_BASE_URL = "https://represent.opennorth.ca"
 SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/ProActive/Summary"
 SENATE_DISCLOSURE_DETAILS_URL = "https://sencanada.ca/en/ProActive/Summary/Details"
-SENATE_DISCLOSURE_SENATORS_URL = "https://sencanada.ca/en/ProActive/Summary/Senators"
 SENATE_PROACTIVE_URL = "https://sencanada.ca/en/proactive/"
 SENATE_ATTENDANCE_URL = "https://sencanada.ca/en/attendance/"
 SENATE_EXPENSE_SUMMARY_FILTER_URL = "https://sencanada.ca/en/proactive/summary/#?Year=2026&Quarter=1&Member=Senators"
@@ -121,16 +120,24 @@ def session() -> requests.Session:
     return http
 
 
-def safe_get(http: requests.Session, url: str, *, expect_json: bool = False) -> requests.Response | None:
+def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None) -> requests.Response | None:
     try:
         polite_delay()
-        response = http.get(url, timeout=30)
+        request_timeout = timeout or int(os.getenv("SENSTATS_REQUEST_TIMEOUT", "20"))
+        response = http.get(url, timeout=request_timeout)
         response.raise_for_status()
         if expect_json and "json" not in response.headers.get("content-type", ""):
             LOGGER.warning("Expected JSON but got %s from %s", response.headers.get("content-type"), url)
         return response
+    except requests.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else "unknown"
+        LOGGER.warning("Skipping %s after HTTP %s", url, status_code)
+        return None
+    except requests.Timeout as exc:
+        LOGGER.warning("Skipping %s after timeout: %s", url, exc)
+        return None
     except requests.RequestException as exc:
-        LOGGER.error("Request failed for %s: %s", url, exc, exc_info=True)
+        LOGGER.warning("Skipping %s after request failure: %s", url, exc)
         return None
 
 
@@ -319,22 +326,26 @@ def infer_quarter(text: str, fallback_year: int | None = None) -> str:
     return f"Unknown-{year}"
 
 
-DISCLOSURE_SUMMARY_URLS = [
-    SENATE_EXPENSE_SUMMARY_FILTER_URL,
-    SENATE_DISCLOSURE_URL,
-    SENATE_DISCLOSURE_SENATORS_URL,
-    SENATE_DISCLOSURE_DETAILS_URL,
-]
-
-
 def disclosure_summary_pages() -> list[str]:
-    """Return only top-level proactive disclosure summary pages.
+    """Return proactive disclosure pages with query parameters server-side.
 
-    Expense ingestion intentionally does not crawl detail pages or nested
-    disclosure links. The summary pages contain the primary static tables we
-    need and are much less likely to trigger connection timeouts.
+    The public page uses hash fragments in the browser, but fragments are not
+    sent over HTTP. These query-form URLs give the server a chance to render
+    quarter/member-filtered tables while avoiding the removed Summary/Senators
+    path that now returns 404.
     """
-    return DISCLOSURE_SUMMARY_URLS
+    current_year = datetime.now(timezone.utc).year
+    years = [current_year, current_year - 1]
+    urls: list[str] = []
+    for year in years:
+        for quarter in range(1, 5):
+            query = f"?Year={year}&Quarter={quarter}&Member=Senators"
+            urls.append(f"{SENATE_DISCLOSURE_URL}{query}")
+            urls.append(f"{SENATE_DISCLOSURE_DETAILS_URL}{query}")
+    urls.extend([SENATE_DISCLOSURE_URL, SENATE_DISCLOSURE_DETAILS_URL])
+    return list(dict.fromkeys(urls))
+
+
 
 def parse_expenses_from_html(html: str, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
     soup = BeautifulSoup(html, "html.parser")
@@ -447,9 +458,12 @@ def committee_links(http: requests.Session) -> list[tuple[str, str]]:
                 links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")
     if links:
         return sorted(links.items())
-    LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-    fallback_codes = ["AEFA", "AGFO", "APPA", "AOVS", "BANC", "CIBA", "CONF", "ENEV", "FISH", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
-    return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")) for code in fallback_codes]
+    if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "false").lower() == "true":
+        LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
+        fallback_codes = ["AEFA", "AGFO", "APPA", "AOVS", "BANC", "CIBA", "CONF", "ENEV", "FISH", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
+        return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")) for code in fallback_codes]
+    LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
+    return []
 
 
 def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord]) -> CommitteeRecord:
