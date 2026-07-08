@@ -790,3 +790,19 @@ input, select, textarea { max-width: 100%; }
 .senstats-dark input, .senstats-dark select { background: #0f172a; border-color: #475569; color: #f8fafc; }
 .senstats-dark .theme-toggle { background: #f8fafc; color: #0f172a; border-color: #94a3b8; }
 @media (max-width: 900px) { .senstats-filter-bar, .senstats-filter-bar .senstats-filters.compact { grid-template-columns: 1fr; } }
+
+/* More cohesive senator profile detail composition */
+.senator-detail-overview { display: grid; gap: 14px; border: 1px solid color-mix(in srgb, var(--group-color, #64748b) 24%, #e8edf7); border-top: 8px solid var(--group-color, #64748b); border-radius: 24px; background: linear-gradient(180deg, color-mix(in srgb, var(--group-color, #64748b) 7%, #fff), #fff 44%); padding: 16px; box-shadow: 0 16px 36px rgba(15,23,42,.08); }
+.senator-detail-overview.group-gro { border-top-color: #94a3b8; }
+.detail-identity-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; }
+.detail-identity-card > img { width: min(140px, 32vw); aspect-ratio: 4 / 5; object-fit: cover; border-radius: 18px; border: 1px solid #e8edf7; box-shadow: 0 12px 28px rgba(15,23,42,.1); }
+.detail-identity-card > div { display: grid; gap: 6px; min-width: 0; }
+.detail-identity-card span, .detail-section-card.compact .source-heading span { color: #64748b; font-size: .74rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.detail-identity-card strong { color: #0f172a; font-size: clamp(1.25rem, 2.4vw, 1.85rem); line-height: 1.05; }
+.detail-identity-card small { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; color: #475569; font-weight: 850; }
+.detail-identity-card a { width: fit-content; border-radius: 999px; background: #eef2ff; color: #3730a3; padding: 6px 10px; font-size: .78rem; font-weight: 900; text-decoration: none; }
+.detail-section-card.compact, .expense-summary-card.compact { box-shadow: none; }
+.senstats-dark .senator-detail-overview { background: linear-gradient(180deg, color-mix(in srgb, var(--group-color, #64748b) 12%, #1e293b), #1e293b 46%); border-color: #334155; box-shadow: none; }
+.senstats-dark .detail-identity-card strong { color: #f8fafc; }
+.senstats-dark .detail-identity-card span, .senstats-dark .detail-identity-card small { color: #cbd5e1; }
+@media (max-width: 560px) { .detail-identity-card { grid-template-columns: 1fr; } .detail-identity-card > img, .detail-identity-card .profile-fallback { justify-self: center; } }

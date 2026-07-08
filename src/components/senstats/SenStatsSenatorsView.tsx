@@ -100,17 +100,27 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
       </section>
       {selectedSenator && detailsOpen && <aside className="expense-panel senator-drilldown" aria-live="polite">
         <div className="drilldown-header"><div><span>Senator details</span><strong>{selectedSenator.name}</strong></div><button type="button" onClick={() => setDetailsOpen(false)}>Close</button></div>
-        <div className={`senstats-stat selected-senator-card ${groupClassName(selectedSenator.party)}`}>{selectedPhotoUrl ? <img src={selectedPhotoUrl} alt={`${selectedSenator.name} portrait`} referrerPolicy="no-referrer" /> : <span className="senator-avatar party-avatar profile-fallback"><i aria-hidden="true">{selectedSenator.name.slice(0, 1)}</i></span>}<span>Profile</span><small>{selectedSenator.province} · <b className="detail-group-pill"><i aria-hidden="true" />{groupLabel(selectedSenator.party)}</b></small>{selectedProfileUrl && <a href={selectedProfileUrl} target="_blank" rel="noreferrer">Official profile</a>}</div>
-        <div className="detail-section-card">
-          <div className="source-heading"><span>Appointment</span><strong>Current term details</strong></div>
-          <div className="senstats-detail-grid" aria-label="Appointment details">
-            <p><span>Appointed / nominated</span><strong>{appointedDate || 'Not synced yet'}</strong></p>
-            <p><span>Appointed by</span><strong>{appointedBy || 'Not synced yet'}</strong></p>
-            <p><span>Retirement</span><strong>{retirementDate || 'Not synced yet'}</strong></p>
-            <p><span>Committee memberships</span><strong>{selectedCommitteeMemberships.length}</strong></p>
+        <section className={`senator-detail-overview ${groupClassName(selectedSenator.party)}`} aria-label="Selected senator profile summary">
+          <div className="detail-identity-card">
+            {selectedPhotoUrl ? <img src={selectedPhotoUrl} alt={`${selectedSenator.name} portrait`} referrerPolicy="no-referrer" /> : <span className="senator-avatar party-avatar profile-fallback"><i aria-hidden="true">{selectedSenator.name.slice(0, 1)}</i></span>}
+            <div>
+              <span>Profile</span>
+              <strong>{selectedSenator.name}</strong>
+              <small>{selectedSenator.province} · <b className="detail-group-pill"><i aria-hidden="true" />{groupLabel(selectedSenator.party)}</b></small>
+              {selectedProfileUrl && <a href={selectedProfileUrl} target="_blank" rel="noreferrer">Official profile</a>}
+            </div>
           </div>
-        </div>
-        <div className="senstats-stat expense-summary-card"><span>Visible expenses</span><strong>{expenses.length ? currency(totalExpenses) : 'No data available'}</strong><small>{expenseLoading ? 'Syncing expense records…' : `${expenses.length} quarterly records`}</small><ExpenseSparkline expenses={expenses} /></div>
+          <div className="detail-section-card compact">
+            <div className="source-heading"><span>Appointment</span><strong>Current term details</strong></div>
+            <div className="senstats-detail-grid" aria-label="Appointment details">
+              <p><span>Appointed / nominated</span><strong>{appointedDate || 'Not synced yet'}</strong></p>
+              <p><span>Appointed by</span><strong>{appointedBy || 'Not synced yet'}</strong></p>
+              <p><span>Retirement</span><strong>{retirementDate || 'Not synced yet'}</strong></p>
+              <p><span>Committee memberships</span><strong>{selectedCommitteeMemberships.length}</strong></p>
+            </div>
+          </div>
+          <div className="senstats-stat expense-summary-card compact"><span>Visible expenses</span><strong>{expenses.length ? currency(totalExpenses) : 'No data available'}</strong><small>{expenseLoading ? 'Syncing expense records…' : `${expenses.length} quarterly records`}</small><ExpenseSparkline expenses={expenses} /></div>
+        </section>
         {selectedCommitteeMemberships.length > 0 && <div className="senstats-profile-data committee-memberships"><strong>Committee memberships</strong>{selectedCommitteeMemberships.map((committee) => { const member = committee.members?.find((item) => item.senatorId === selectedSenator.id || item.name === selectedSenator.name); return <p key={committee.id}><span>{committee.code}</span><small>{committee.name}{member?.role ? ` · ${member.role}` : ''}</small></p>; })}</div>}
         {selectedProfileFields.length > 0 && <div className="senstats-profile-data"><strong>Additional Senate profile data</strong>{selectedProfileFields.map(([key, value]) => <p key={key}><span>{sourceLabel(key)}</span><small>{String(value)}</small></p>)}</div>}
         <SenStatsExpenseChart expenses={expenses} loading={expenseLoading} />
