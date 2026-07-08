@@ -99,7 +99,6 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
         </table>}
       </section>
       {selectedSenator && detailsOpen && <aside className="expense-panel senator-drilldown" aria-live="polite">
-        <div className="drilldown-header"><div><span>Senator details</span><strong>{selectedSenator.name}</strong></div><button type="button" onClick={() => setDetailsOpen(false)}>Close</button></div>
         <section className={`senator-detail-overview ${groupClassName(selectedSenator.party)}`} aria-label="Selected senator profile summary">
           <div className="detail-identity-card">
             {selectedPhotoUrl ? <img src={selectedPhotoUrl} alt={`${selectedSenator.name} portrait`} referrerPolicy="no-referrer" /> : <span className="senator-avatar party-avatar profile-fallback"><i aria-hidden="true">{selectedSenator.name.slice(0, 1)}</i></span>}
@@ -107,7 +106,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
               <span>Profile</span>
               <strong>{selectedSenator.name}</strong>
               <small>{selectedSenator.province} · <b className="detail-group-pill"><i aria-hidden="true" />{groupLabel(selectedSenator.party)}</b></small>
-              {selectedProfileUrl && <a href={selectedProfileUrl} target="_blank" rel="noreferrer">Official profile</a>}
+              <span className="profile-actions">{selectedProfileUrl && <a href={selectedProfileUrl} target="_blank" rel="noreferrer">Official profile</a>}<button type="button" onClick={() => setDetailsOpen(false)}>Close</button></span>
             </div>
           </div>
           <div className="detail-section-card compact">

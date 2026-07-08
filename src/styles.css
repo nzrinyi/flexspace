@@ -806,3 +806,8 @@ input, select, textarea { max-width: 100%; }
 .senstats-dark .detail-identity-card strong { color: #f8fafc; }
 .senstats-dark .detail-identity-card span, .senstats-dark .detail-identity-card small { color: #cbd5e1; }
 @media (max-width: 560px) { .detail-identity-card { grid-template-columns: 1fr; } .detail-identity-card > img, .detail-identity-card .profile-fallback { justify-self: center; } }
+
+/* Integrated senator profile actions */
+.profile-actions { display: flex !important; flex-wrap: wrap; gap: 8px; align-items: center; letter-spacing: 0 !important; text-transform: none !important; }
+.profile-actions button { border: 0; border-radius: 999px; background: #f1f5f9; color: #334155; padding: 6px 10px; font: inherit; font-size: .78rem; font-weight: 900; }
+.senstats-dark .profile-actions button { background: #0f172a; color: #f8fafc; }
