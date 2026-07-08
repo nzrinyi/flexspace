@@ -75,15 +75,15 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
     <div className="senstats-group-key" aria-label="Group colour legend">
       {groupOptions.filter((group) => group !== 'All').map((group) => <span key={group} className={groupClassName(group)}><i />{groupLabel(group)}</span>)}
     </div>
+    <section className="senstats-filter-bar" aria-label="Senator filters">
+      <div className="filter-rail-heading"><span>Refine senators</span><strong>{filteredSenators.length}</strong><small>of {senators.length}</small></div>
+      <div className="senstats-filters compact">
+        <label><span>Search</span><input value={searchTerm} onChange={(event) => onSearchTermChange(event.target.value)} placeholder="Name, province, group…" /></label>
+        <label><span>Group</span><select value={groupFilter} onChange={(event) => onGroupFilterChange(event.target.value)}>{groupOptions.map((group) => <option key={group}>{group}</option>)}</select></label>
+        <label><span>Province</span><select value={provinceFilter} onChange={(event) => onProvinceFilterChange(event.target.value)}>{provinceOptions.map((province) => <option key={province}>{province}</option>)}</select></label>
+      </div>
+    </section>
     <div className={`senstats-grid senator-workspace ${showDetails ? 'with-details' : ''}`}>
-      <aside className="senstats-filter-rail" aria-label="Senator filters">
-        <div className="filter-rail-heading"><span>Refine</span><strong>{filteredSenators.length}</strong><small>of {senators.length} senators</small></div>
-        <div className="senstats-filters compact">
-          <label><span>Search</span><input value={searchTerm} onChange={(event) => onSearchTermChange(event.target.value)} placeholder="Name, province, group…" /></label>
-          <label><span>Group</span><select value={groupFilter} onChange={(event) => onGroupFilterChange(event.target.value)}>{groupOptions.map((group) => <option key={group}>{group}</option>)}</select></label>
-          <label><span>Province</span><select value={provinceFilter} onChange={(event) => onProvinceFilterChange(event.target.value)}>{provinceOptions.map((province) => <option key={province}>{province}</option>)}</select></label>
-        </div>
-      </aside>
       <section className="senator-list-panel" aria-label="Canadian senators">
         {senators.length === 0 && <p className="muted">No senators synced yet. The daily workflow will populate this list once it runs.</p>}
         {filteredSenators.length === 0 && senators.length > 0 && <p className="muted">No senators match those filters.</p>}

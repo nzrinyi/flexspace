@@ -775,3 +775,18 @@ input, select, textarea { max-width: 100%; }
 .dashboard-overview-banner span { color: #1e3a8a; font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
 .dashboard-overview-banner strong { color: #0f172a; font-size: 1.05rem; }
 .dashboard-overview-banner small { color: #475569; font-weight: 850; }
+
+/* SenStats filter bar and initial dark-mode option */
+.senstats-filter-bar { display: grid; grid-template-columns: minmax(130px, .28fr) minmax(0, 1fr); gap: 14px; align-items: end; border: 1px solid #e8edf7; border-radius: 22px; background: linear-gradient(180deg,#fff,#f8fafc); padding: 14px; box-shadow: 0 12px 28px rgba(15,23,42,.06); }
+.senstats-filter-bar .senstats-filters.compact { grid-template-columns: 1.4fr 1fr 1fr; }
+.senator-workspace.with-details { grid-template-columns: minmax(360px, .95fr) minmax(420px, 1.25fr); }
+.senator-workspace:not(.with-details) { grid-template-columns: minmax(0, 1fr); }
+.theme-toggle { justify-self: end; border: 1px solid #dbeafe; border-radius: 999px; background: #eef2ff; color: #1e3a8a; padding: 8px 12px; font: inherit; font-size: .78rem; font-weight: 950; }
+.senstats-dark { color: #e2e8f0; background: linear-gradient(180deg,#0f172a,#111827); border-color: #334155; box-shadow: 0 24px 60px rgba(0,0,0,.28); }
+.senstats-dark .section-heading h2, .senstats-dark .source-card strong, .senstats-dark .senstats-stat strong, .senstats-dark .dashboard-table strong, .senstats-dark .group-accordion-title strong, .senstats-dark .senator-table strong, .senstats-dark .drilldown-header strong, .senstats-dark .senstats-profile-data > strong { color: #f8fafc; }
+.senstats-dark .section-heading span, .senstats-dark .source-card small, .senstats-dark .source-card p, .senstats-dark .senstats-stat span, .senstats-dark .senstats-stat small, .senstats-dark .dashboard-table span, .senstats-dark .senator-table td, .senstats-dark .filter-rail-heading small, .senstats-dark .muted { color: #cbd5e1; }
+.senstats-dark .senstats-tabs, .senstats-dark .senstats-filter-bar, .senstats-dark .senator-list-panel, .senstats-dark .senator-drilldown, .senstats-dark .detail-section-card, .senstats-dark .source-card, .senstats-dark .senstats-profile-data, .senstats-dark .drilldown-header, .senstats-dark .dashboard-table, .senstats-dark .dashboard-table > div, .senstats-dark .source-link-list a { background: #1e293b; border-color: #334155; box-shadow: none; }
+.senstats-dark .senstats-tabs button.active, .senstats-dark .senator-table th, .senstats-dark .senator-table tbody tr:hover, .senstats-dark .senator-table tbody tr.active { background: #0f172a; color: #f8fafc; }
+.senstats-dark input, .senstats-dark select { background: #0f172a; border-color: #475569; color: #f8fafc; }
+.senstats-dark .theme-toggle { background: #f8fafc; color: #0f172a; border-color: #94a3b8; }
+@media (max-width: 900px) { .senstats-filter-bar, .senstats-filter-bar .senstats-filters.compact { grid-template-columns: 1fr; } }
