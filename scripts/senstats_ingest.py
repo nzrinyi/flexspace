@@ -120,7 +120,7 @@ def session() -> requests.Session:
     return http
 
 
-def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None) -> requests.Response | None:
+def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True) -> requests.Response | None:
     try:
         polite_delay()
         request_timeout = timeout or int(os.getenv("SENSTATS_REQUEST_TIMEOUT", "20"))
@@ -130,14 +130,17 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
             LOGGER.warning("Expected JSON but got %s from %s", response.headers.get("content-type"), url)
         return response
     except requests.HTTPError as exc:
-        status_code = exc.response.status_code if exc.response is not None else "unknown"
-        LOGGER.warning("Skipping %s after HTTP %s", url, status_code)
+        if log_failures:
+            status_code = exc.response.status_code if exc.response is not None else "unknown"
+            LOGGER.warning("Skipping %s after HTTP %s", url, status_code)
         return None
     except requests.Timeout as exc:
-        LOGGER.warning("Skipping %s after timeout: %s", url, exc)
+        if log_failures:
+            LOGGER.warning("Skipping %s after timeout: %s", url, exc)
         return None
     except requests.RequestException as exc:
-        LOGGER.warning("Skipping %s after request failure: %s", url, exc)
+        if log_failures:
+            LOGGER.warning("Skipping %s after request failure: %s", url, exc)
         return None
 
 
@@ -422,11 +425,72 @@ def parse_expenses_from_csv(text: str, source_url: str, senators_by_name: dict[s
     return records
 
 
+
+
+def proactive_api_candidates(year: int, quarter: int) -> list[str]:
+    query = f"Year={year}&Quarter={quarter}&Member=Senators"
+    lower_query = f"year={year}&quarter={quarter}&member=Senators"
+    return [
+        f"https://sencanada.ca/api/proactive/summary?{query}",
+        f"https://sencanada.ca/api/proactive/summary/details?{query}",
+        f"https://sencanada.ca/umbraco/api/ProactiveDisclosureApi/GetSummary?{query}",
+        f"https://sencanada.ca/umbraco/api/ProactiveDisclosureApi/GetDetails?{query}",
+        f"https://sencanada.ca/umbraco/surface/ProactiveDisclosure/GetSummary?{query}",
+        f"https://sencanada.ca/umbraco/surface/ProactiveDisclosure/GetDetails?{query}",
+        f"https://sencanada.ca/umbraco/surface/ProactiveDisclosureSurface/GetSummary?{lower_query}",
+        f"https://sencanada.ca/umbraco/surface/ProactiveDisclosureSurface/GetDetails?{lower_query}",
+    ]
+
+
+def parse_expenses_from_json_payload(payload: Any, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
+    records: list[ExpenseRecord] = []
+
+    def walk(value: Any) -> Iterable[dict[str, Any]]:
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from walk(child)
+
+    for item in walk(payload):
+        values = {str(key): firestore_safe(val) for key, val in item.items()}
+        joined = " | ".join(str(val) for val in values.values())
+        matched = match_senator_from_text(joined, senators_by_name)
+        amount = first_money(str(val) for key, val in values.items() if "amount" in key.lower() or "total" in key.lower() or "$" in str(val))
+        if not matched or amount is None:
+            continue
+        category = next((str(val) for key, val in values.items() if any(token in key.lower() for token in ["category", "type", "expense"])), "Uncategorized")
+        quarter = next((infer_quarter(str(val)) for key, val in values.items() if any(token in key.lower() for token in ["quarter", "period", "date", "fiscal"])), infer_quarter(source_url))
+        records.append(ExpenseRecord(matched.senator_id, matched.name, quarter, amount, category, source_url, values))
+    return records
+
+
+def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
+    current_year = datetime.now(timezone.utc).year
+    records: list[ExpenseRecord] = []
+    for year in [current_year, current_year - 1]:
+        for quarter in range(1, 5):
+            for url in proactive_api_candidates(year, quarter):
+                response = safe_get(http, url, expect_json=True, timeout=12, log_failures=False)
+                if response is None:
+                    continue
+                try:
+                    parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
+                except json.JSONDecodeError:
+                    parsed = parse_expenses_from_html(response.text, url, senators_by_name)
+                if parsed:
+                    LOGGER.info("Parsed %s expense rows from proactive disclosure API candidate %s", len(parsed), url)
+                    records.extend(parsed)
+                    break
+    return records
+
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
-    records: list[ExpenseRecord] = []
+    records = fetch_expenses_from_candidate_apis(http, senators_by_name)
     for link in disclosure_summary_pages():
-        response = safe_get(http, link)
+        response = safe_get(http, link, log_failures=False)
         if response is None:
             continue
         try:
@@ -436,11 +500,11 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
             else:
                 parsed = parse_expenses_from_html(response.text, link, senators_by_name)
                 parsed.extend(parse_expenses_from_embedded_json(response.text, link, senators_by_name))
-            if not parsed:
-                LOGGER.warning("No expense rows parsed from %s; structure may have changed.", link)
             records.extend(parsed)
         except Exception as exc:  # noqa: BLE001 - ingestion should log and continue
-            LOGGER.error("Expense parse failed for %s: %s", link, exc, exc_info=True)
+            LOGGER.warning("Expense parse failed for %s: %s", link, exc)
+    if not records:
+        LOGGER.warning("No expense rows parsed from proactive disclosure API candidates or summary pages. If this continues, capture the browser Network/XHR endpoint used by %s and add it to proactive_api_candidates().", SENATE_EXPENSE_SUMMARY_FILTER_URL)
     LOGGER.info("Parsed %s expense records", len(records))
     return records
 
