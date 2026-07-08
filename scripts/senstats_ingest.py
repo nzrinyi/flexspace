@@ -468,12 +468,15 @@ def parse_expenses_from_json_payload(payload: Any, source_url: str, senators_by_
 
 
 def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
+    if os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() != "true":
+        LOGGER.info("Skipping proactive disclosure API probing; set SENSTATS_PROBE_PROACTIVE_APIS=true after capturing the exact Network/XHR endpoint.")
+        return []
     current_year = datetime.now(timezone.utc).year
     records: list[ExpenseRecord] = []
     for year in [current_year, current_year - 1]:
         for quarter in range(1, 5):
             for url in proactive_api_candidates(year, quarter):
-                response = safe_get(http, url, expect_json=True, timeout=12, log_failures=False)
+                response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
                 if response is None:
                     continue
                 try:
@@ -489,6 +492,7 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     records = fetch_expenses_from_candidate_apis(http, senators_by_name)
+    LOGGER.info("Checking %s proactive disclosure summary/detail pages for static expense rows", len(disclosure_summary_pages()))
     for link in disclosure_summary_pages():
         response = safe_get(http, link, log_failures=False)
         if response is None:
