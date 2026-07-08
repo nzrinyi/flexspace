@@ -38,6 +38,7 @@ except ImportError:  # pragma: no cover - surfaced by main logging in CI
 REPRESENT_BASE_URL = "https://represent.opennorth.ca"
 SENATE_DISCLOSURE_URL = "https://sencanada.ca/en/ProActive/Summary"
 SENATE_DISCLOSURE_DETAILS_URL = "https://sencanada.ca/en/ProActive/Summary/Details"
+SENATE_DISCLOSURE_SENATORS_URL = "https://sencanada.ca/en/ProActive/Summary/Senators"
 SENATE_PROACTIVE_URL = "https://sencanada.ca/en/proactive/"
 SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
@@ -138,6 +139,13 @@ def first_present(*values: Any) -> str | None:
         if value:
             return str(value)
     return None
+
+
+def is_probably_image_url(value: str | None) -> bool:
+    if not value:
+        return False
+    lowered = value.lower().split("?", 1)[0]
+    return any(token in lowered for token in ["/media/", "/images/", "/image/"]) or lowered.endswith((".jpg", ".jpeg", ".png", ".webp", ".gif"))
 
 
 def extract_image_url(container: Any, base_url: str) -> str | None:
@@ -242,7 +250,7 @@ def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
                         province=str(item.get("district_name") or item.get("extra", {}).get("province") or item.get("province") or "Unknown"),
                         office_details=firestore_safe(offices),
                         source_url=str(item.get("source_url") or item.get("url") or REPRESENT_BASE_URL),
-                        photo_url=first_present(item.get("photo_url"), item.get("personal_url"), item.get("image")),
+                        photo_url=first_present(item.get("photo_url"), item.get("image")),
                         contact_details=firestore_safe(offices),
                         extra_details=firestore_safe(item.get("extra") or {}),
                         raw_data=raw_item if isinstance(raw_item, dict) else {"value": raw_item},
@@ -277,7 +285,7 @@ def enrich_with_senate_profiles(http: requests.Session, senators: list[SenatorRe
             senator,
             party=official.party or senator.party,
             province=official.province or senator.province,
-            photo_url=senator.photo_url or official.photo_url,
+            photo_url=senator.photo_url if is_probably_image_url(senator.photo_url) else official.photo_url or senator.photo_url,
             contact_details=senator.contact_details or official.contact_details,
             extra_details={**(official.extra_details or {}), **(senator.extra_details or {})},
             profile_details={**(official.profile_details or {}), **(senator.profile_details or {})},
@@ -417,7 +425,7 @@ def infer_quarter(text: str, fallback_year: int | None = None) -> str:
 
 def disclosure_links(http: requests.Session) -> list[str]:
     links: list[str] = []
-    for index_url in [SENATE_DISCLOSURE_URL, SENATE_DISCLOSURE_DETAILS_URL, SENATE_PROACTIVE_URL]:
+    for index_url in [SENATE_DISCLOSURE_URL, SENATE_DISCLOSURE_SENATORS_URL, SENATE_DISCLOSURE_DETAILS_URL, SENATE_PROACTIVE_URL]:
         response = safe_get(http, index_url)
         if response is None:
             continue
@@ -432,6 +440,12 @@ def disclosure_links(http: requests.Session) -> list[str]:
                 links.append(absolute)
             elif "/proactive" in lower_href or any(lower_href.endswith(ext) for ext in [".csv", ".html", ".htm", ".xlsx", ".xls"]):
                 links.append(absolute)
+        for script in soup.find_all("script"):
+            script_text = script.get_text(" ", strip=True)
+            for match in re.finditer(r"(?:https?://sencanada\.ca)?/en/ProActive/[^\"\'\s<>]+", script_text, flags=re.IGNORECASE):
+                links.append(urljoin(index_url, match.group(0)))
+            for match in re.finditer(r"[^\"\'\s<>]+\.(?:csv|xlsx?|html?)", script_text, flags=re.IGNORECASE):
+                links.append(urljoin(index_url, match.group(0)))
     unique = list(dict.fromkeys(links))
     if not unique:
         LOGGER.warning("No disclosure links found on Senate proactive disclosure pages; HTML structure may have changed.")
@@ -459,6 +473,44 @@ def parse_expenses_from_html(html: str, source_url: str, senators_by_name: dict[
             records.append(ExpenseRecord(matched.senator_id, matched.name, infer_quarter(source_url + " " + table.get_text(" ", strip=True)), amount, category, source_url, {"cells": cells, "row": row_values}))
     return records
 
+
+
+def parse_expenses_from_embedded_json(html: str, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
+    soup = BeautifulSoup(html, "html.parser")
+    records: list[ExpenseRecord] = []
+
+    def walk(value: Any) -> Iterable[Any]:
+        if isinstance(value, dict):
+            yield value
+            for child in value.values():
+                yield from walk(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from walk(child)
+
+    for script in soup.find_all("script"):
+        text = script.string or script.get_text(" ", strip=True)
+        if not text or not any(token in text.lower() for token in ["amount", "expense", "hospitality", "travel", "senator"]):
+            continue
+        candidates = [text]
+        for match in re.finditer(r"(\{.*\}|\[.*\])", text, flags=re.DOTALL):
+            candidates.append(match.group(1))
+        for candidate in candidates:
+            try:
+                payload = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+            for item in walk(payload):
+                values = {str(key): firestore_safe(val) for key, val in item.items()}
+                joined = " | ".join(str(val) for val in values.values())
+                matched = match_senator_from_text(joined, senators_by_name)
+                amount = first_money(str(val) for key, val in values.items() if "amount" in key.lower() or "total" in key.lower() or "$" in str(val))
+                if not matched or amount is None:
+                    continue
+                category = next((str(val) for key, val in values.items() if any(token in key.lower() for token in ["category", "type", "expense"])), "Uncategorized")
+                quarter = next((infer_quarter(str(val)) for key, val in values.items() if any(token in key.lower() for token in ["quarter", "period", "date", "fiscal"])), infer_quarter(source_url))
+                records.append(ExpenseRecord(matched.senator_id, matched.name, quarter, amount, category, source_url, values))
+    return records
 
 def parse_expenses_from_csv(text: str, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
     records: list[ExpenseRecord] = []
@@ -488,6 +540,7 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
                 parsed = parse_expenses_from_csv(response.text, link, senators_by_name)
             else:
                 parsed = parse_expenses_from_html(response.text, link, senators_by_name)
+                parsed.extend(parse_expenses_from_embedded_json(response.text, link, senators_by_name))
             if not parsed:
                 LOGGER.warning("No expense rows parsed from %s; structure may have changed.", link)
             records.extend(parsed)
@@ -507,12 +560,12 @@ def committee_links(http: requests.Session) -> list[tuple[str, str]]:
             match = re.search(r"/en/committees/([a-z]{3,5})(?:/45-1)?/?", href, flags=re.IGNORECASE)
             if match:
                 code = match.group(1).upper()
-                links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code}/45-1?v=committee-members")
+                links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")
     if links:
         return sorted(links.items())
     LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-    fallback_codes = ["AEFA", "AGFO", "APPA", "BANC", "CIBA", "CONF", "ENEV", "FISH", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "SECD", "SOCI", "TRCM"]
-    return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code}/45-1?v=committee-members")) for code in fallback_codes]
+    fallback_codes = ["AEFA", "AGFO", "APPA", "AOVS", "BANC", "CIBA", "CONF", "ENEV", "FISH", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
+    return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")) for code in fallback_codes]
 
 
 def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord]) -> CommitteeRecord:

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SenStatsExpenseDocument, SenStatsSenatorDocument } from '../../types';
+import type { SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../../types';
 import { currency, groupClassName, groupLabel } from './SenStatsHelpers';
 import { SenStatsExpenseChart } from './SenStatsExpenseChart';
 
@@ -8,6 +8,7 @@ interface SenStatsSenatorsViewProps {
   selectedSenator?: SenStatsSenatorDocument;
   filteredSenators: SenStatsSenatorDocument[];
   expenses: Array<SenStatsExpenseDocument & { id: string }>;
+  committees: Array<SenStatsCommitteeDocument & { id: string }>;
   expenseLoading: boolean;
   groupOptions: string[];
   provinceOptions: string[];
@@ -26,11 +27,33 @@ function senatorPhotoUrl(senator?: SenStatsSenatorDocument) {
   return senator?.photoUrl || (typeof profilePhoto === 'string' ? profilePhoto : undefined);
 }
 
-export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenators, expenses, expenseLoading, groupOptions, provinceOptions, groupFilter, provinceFilter, searchTerm, recentlyChangedSenatorIds, onGroupFilterChange, onProvinceFilterChange, onSearchTermChange, onSelectSenator }: SenStatsSenatorsViewProps) {
+function detailValue(senator: SenStatsSenatorDocument | undefined, keys: string[]) {
+  if (!senator) return '';
+  const sources = [senator.extraDetails, senator.profileDetails, ...(senator.officeDetails ?? [])];
+  for (const source of sources) {
+    if (!source) continue;
+    for (const key of keys) {
+      const value = source[key];
+      if (typeof value === 'string' && value.trim()) return value;
+      if (typeof value === 'number') return String(value);
+    }
+  }
+  return '';
+}
+
+function sourceLabel(key: string) {
+  return key.replace(/-/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
+}
+
+export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenators, expenses, committees, expenseLoading, groupOptions, provinceOptions, groupFilter, provinceFilter, searchTerm, recentlyChangedSenatorIds, onGroupFilterChange, onProvinceFilterChange, onSearchTermChange, onSelectSenator }: SenStatsSenatorsViewProps) {
   const [detailsOpen, setDetailsOpen] = useState(Boolean(selectedSenator));
   const totalExpenses = expenses.reduce((total, expense) => total + (Number(expense.amount) || 0), 0);
-  const selectedProfileFields = selectedSenator ? Object.entries({ ...(selectedSenator.extraDetails ?? {}), ...(selectedSenator.profileDetails ?? {}) }).filter(([, value]) => typeof value === 'string' && value).slice(0, 8) : [];
   const selectedPhotoUrl = senatorPhotoUrl(selectedSenator);
+  const appointedBy = detailValue(selectedSenator, ['appointedOnAdviceOf', 'appointed-by', 'appointedBy', 'appointed on advice of']);
+  const appointedDate = detailValue(selectedSenator, ['nominatedDate', 'appointed-date', 'appointedDate', 'summoned-to-the-senate', 'date-of-appointment']);
+  const retirementDate = detailValue(selectedSenator, ['retirementDate', 'retirement-date', 'mandatory-retirement-date', 'retirement']);
+  const selectedProfileFields = selectedSenator ? Object.entries({ ...(selectedSenator.extraDetails ?? {}), ...(selectedSenator.profileDetails ?? {}) }).filter(([key, value]) => typeof value === 'string' && value && !['photoUrl', 'heading', 'nominatedDate', 'retirementDate', 'appointedOnAdviceOf'].includes(key)).slice(0, 10) : [];
+  const selectedCommitteeMemberships = selectedSenator ? committees.filter((committee) => (committee.members ?? []).some((member) => member.senatorId === selectedSenator.id || member.name === selectedSenator.name)) : [];
 
   useEffect(() => {
     if (selectedSenator) setDetailsOpen(true);
@@ -65,8 +88,15 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
       {selectedSenator && detailsOpen && <aside className="expense-panel senator-drilldown" aria-live="polite">
         <div className="drilldown-header"><div><span>Senator details</span><strong>{selectedSenator.name}</strong></div><button type="button" onClick={() => setDetailsOpen(false)}>Close</button></div>
         <div className={`senstats-stat selected-senator-card ${groupClassName(selectedSenator.party)}`}>{selectedPhotoUrl && <img src={selectedPhotoUrl} alt={`${selectedSenator.name} portrait`} referrerPolicy="no-referrer" />}<span>Profile</span><small>{selectedSenator.province} · {groupLabel(selectedSenator.party)}</small>{selectedSenator.sourceUrl && <a href={selectedSenator.sourceUrl} target="_blank" rel="noreferrer">Official profile</a>}</div>
+        <div className="senstats-detail-grid" aria-label="Appointment details">
+          <p><span>Appointed / nominated</span><strong>{appointedDate || 'Not synced yet'}</strong></p>
+          <p><span>Appointed by</span><strong>{appointedBy || 'Not synced yet'}</strong></p>
+          <p><span>Retirement</span><strong>{retirementDate || 'Not synced yet'}</strong></p>
+          <p><span>Committee memberships</span><strong>{selectedCommitteeMemberships.length}</strong></p>
+        </div>
         <div className="senstats-stat"><span>Visible expenses</span><strong>{expenses.length ? currency(totalExpenses) : 'No data available'}</strong><small>{expenseLoading ? 'Syncing expense records…' : `${expenses.length} quarterly records`}</small></div>
-        {selectedProfileFields.length > 0 && <div className="senstats-profile-data"><strong>Additional profile data</strong>{selectedProfileFields.map(([key, value]) => <p key={key}><span>{key.replace(/-/g, ' ')}</span><small>{String(value)}</small></p>)}</div>}
+        {selectedCommitteeMemberships.length > 0 && <div className="senstats-profile-data committee-memberships"><strong>Committee memberships</strong>{selectedCommitteeMemberships.map((committee) => { const member = committee.members?.find((item) => item.senatorId === selectedSenator.id || item.name === selectedSenator.name); return <p key={committee.id}><span>{committee.code}</span><small>{committee.name}{member?.role ? ` · ${member.role}` : ''}</small></p>; })}</div>}
+        {selectedProfileFields.length > 0 && <div className="senstats-profile-data"><strong>Additional Senate profile data</strong>{selectedProfileFields.map(([key, value]) => <p key={key}><span>{sourceLabel(key)}</span><small>{String(value)}</small></p>)}</div>}
         <SenStatsExpenseChart expenses={expenses} loading={expenseLoading} />
       </aside>}
     </div>
