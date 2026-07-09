@@ -992,8 +992,8 @@ def main() -> int:
             return 1
         return 0
     attendance = fetch_attendance_records(http, senators)
-    expenses = fetch_expense_records(http, senators)
     committees = fetch_committee_records(http, senators)
+    expenses = fetch_expense_records(http, senators)
     try:
         db = firestore_client()
         existing = existing_senator_snapshot(db)
