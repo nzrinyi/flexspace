@@ -85,10 +85,12 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
 
 
   useEffect(() => {
-    const attendanceQuery = query(collection(db, 'senstats_attendance'), orderBy('senatorName'));
-    return onSnapshot(attendanceQuery, (snapshot) => {
-      setAttendance(snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }) as SenStatsAttendance));
-    }, (snapshotError) => setError(snapshotError.message));
+    return onSnapshot(collection(db, 'senstats_attendance'), (snapshot) => {
+      setAttendance(snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data() }) as SenStatsAttendance).sort((a, b) => String(a.senatorName ?? '').localeCompare(String(b.senatorName ?? ''))));
+    }, (snapshotError) => {
+      console.warn('Unable to load SenStats attendance rows', snapshotError);
+      setAttendance([]);
+    });
   }, []);
 
   useEffect(() => {
@@ -140,7 +142,7 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
       </div>
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
-      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />}
+      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} recentlyChangedSenatorIds={recentlyChangedSenatorIds} syncedAttendanceCount={syncStatus?.attendanceCount ?? 0} />}
       {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
       {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? expenses.length} committeeCount={syncStatus?.committeeCount ?? committees.length} attendanceCount={syncStatus?.attendanceCount ?? attendance.length} syncStatus={syncStatus} />}
       {activeTab === 'changes' && <SenStatsChangeLogView changes={changeLog} />}
