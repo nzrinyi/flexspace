@@ -141,7 +141,7 @@ def session() -> requests.Session:
     contact_email = os.getenv("SENSTATS_CONTACT_EMAIL", "configure-SENSTATS_CONTACT_EMAIL")
     user_agent = os.getenv("SENSTATS_USER_AGENT", f"Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: {contact_email})")
     http = requests.Session()
-    http.headers.update({"User-Agent": user_agent or DEFAULT_USER_AGENT, "Accept": "application/json,text/html,*/*"})
+    http.headers.update({"User-Agent": user_agent or DEFAULT_USER_AGENT, "Accept": "application/json,text/html,*/*", "X-Requested-With": "XMLHttpRequest"})
     return http
 
 
@@ -223,6 +223,10 @@ def clean_display_name(value: str) -> str:
     return re.sub(r"\s+", " ", value.replace("The Honourable", "").replace("Honourable", "")).strip(" ,")
 
 
+def profile_url_key(value: str) -> str:
+    return urljoin("https://sencanada.ca", value).split("?", 1)[0].rstrip("/").lower()
+
+
 def fetch_senator_tile_photo_urls(http: requests.Session) -> dict[str, str]:
     """Read senator images from the official tile XHR endpoint."""
     response = safe_get(http, SENATE_SENATORS_TILES_AJAX_URL, timeout=int(os.getenv("SENSTATS_SENATOR_PHOTO_TIMEOUT", "20")), log_failures=False)
@@ -237,9 +241,10 @@ def fetch_senator_tile_photo_urls(http: requests.Session) -> dict[str, str]:
         container = image.find_parent(["article", "li", "div"]) or image.parent
         anchor = container.find("a", href=True) if hasattr(container, "find") else None
         name = clean_display_name(str(image.get("alt") or "") or (anchor.get_text(" ", strip=True) if anchor else ""))
-        if not name:
-            continue
-        photos[stable_id(name)] = photo_url
+        if name:
+            photos[stable_id(name)] = photo_url
+        if anchor and anchor.get("href"):
+            photos[profile_url_key(str(anchor["href"]))] = photo_url
     LOGGER.info("Parsed %s senator photo URLs from official Senate tiles XHR", len(photos))
     return photos
 
@@ -298,7 +303,7 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
             source_url = SENATE_SENATORS_AJAX_URL
             profile_url = urljoin("https://sencanada.ca", str(anchor["href"])) if anchor else ""
             row_photo_url = extract_image_url(row, "https://sencanada.ca")
-            photo_url = row_photo_url if is_probably_image_url(row_photo_url) else tile_photo_urls.get(stable_id(name))
+            photo_url = row_photo_url if is_probably_image_url(row_photo_url) else tile_photo_urls.get(profile_url_key(profile_url), tile_photo_urls.get(stable_id(name)))
             profile_details: dict[str, Any] = {"profileUrl": profile_url} if profile_url else {}
             office_details = {
                 "type": "senate-profile",
