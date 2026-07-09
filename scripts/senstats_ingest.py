@@ -733,7 +733,7 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
     return []
 
 
-def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord]) -> CommitteeRecord:
+def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord], senators_by_profile: dict[str, SenatorRecord]) -> CommitteeRecord:
     soup = BeautifulSoup(html, "html.parser")
     heading = soup.find("h1")
     name = heading.get_text(" ", strip=True) if heading else KNOWN_COMMITTEE_NAMES.get(code.upper(), code)
@@ -743,24 +743,53 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
     committee_type = "Standing Committee" if "Standing" in raw_text[:500] else "Committee"
     members: list[dict[str, str]] = []
     seen: set[str] = set()
+
+    def append_member(name_text: str, role: str, party: str = "", province: str = "", profile_url: str = "") -> None:
+        normalized_name = clean_display_name(name_text)
+        senator = senators_by_profile.get(profile_url_key(profile_url)) if profile_url else None
+        senator = senator or senators_by_name.get(normalized_name)
+        key = senator.senator_id if senator else stable_id(normalized_name or profile_url)
+        if not key or key in seen:
+            return
+        seen.add(key)
+        members.append({
+            "name": senator.name if senator else normalized_name,
+            "senatorId": senator.senator_id if senator else key,
+            "role": role,
+            "party": senator.party if senator else party_label(party),
+            "province": senator.province if senator else province,
+        })
+
+    for card in soup.select(".sc-committee-members-dynamic-content-member-card"):
+        row = card.find_parent("div", class_="row")
+        if row is None:
+            continue
+        anchor = row.find("a", href=True)
+        role_heading = row.find(["h3", "h4"])
+        detail_text = row.get_text(" ", strip=True)
+        party = ""
+        province = ""
+        affiliation_match = re.search(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", detail_text)
+        if affiliation_match:
+            party = affiliation_match.group(1)
+            province = affiliation_match.group(2)
+        append_member(anchor.get_text(" ", strip=True) if anchor else "", role_heading.get_text(" ", strip=True) if role_heading else "Member", party, province, str(anchor["href"]) if anchor else "")
+
     for senator_name, senator in senators_by_name.items():
-        if senator_name.lower() not in raw_text.lower():
+        if senator.senator_id in seen or senator_name.lower() not in raw_text.lower():
             continue
         role = ""
         for line in raw_text.splitlines():
             if senator_name in line and any(token in line.lower() for token in ["chair", "deputy", "member", "ex officio"]):
                 role = line.replace(senator_name, "").strip(" -·,;:")[:80]
                 break
-        key = senator.senator_id
-        if key in seen:
-            continue
-        seen.add(key)
-        members.append({"name": senator.name, "senatorId": senator.senator_id, "role": role, "party": senator.party, "province": senator.province})
+        append_member(senator.name, role or "Member", senator.party, senator.province, "")
     return CommitteeRecord(stable_id(code), code, name, committee_type, session, source_url, members)
 
 
 def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[CommitteeRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
+    senators_by_profile = {profile_url_key(str((senator.profile_details or {}).get("profileUrl") or "")): senator for senator in senators if (senator.profile_details or {}).get("profileUrl")}
     committees: list[CommitteeRecord] = []
     committee_timeout = int(os.getenv("SENSTATS_COMMITTEE_TIMEOUT", "10"))
     session_id = os.getenv("SENSTATS_COMMITTEE_SESSION_ID", "32")
@@ -774,7 +803,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         if response is None:
             continue
         try:
-            committees.append(parse_committee_page(response.text, source_url, code, senators_by_name))
+            committees.append(parse_committee_page(response.text, source_url, code, senators_by_name, senators_by_profile))
         except Exception as exc:  # noqa: BLE001
             LOGGER.error("Committee parse failed for %s: %s", source_url, exc, exc_info=True)
     LOGGER.info("Parsed %s committee records", len(committees))
