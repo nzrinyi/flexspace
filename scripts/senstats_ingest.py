@@ -42,9 +42,32 @@ SENATE_PROACTIVE_URL = "https://sencanada.ca/en/proactive/"
 SENATE_ATTENDANCE_URL = "https://sencanada.ca/en/attendance/"
 SENATE_EXPENSE_SUMMARY_FILTER_URL = "https://sencanada.ca/en/proactive/summary/#?Year=2026&Quarter=1&Member=Senators"
 SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
+SENATE_SENATORS_TILES_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorstiles"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
+SENATE_COMMITTEE_LIST_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeListPartialView?parlsession=&Lang=en"
+SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeMembership"
 
 KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "CONF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
+KNOWN_COMMITTEE_NAMES = {
+    "AEFA": "Foreign Affairs and International Trade",
+    "AGFO": "Agriculture and Forestry",
+    "AOVS": "Audit and Oversight",
+    "APPA": "Indigenous Peoples",
+    "BANC": "Banking, Commerce and the Economy",
+    "CIBA": "Internal Economy, Budgets and Administration",
+    "CONF": "Ethics and Conflict of Interest for Senators",
+    "ENEV": "Energy, the Environment and Natural Resources",
+    "LCJC": "Legal and Constitutional Affairs",
+    "NFFN": "National Finance",
+    "OLLO": "Official Languages",
+    "POFO": "Fisheries and Oceans",
+    "RIDR": "Human Rights",
+    "RPRD": "Rules, Procedures and the Rights of Parliament",
+    "SECD": "National Security, Defence and Veterans Affairs",
+    "SELE": "Selection Committee",
+    "SOCI": "Social Affairs, Science and Technology",
+    "TRCM": "Transport and Communications",
+}
 DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: configure-SENSTATS_CONTACT_EMAIL)"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
 
@@ -196,6 +219,31 @@ def extract_image_url(container: Any, base_url: str) -> str | None:
     return None
 
 
+def clean_display_name(value: str) -> str:
+    return re.sub(r"\s+", " ", value.replace("The Honourable", "").replace("Honourable", "")).strip(" ,")
+
+
+def fetch_senator_tile_photo_urls(http: requests.Session) -> dict[str, str]:
+    """Read senator images from the official tile XHR endpoint."""
+    response = safe_get(http, SENATE_SENATORS_TILES_AJAX_URL, timeout=int(os.getenv("SENSTATS_SENATOR_PHOTO_TIMEOUT", "20")), log_failures=False)
+    if response is None:
+        return {}
+    soup = BeautifulSoup(response.text, "html.parser")
+    photos: dict[str, str] = {}
+    for image in soup.find_all("img"):
+        photo_url = extract_image_url(image.parent or image, "https://sencanada.ca")
+        if not is_probably_image_url(photo_url):
+            continue
+        container = image.find_parent(["article", "li", "div"]) or image.parent
+        anchor = container.find("a", href=True) if hasattr(container, "find") else None
+        name = clean_display_name(str(image.get("alt") or "") or (anchor.get_text(" ", strip=True) if anchor else ""))
+        if not name:
+            continue
+        photos[stable_id(name)] = photo_url
+    LOGGER.info("Parsed %s senator photo URLs from official Senate tiles XHR", len(photos))
+    return photos
+
+
 def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
     """Fetch current senators from the official directory in one request.
 
@@ -235,6 +283,7 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
     if response is None:
         return []
     try:
+        tile_photo_urls = fetch_senator_tile_photo_urls(http)
         soup = BeautifulSoup(response.text, "html.parser")
         rows = soup.find_all("tr")
         senators: list[SenatorRecord] = []
@@ -249,6 +298,7 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
             source_url = SENATE_SENATORS_AJAX_URL
             profile_url = urljoin("https://sencanada.ca", str(anchor["href"])) if anchor else ""
             row_photo_url = extract_image_url(row, "https://sencanada.ca")
+            photo_url = row_photo_url if is_probably_image_url(row_photo_url) else tile_photo_urls.get(stable_id(name))
             profile_details: dict[str, Any] = {"profileUrl": profile_url} if profile_url else {}
             office_details = {
                 "type": "senate-profile",
@@ -264,7 +314,7 @@ def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]
                     province=province,
                     office_details=[office_details],
                     source_url=source_url,
-                    photo_url=row_photo_url if is_probably_image_url(row_photo_url) else None,
+                    photo_url=photo_url,
                     contact_details=[],
                     extra_details={"nominatedDate": nominated, "retirementDate": retirement, "appointedOnAdviceOf": appointed_by},
                     profile_details=firestore_safe(profile_details),
@@ -628,9 +678,19 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
     return records
 
 
-def committee_links(http: requests.Session) -> list[tuple[str, str]]:
-    response = safe_get(http, SENATE_COMMITTEES_URL)
-    links: dict[str, str] = {}
+def committee_id_from_markup(html: str, code: str) -> str | None:
+    windows = [match.start() for match in re.finditer(re.escape(code), html, flags=re.IGNORECASE)]
+    for start in windows:
+        excerpt = html[max(0, start - 600):start + 1200]
+        match = re.search(r"(?:CommitteeId|committeeId|data-committee-id)[\"'=\s:]+(\d+)", excerpt)
+        if match:
+            return match.group(1)
+    return None
+
+
+def committee_links(http: requests.Session) -> list[dict[str, str]]:
+    response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=int(os.getenv("SENSTATS_COMMITTEE_LIST_TIMEOUT", "20")), log_failures=False)
+    links: dict[str, dict[str, str]] = {}
     if response is not None:
         soup = BeautifulSoup(response.text, "html.parser")
         for anchor in soup.find_all("a", href=True):
@@ -639,12 +699,31 @@ def committee_links(http: requests.Session) -> list[tuple[str, str]]:
             if match:
                 code = match.group(1).upper()
                 if code in KNOWN_COMMITTEE_CODES:
-                    links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
+                    links[code] = {
+                        "code": code,
+                        "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
+                        "committeeId": committee_id_from_markup(response.text, code) or "",
+                    }
+    if not links:
+        response = safe_get(http, SENATE_COMMITTEES_URL)
+        if response is not None:
+            soup = BeautifulSoup(response.text, "html.parser")
+            for anchor in soup.find_all("a", href=True):
+                href = str(anchor["href"])
+                match = re.search(r"/en/committees/([a-z]{3,5})(?:/45-1)?/?", href, flags=re.IGNORECASE)
+                if match:
+                    code = match.group(1).upper()
+                    if code in KNOWN_COMMITTEE_CODES:
+                        links[code] = {
+                            "code": code,
+                            "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
+                            "committeeId": committee_id_from_markup(response.text, code) or "",
+                        }
     if links:
-        return sorted(links.items())
+        return [links[code] for code in sorted(links)]
     if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "true").lower() == "true":
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-        return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")) for code in KNOWN_COMMITTEE_CODES]
+        return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": ""} for code in KNOWN_COMMITTEE_CODES]
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
     return []
 
@@ -652,7 +731,7 @@ def committee_links(http: requests.Session) -> list[tuple[str, str]]:
 def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord]) -> CommitteeRecord:
     soup = BeautifulSoup(html, "html.parser")
     heading = soup.find("h1")
-    name = heading.get_text(" ", strip=True) if heading else code
+    name = heading.get_text(" ", strip=True) if heading else KNOWN_COMMITTEE_NAMES.get(code.upper(), code)
     raw_text = soup.get_text("\n", strip=True)
     session_match = re.search(r"(\d{2}-\d).*?(\d{2}(?:st|nd|rd|th) Parliament, \d(?:st|nd|rd|th) Session.*?)\n", raw_text)
     session = " ".join(session_match.group(0).split()) if session_match else "45-1"
@@ -679,14 +758,20 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     senators_by_name = {senator.name: senator for senator in senators}
     committees: list[CommitteeRecord] = []
     committee_timeout = int(os.getenv("SENSTATS_COMMITTEE_TIMEOUT", "10"))
-    for code, url in committee_links(http):
-        response = safe_get(http, url, timeout=committee_timeout)
+    session_id = os.getenv("SENSTATS_COMMITTEE_SESSION_ID", "32")
+    for link in committee_links(http):
+        code = link["code"]
+        url = link["url"]
+        committee_id = link.get("committeeId", "")
+        membership_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id, 'Lang': 'en'})}" if committee_id else ""
+        source_url = membership_url or url
+        response = safe_get(http, source_url, timeout=committee_timeout)
         if response is None:
             continue
         try:
-            committees.append(parse_committee_page(response.text, url, code, senators_by_name))
+            committees.append(parse_committee_page(response.text, source_url, code, senators_by_name))
         except Exception as exc:  # noqa: BLE001
-            LOGGER.error("Committee parse failed for %s: %s", url, exc, exc_info=True)
+            LOGGER.error("Committee parse failed for %s: %s", source_url, exc, exc_info=True)
     LOGGER.info("Parsed %s committee records", len(committees))
     return committees
 
