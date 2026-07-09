@@ -950,3 +950,24 @@ input, select, textarea { max-width: 100%; }
   border-left-color: var(--sen-border-strong) !important;
   border-top-color: var(--sen-border-strong);
 }
+
+/* SenStats shell-level dark mode: cover the real page background, not only cards */
+body.senstats-body-dark { background: #020617; color: #e2e8f0; }
+.senstats-shell-dark { color: #e2e8f0; }
+.senstats-shell-dark .hero.card,
+.senstats-shell-dark .senstats-dashboard.card { background: #0f172a; border-color: #334155; box-shadow: none; }
+.senstats-shell-dark .senstats-name { color: #c4b5fd; }
+.senstats-shell-dark .theme-toggle { background: #312e81; color: #e0e7ff; border-color: #4c1d95; }
+.senstats-dashboard.senstats-dark { background: var(--sen-bg); border-color: var(--sen-border); }
+.senstats-dashboard.senstats-dark .senstats-tabs button:not(.active) { color: var(--sen-text-2); }
+.senstats-dashboard.senstats-dark .senator-table,
+.senstats-dashboard.senstats-dark .senator-table tbody,
+.senstats-dashboard.senstats-dark .senator-table tr,
+.senstats-dashboard.senstats-dark .dashboard-table,
+.senstats-dashboard.senstats-dark .source-table { background: var(--sen-surface); color: var(--sen-text-2); }
+.senstats-dashboard.senstats-dark .senator-table em,
+.senstats-dashboard.senstats-dark .dashboard-table em { color: var(--sen-text); }
+.senstats-dashboard.senstats-dark .dashboard-overview-banner { border-color: var(--sen-border); background: var(--sen-surface); }
+.senstats-dashboard.senstats-dark .dashboard-overview-banner strong { color: var(--sen-text); }
+.senstats-dashboard.senstats-dark .dashboard-overview-banner span,
+.senstats-dashboard.senstats-dark .dashboard-overview-banner small { color: var(--sen-muted); }

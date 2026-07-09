@@ -137,7 +137,15 @@ function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) =>
 }
 
 function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
-  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button></div></section><SenStatsDashboard /></main>;
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('senstats.darkMode') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('senstats.darkMode', String(darkMode));
+    document.body.classList.toggle('senstats-body-dark', darkMode);
+    return () => document.body.classList.remove('senstats-body-dark');
+  }, [darkMode]);
+
+  return <main className={`shell senstats-shell ${darkMode ? 'senstats-shell-dark' : ''}`}><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="theme-toggle" type="button" onClick={() => setDarkMode((current) => !current)} aria-pressed={darkMode}>{darkMode ? 'Light mode' : 'Dark mode'}</button></div></section><SenStatsDashboard darkMode={darkMode} /></main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {

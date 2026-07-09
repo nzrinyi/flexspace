@@ -43,6 +43,8 @@ SENATE_ATTENDANCE_URL = "https://sencanada.ca/en/attendance/"
 SENATE_EXPENSE_SUMMARY_FILTER_URL = "https://sencanada.ca/en/proactive/summary/#?Year=2026&Quarter=1&Member=Senators"
 SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
+
+KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "CONF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
 DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: configure-SENSTATS_CONTACT_EMAIL)"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
 
@@ -627,13 +629,13 @@ def committee_links(http: requests.Session) -> list[tuple[str, str]]:
             match = re.search(r"/en/committees/([a-z]{3,5})(?:/45-1)?/?", href, flags=re.IGNORECASE)
             if match:
                 code = match.group(1).upper()
-                links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")
+                if code in KNOWN_COMMITTEE_CODES:
+                    links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
     if links:
         return sorted(links.items())
     if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "true").lower() == "true":
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-        fallback_codes = ["AEFA", "AGFO", "APPA", "AOVS", "BANC", "CIBA", "CONF", "ENEV", "FISH", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
-        return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")) for code in fallback_codes]
+        return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")) for code in KNOWN_COMMITTEE_CODES]
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
     return []
 

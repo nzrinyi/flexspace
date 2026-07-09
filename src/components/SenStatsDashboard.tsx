@@ -32,9 +32,8 @@ class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: 
   }
 }
 
-function SenStatsDashboardContent() {
+function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
   const [activeTab, setActiveTab] = useState<SenStatsTab>('senators');
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('senstats.darkMode') === 'true');
   const [senators, setSenators] = useState<SenStatsSenator[]>([]);
   const [committees, setCommittees] = useState<SenStatsCommittee[]>([]);
   const [selectedSenatorId, setSelectedSenatorId] = useState<string | null>(null);
@@ -50,9 +49,6 @@ function SenStatsDashboardContent() {
   const [expenseLoading, setExpenseLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('senstats.darkMode', String(darkMode));
-  }, [darkMode]);
 
   useEffect(() => {
     const senatorsQuery = query(collection(db, 'senstats_senators'), orderBy('name'));
@@ -139,12 +135,6 @@ function SenStatsDashboardContent() {
 
   return (
     <section className={`card senstats-dashboard ${darkMode ? 'senstats-dark' : ''}`}>
-      <div className="section-heading">
-        <div><h2>Senators, dashboards, groups, and committees</h2></div>
-        <span>{senators.length} senators synced · daily at 09:17 UTC</span>
-        <button className="theme-toggle" type="button" onClick={() => setDarkMode((current) => !current)} aria-pressed={darkMode}>{darkMode ? 'Light mode' : 'Dark mode'}</button>
-      </div>
-
       <div className="senstats-tabs" role="tablist" aria-label="SenStats sections">
         {(['senators', 'dashboards', 'committees', 'sources', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : 'Change log'}</button>)}
       </div>
@@ -158,6 +148,6 @@ function SenStatsDashboardContent() {
   );
 }
 
-export function SenStatsDashboard() {
-  return <SenStatsErrorBoundary><SenStatsDashboardContent /></SenStatsErrorBoundary>;
+export function SenStatsDashboard({ darkMode }: { darkMode: boolean }) {
+  return <SenStatsErrorBoundary><SenStatsDashboardContent darkMode={darkMode} /></SenStatsErrorBoundary>;
 }
