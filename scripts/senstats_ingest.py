@@ -512,17 +512,23 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
     current_year = datetime.now(timezone.utc).year
     records: list[ExpenseRecord] = []
     attempted_urls: set[str] = set()
+    max_attempts = int(os.getenv("SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS", "10"))
+    timeout_seconds = int(os.getenv("SENSTATS_PROACTIVE_TIMEOUT", "10"))
+    LOGGER.info("Checking Senate proactive disclosure GetProActiveData XHR candidates (max %s attempts)", max_attempts)
     for year in [current_year, current_year - 1]:
         for quarter in range(1, 5):
             quarter_records: list[ExpenseRecord] = []
             for url in proactive_data_urls(year, quarter):
                 if url in attempted_urls:
                     continue
+                if len(attempted_urls) >= max_attempts:
+                    LOGGER.info("Stopped proactive XHR probing after %s attempts; set SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS to raise this limit.", max_attempts)
+                    break
                 attempted_urls.add(url)
                 response = safe_get(
                     http,
                     url,
-                    timeout=12,
+                    timeout=timeout_seconds,
                     log_failures=False,
                     headers={"Referer": f"{SENATE_DISCLOSURE_URL}/#?Year={year}&Quarter={quarter}&Member=Senators"},
                 )
@@ -542,6 +548,8 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
                     LOGGER.info("Parsed %s expense rows from proactive disclosure XHR %s", len(parsed), url)
                     quarter_records.extend(parsed)
                     break
+            if len(attempted_urls) >= max_attempts and not quarter_records:
+                break
             if not quarter_records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() == "true":
                 for url in proactive_api_candidates(year, quarter):
                     response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
@@ -563,23 +571,27 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     records = fetch_expenses_from_candidate_apis(http, senators_by_name)
-    LOGGER.info("Checking %s proactive disclosure summary/detail pages for static expense rows", len(disclosure_summary_pages()))
-    for link in disclosure_summary_pages():
-        response = safe_get(http, link, log_failures=False)
-        if response is None:
-            continue
-        try:
-            content_type = response.headers.get("content-type", "").lower()
-            if "csv" in content_type or link.lower().endswith(".csv"):
-                parsed = parse_expenses_from_csv(response.text, link, senators_by_name)
-            else:
-                parsed = parse_expenses_from_html(response.text, link, senators_by_name)
-                parsed.extend(parse_expenses_from_embedded_json(response.text, link, senators_by_name))
-            records.extend(parsed)
-        except Exception as exc:  # noqa: BLE001 - ingestion should log and continue
-            LOGGER.warning("Expense parse failed for %s: %s", link, exc)
+    check_static_pages = os.getenv("SENSTATS_CHECK_STATIC_PROACTIVE_PAGES", "false").lower() == "true"
+    if not records and check_static_pages:
+        LOGGER.info("Checking %s proactive disclosure summary/detail pages for static expense rows", len(disclosure_summary_pages()))
+        for link in disclosure_summary_pages():
+            response = safe_get(http, link, timeout=int(os.getenv("SENSTATS_STATIC_PROACTIVE_TIMEOUT", "8")), log_failures=False)
+            if response is None:
+                continue
+            try:
+                content_type = response.headers.get("content-type", "").lower()
+                if "csv" in content_type or link.lower().endswith(".csv"):
+                    parsed = parse_expenses_from_csv(response.text, link, senators_by_name)
+                else:
+                    parsed = parse_expenses_from_html(response.text, link, senators_by_name)
+                    parsed.extend(parse_expenses_from_embedded_json(response.text, link, senators_by_name))
+                records.extend(parsed)
+            except Exception as exc:  # noqa: BLE001 - ingestion should log and continue
+                LOGGER.warning("Expense parse failed for %s: %s", link, exc)
+    elif not records:
+        LOGGER.info("Skipping static proactive summary/detail page fallback because SENSTATS_CHECK_STATIC_PROACTIVE_PAGES is not true; those pages have recently returned shells without expense rows and can add several minutes of timeouts.")
     if not records:
-        LOGGER.warning("No expense rows parsed from the captured GetProActiveData XHR endpoints or fallback summary pages. If this continues, copy the full GetProActiveData request URL from the browser Network tab and update proactive_data_urls().")
+        LOGGER.warning("No expense rows parsed from the captured GetProActiveData XHR endpoints. If this continues, set SENSTATS_PROACTIVE_XHR_URL to the full GetProActiveData request URL copied from the browser Network tab.")
     LOGGER.info("Parsed %s expense records", len(records))
     return records
 
