@@ -811,3 +811,142 @@ input, select, textarea { max-width: 100%; }
 .profile-actions { display: flex !important; flex-wrap: wrap; gap: 8px; align-items: center; letter-spacing: 0 !important; text-transform: none !important; }
 .profile-actions button { border: 0; border-radius: 999px; background: #f1f5f9; color: #334155; padding: 6px 10px; font: inherit; font-size: .78rem; font-weight: 900; }
 .senstats-dark .profile-actions button { background: #0f172a; color: #f8fafc; }
+
+/* SenStats theme token pass: centralize colors so light/dark themes can evolve safely */
+.senstats-dashboard {
+  --sen-bg: #ffffff;
+  --sen-bg-soft: #f8fafc;
+  --sen-surface: #ffffff;
+  --sen-surface-2: #f8fafc;
+  --sen-border: #e8edf7;
+  --sen-border-strong: #cbd5e1;
+  --sen-text: #0f172a;
+  --sen-text-2: #25324a;
+  --sen-muted: #64748b;
+  --sen-link-bg: #eef2ff;
+  --sen-link-text: #3730a3;
+  --sen-shadow: 0 12px 28px rgba(15,23,42,.06);
+  --sen-shadow-strong: 0 16px 36px rgba(15,23,42,.08);
+  --sen-input-bg: #ffffff;
+  --sen-row-hover: color-mix(in srgb, var(--group-color, #64748b) 8%, #fff);
+  color: var(--sen-text-2);
+}
+.senstats-dashboard.senstats-dark {
+  --sen-bg: #0f172a;
+  --sen-bg-soft: #111827;
+  --sen-surface: #1e293b;
+  --sen-surface-2: #0f172a;
+  --sen-border: #334155;
+  --sen-border-strong: #475569;
+  --sen-text: #f8fafc;
+  --sen-text-2: #e2e8f0;
+  --sen-muted: #cbd5e1;
+  --sen-link-bg: #312e81;
+  --sen-link-text: #e0e7ff;
+  --sen-shadow: none;
+  --sen-shadow-strong: none;
+  --sen-input-bg: #0f172a;
+  --sen-row-hover: color-mix(in srgb, var(--group-color, #64748b) 18%, #0f172a);
+}
+.senstats-dashboard .senstats-tabs,
+.senstats-dashboard .senstats-filter-bar,
+.senstats-dashboard .senator-list-panel,
+.senstats-dashboard .senator-drilldown,
+.senstats-dashboard .source-card,
+.senstats-dashboard .senstats-stat,
+.senstats-dashboard .senstats-profile-data,
+.senstats-dashboard .detail-section-card,
+.senstats-dashboard .dashboard-table,
+.senstats-dashboard .dashboard-table > div,
+.senstats-dashboard .source-table,
+.senstats-dashboard .source-table > div,
+.senstats-dashboard .source-link-list a,
+.senstats-dashboard .change-log-item,
+.senstats-dashboard .dashboard-metric-card,
+.senstats-dashboard .senstats-detail-grid p,
+.senstats-dashboard .expense-chart-legend span,
+.senstats-dashboard .drilldown-header {
+  background: var(--sen-surface);
+  border-color: var(--sen-border);
+  color: var(--sen-text-2);
+  box-shadow: var(--sen-shadow);
+}
+.senstats-dashboard .senstats-tabs,
+.senstats-dashboard .source-table-head,
+.senstats-dashboard .senator-table th,
+.senstats-dashboard .dashboard-overview-banner,
+.senstats-dashboard .expense-chart-stack,
+.senstats-dashboard .expense-sparkline svg {
+  background: var(--sen-surface-2);
+}
+.senstats-dashboard .senator-table td,
+.senstats-dashboard .source-card p,
+.senstats-dashboard .source-card small,
+.senstats-dashboard .dashboard-table span,
+.senstats-dashboard .change-log-item p,
+.senstats-dashboard .senstats-profile-data small,
+.senstats-dashboard .expense-sparkline span {
+  color: var(--sen-text-2);
+}
+.senstats-dashboard .section-heading h2,
+.senstats-dashboard .senator-table strong,
+.senstats-dashboard .source-card strong,
+.senstats-dashboard .source-heading strong,
+.senstats-dashboard .senstats-stat strong,
+.senstats-dashboard .senstats-detail-grid strong,
+.senstats-dashboard .dashboard-table strong,
+.senstats-dashboard .dashboard-metric-card strong,
+.senstats-dashboard .change-log-item strong,
+.senstats-dashboard .detail-identity-card strong,
+.senstats-dashboard .senstats-profile-data > strong {
+  color: var(--sen-text);
+}
+.senstats-dashboard .section-heading span,
+.senstats-dashboard .senstats-filters label,
+.senstats-dashboard .senstats-stat span,
+.senstats-dashboard .senstats-stat small,
+.senstats-dashboard .source-card span,
+.senstats-dashboard .source-heading span,
+.senstats-dashboard .senstats-detail-grid span,
+.senstats-dashboard .filter-rail-heading span,
+.senstats-dashboard .filter-rail-heading small,
+.senstats-dashboard .dashboard-metric-card small,
+.senstats-dashboard .change-log-item span,
+.senstats-dashboard .change-log-item small,
+.senstats-dashboard .expense-chart-row > span,
+.senstats-dashboard .muted {
+  color: var(--sen-muted);
+}
+.senstats-dashboard input,
+.senstats-dashboard select {
+  background: var(--sen-input-bg);
+  border-color: var(--sen-border-strong);
+  color: var(--sen-text);
+}
+.senstats-dashboard .senstats-tabs button.active,
+.senstats-dashboard .theme-toggle,
+.senstats-dashboard .source-heading a,
+.senstats-dashboard .source-link-list a,
+.senstats-dashboard .detail-identity-card a,
+.senstats-dashboard .profile-actions button,
+.senstats-dashboard .change-log-item a,
+.senstats-dashboard .selected-senator-card a {
+  background: var(--sen-link-bg);
+  color: var(--sen-link-text);
+}
+.senstats-dashboard .senator-table tbody tr:hover,
+.senstats-dashboard .senator-table tbody tr.active,
+.senstats-dashboard .group-senator-row:hover {
+  background: var(--sen-row-hover);
+}
+.senstats-dashboard .senator-detail-overview {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--group-color, #64748b) 8%, var(--sen-surface)), var(--sen-surface) 44%);
+  border-color: color-mix(in srgb, var(--group-color, #64748b) 24%, var(--sen-border));
+  box-shadow: var(--sen-shadow-strong);
+}
+.senstats-dashboard .dashboard-metric-card.group-gro,
+.senstats-dashboard .senator-detail-overview.group-gro {
+  border-color: var(--sen-border-strong);
+  border-left-color: var(--sen-border-strong) !important;
+  border-top-color: var(--sen-border-strong);
+}
