@@ -218,6 +218,12 @@ def party_label(value: str) -> str:
     return labels.get(value.strip(), value.strip() or "Independent/Unknown")
 
 
+def party_compare_key(value: Any) -> str:
+    """Normalize party labels before comparing stored and freshly parsed values."""
+    label = party_label(str(value or ""))
+    return re.sub(r"[^a-z0-9]+", "", label.lower())
+
+
 def fetch_senate_website_senators(http: requests.Session) -> list[SenatorRecord]:
     """Fallback to the official Senate current-senators AJAX endpoint.
 
@@ -725,8 +731,8 @@ def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterabl
                 "syncId": sync_id,
             })
             continue
-        previous_party = str(previous.get("party") or "")
-        if previous_party and previous_party != senator.party:
+        previous_party = party_label(str(previous.get("party") or ""))
+        if previous_party and party_compare_key(previous_party) != party_compare_key(senator.party):
             changes.append({
                 "type": "group_change",
                 "senatorId": senator_id,
@@ -799,8 +805,8 @@ def write_party_affiliation_history(db: Any, senators: Iterable[SenatorRecord]) 
     for senator in senators:
         ref = db.collection("senstats_senators").document(senator.senator_id)
         existing = ref.get()
-        previous_party = existing.to_dict().get("party") if existing.exists else None
-        if previous_party and previous_party != senator.party:
+        previous_party = party_label(str(existing.to_dict().get("party") or "")) if existing.exists else None
+        if previous_party and party_compare_key(previous_party) != party_compare_key(senator.party):
             history_id = hashlib.sha1(f"{senator.senator_id}|{previous_party}|{senator.party}".encode("utf-8")).hexdigest()
             ref.collection("party_affiliation_history").document(history_id).set({
                 "senatorId": senator.senator_id,

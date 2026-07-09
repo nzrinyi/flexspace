@@ -973,8 +973,10 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-dashboard.senstats-dark .dashboard-overview-banner small { color: var(--sen-muted); }
 .attendance-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .dashboard-table.attendance-table.expanded > div { grid-template-columns: minmax(170px, 1.2fr) minmax(86px, .5fr) minmax(88px, .55fr) repeat(6, minmax(76px, .42fr)); }
+.dashboard-table.attendance-table.aggregate > div { grid-template-columns: minmax(170px, 1.2fr) minmax(84px, .5fr) minmax(86px, .5fr) repeat(5, minmax(76px, .42fr)); }
 @media (max-width: 980px) { .dashboard-table.attendance-table.expanded { overflow-x: auto; } .dashboard-table.attendance-table.expanded > div { min-width: 860px; } }
-@media (max-width: 760px) { .dashboard-table.attendance-table.expanded > div { min-width: 0; grid-template-columns: 1fr; } }
+@media (max-width: 980px) { .dashboard-table.attendance-table.aggregate { overflow-x: auto; } .dashboard-table.attendance-table.aggregate > div { min-width: 780px; } }
+@media (max-width: 760px) { .dashboard-table.attendance-table.expanded > div, .dashboard-table.attendance-table.aggregate > div { min-width: 0; grid-template-columns: 1fr; } }
 
 /* Mobile containment pass: keep SenStats pages inside the viewport */
 .senstats-dashboard, .senstats-dashboard * { min-width: 0; }
@@ -1024,7 +1026,8 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
   .profile-actions button { flex: 1 1 140px; text-align: center; }
   .dashboard-table { border: 0; gap: 10px; background: transparent; overflow-x: visible; }
   .dashboard-table > div,
-  .dashboard-table.attendance-table.expanded > div { min-width: 0; grid-template-columns: 1fr; border: 1px solid var(--sen-border, #e8edf7); border-left-width: 5px; border-radius: 14px; background: var(--sen-surface, #fff); }
+  .dashboard-table.attendance-table.expanded > div,
+  .dashboard-table.attendance-table.aggregate > div { min-width: 0; grid-template-columns: 1fr; border: 1px solid var(--sen-border, #e8edf7); border-left-width: 5px; border-radius: 14px; background: var(--sen-surface, #fff); }
   .dashboard-table .source-table-head { display: none; }
   .source-table { border: 0; gap: 10px; background: transparent; }
   .source-table > div { grid-template-columns: 1fr; border: 1px solid var(--sen-border, #e8edf7); border-radius: 14px; }
