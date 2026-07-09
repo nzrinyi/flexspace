@@ -433,26 +433,39 @@ def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -
     The proactive disclosure page is hash-routed in the browser, so fetching
     `/en/proactive/summary/?Year=...` directly often returns only the shell.
     The browser Network tab shows a `GetProActiveData` XHR that returns the
-    rendered table partial. Include the hash filter in the `url` parameter so
-    the partial is filtered the same way users see it in the UI.
+    rendered table partial. The observed request keeps the route path in the
+    `url` parameter (not the hash filter), so try that canonical shape first;
+    hash-filter variants remain as fallbacks. Operators can override this with
+    `SENSTATS_PROACTIVE_XHR_URL` and may use `{year}` / `{quarter}` placeholders.
     """
+    configured = os.getenv("SENSTATS_PROACTIVE_XHR_URL", "").strip()
+    if configured:
+        return [
+            item.strip().format(year=year, quarter=quarter, display_for=display_for)
+            for item in configured.split(",")
+            if item.strip()
+        ]
+
+    route_path = "/en/proactive/summary/"
     hash_path = f"/en/proactive/summary/#?Year={year}&Quarter={quarter}&Member=Senators"
-    base_params = {
-        "displayFor": display_for,
-        "isHashRouted": "true",
-        "url": hash_path,
-        "root": "undefined",
-        "Lang": "en",
-    }
-    query = urlencode(base_params)
+    route_query = urlencode({"displayFor": display_for, "isHashRouted": "true", "url": route_path, "root": "undefined", "Lang": "en"})
+    hash_query = urlencode({"displayFor": display_for, "isHashRouted": "true", "url": hash_path, "root": "undefined", "Lang": "en"})
     endpoint_paths = [
+        # This casing/shape matches the browser Network entry reported for the public page.
+        "/en/ProActive/Summary/GetProActiveData",
+        "/en/proactive/summary/GetProActiveData",
+        # Older/alternate Umbraco MVC route names kept as fallbacks.
         "/umbraco/Surface/ProActiveSurface/GetProActiveData",
         "/umbraco/Surface/ProActiveDisclosureSurface/GetProActiveData",
         "/umbraco/Surface/ProActiveDisclosure/GetProActiveData",
         "/umbraco/Surface/ProActive/GetProActiveData",
-        "/en/proactive/summary/GetProActiveData",
     ]
-    return [f"https://sencanada.ca{path}?{query}" for path in endpoint_paths]
+    urls: list[str] = []
+    for path in endpoint_paths:
+        urls.append(f"https://sencanada.ca{path}?{route_query}")
+    for path in endpoint_paths[:2]:
+        urls.append(f"https://sencanada.ca{path}?{hash_query}")
+    return list(dict.fromkeys(urls))
 
 
 def proactive_api_candidates(year: int, quarter: int) -> list[str]:
@@ -498,10 +511,14 @@ def parse_expenses_from_json_payload(payload: Any, source_url: str, senators_by_
 def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
     current_year = datetime.now(timezone.utc).year
     records: list[ExpenseRecord] = []
+    attempted_urls: set[str] = set()
     for year in [current_year, current_year - 1]:
         for quarter in range(1, 5):
             quarter_records: list[ExpenseRecord] = []
             for url in proactive_data_urls(year, quarter):
+                if url in attempted_urls:
+                    continue
+                attempted_urls.add(url)
                 response = safe_get(
                     http,
                     url,
@@ -540,7 +557,7 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
                         break
             records.extend(quarter_records)
     if not records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() != "true":
-        LOGGER.info("No expenses parsed from captured GetProActiveData XHR endpoints; optional legacy API probing remains disabled unless SENSTATS_PROBE_PROACTIVE_APIS=true.")
+        LOGGER.info("No expenses parsed from captured GetProActiveData XHR endpoints. If the public page still shows expenses, set SENSTATS_PROACTIVE_XHR_URL to the full copied request URL; optional legacy API probing remains disabled unless SENSTATS_PROBE_PROACTIVE_APIS=true.")
     return records
 
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
