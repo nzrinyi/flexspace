@@ -213,6 +213,7 @@ export interface SenStatsSyncStatusDocument {
   senatorCount?: number;
   expenseCount?: number;
   committeeCount?: number;
+  attendanceCount?: number;
   changeCount?: number;
   errorCount?: number;
   errors?: string[];

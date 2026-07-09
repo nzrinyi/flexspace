@@ -517,62 +517,74 @@ def parse_expenses_from_json_payload(payload: Any, source_url: str, senators_by_
     return records
 
 
+def expense_periods() -> list[tuple[int, int]]:
+    """Return every proactive-disclosure quarter from Q3 2016 to now."""
+    current = datetime.now(timezone.utc)
+    current_quarter = ((current.month - 1) // 3) + 1
+    periods: list[tuple[int, int]] = []
+    for year in range(2016, current.year + 1):
+        first_quarter = 3 if year == 2016 else 1
+        last_quarter = current_quarter if year == current.year else 4
+        for quarter in range(first_quarter, last_quarter + 1):
+            periods.append((year, quarter))
+    return periods
+
+
 def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
-    current_year = datetime.now(timezone.utc).year
+    periods = expense_periods()
     records: list[ExpenseRecord] = []
     attempted_urls: set[str] = set()
-    max_attempts = int(os.getenv("SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS", "10"))
+    max_attempts = int(os.getenv("SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS", "80"))
     timeout_seconds = int(os.getenv("SENSTATS_PROACTIVE_TIMEOUT", "10"))
-    LOGGER.info("Checking Senate proactive disclosure GetProActiveData XHR candidates (max %s attempts)", max_attempts)
-    for year in [current_year, current_year - 1]:
-        for quarter in range(1, 5):
-            quarter_records: list[ExpenseRecord] = []
-            for url in proactive_data_urls(year, quarter):
-                if url in attempted_urls:
-                    continue
-                if len(attempted_urls) >= max_attempts:
-                    LOGGER.info("Stopped proactive XHR probing after %s attempts; set SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS to raise this limit.", max_attempts)
-                    break
-                attempted_urls.add(url)
-                response = safe_get(
-                    http,
-                    url,
-                    timeout=timeout_seconds,
-                    log_failures=False,
-                    headers={"Referer": f"{SENATE_DISCLOSURE_URL}/#?Year={year}&Quarter={quarter}&Member=Senators"},
-                )
+    LOGGER.info("Checking Senate proactive disclosure GetProActiveData XHR candidates for %s quarters back to Q3 2016 (max %s attempts)", len(periods), max_attempts)
+    for year, quarter in periods:
+        quarter_records: list[ExpenseRecord] = []
+        for url in proactive_data_urls(year, quarter):
+            if url in attempted_urls:
+                continue
+            if len(attempted_urls) >= max_attempts:
+                LOGGER.info("Stopped proactive XHR probing after %s attempts; set SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS to raise this limit.", max_attempts)
+                break
+            attempted_urls.add(url)
+            response = safe_get(
+                http,
+                url,
+                timeout=timeout_seconds,
+                log_failures=False,
+                headers={"Referer": f"{SENATE_DISCLOSURE_URL}/#?Year={year}&Quarter={quarter}&Member=Senators"},
+            )
+            if response is None:
+                continue
+            content_type = response.headers.get("content-type", "").lower()
+            try:
+                if "json" in content_type:
+                    parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
+                else:
+                    parsed = parse_expenses_from_html(response.text, url, senators_by_name)
+                    parsed.extend(parse_expenses_from_embedded_json(response.text, url, senators_by_name))
+            except Exception as exc:  # noqa: BLE001 - endpoint shape is external and may change
+                LOGGER.warning("Expense XHR parse failed for %s: %s", url, exc)
+                continue
+            if parsed:
+                LOGGER.info("Parsed %s expense rows from proactive disclosure XHR %s", len(parsed), url)
+                quarter_records.extend(parsed)
+                break
+        if len(attempted_urls) >= max_attempts and not quarter_records:
+            break
+        if not quarter_records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() == "true":
+            for url in proactive_api_candidates(year, quarter):
+                response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
                 if response is None:
                     continue
-                content_type = response.headers.get("content-type", "").lower()
                 try:
-                    if "json" in content_type:
-                        parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
-                    else:
-                        parsed = parse_expenses_from_html(response.text, url, senators_by_name)
-                        parsed.extend(parse_expenses_from_embedded_json(response.text, url, senators_by_name))
-                except Exception as exc:  # noqa: BLE001 - endpoint shape is external and may change
-                    LOGGER.warning("Expense XHR parse failed for %s: %s", url, exc)
-                    continue
+                    parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
+                except json.JSONDecodeError:
+                    parsed = parse_expenses_from_html(response.text, url, senators_by_name)
                 if parsed:
-                    LOGGER.info("Parsed %s expense rows from proactive disclosure XHR %s", len(parsed), url)
+                    LOGGER.info("Parsed %s expense rows from proactive disclosure API candidate %s", len(parsed), url)
                     quarter_records.extend(parsed)
                     break
-            if len(attempted_urls) >= max_attempts and not quarter_records:
-                break
-            if not quarter_records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() == "true":
-                for url in proactive_api_candidates(year, quarter):
-                    response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
-                    if response is None:
-                        continue
-                    try:
-                        parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
-                    except json.JSONDecodeError:
-                        parsed = parse_expenses_from_html(response.text, url, senators_by_name)
-                    if parsed:
-                        LOGGER.info("Parsed %s expense rows from proactive disclosure API candidate %s", len(parsed), url)
-                        quarter_records.extend(parsed)
-                        break
-            records.extend(quarter_records)
+        records.extend(quarter_records)
     if not records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() != "true":
         LOGGER.info("No expenses parsed from captured GetProActiveData XHR endpoints. If the public page still shows expenses, set SENSTATS_PROACTIVE_XHR_URL to the full copied request URL; optional legacy API probing remains disabled unless SENSTATS_PROBE_PROACTIVE_APIS=true.")
     return records

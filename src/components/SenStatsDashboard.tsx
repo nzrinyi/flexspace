@@ -2,12 +2,10 @@ import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { SenStatsAffiliationHistoryDocument, SenStatsAttendanceDocument, SenStatsChangeLogDocument, SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument, SenStatsSyncStatusDocument } from '../types';
-import { SenStatsAdminView } from './senstats/SenStatsAdminView';
 import { SenStatsChangeLogView } from './senstats/SenStatsChangeLogView';
 import { SenStatsCommitteesView } from './senstats/SenStatsCommitteesView';
 import { SenStatsDashboardsView } from './senstats/SenStatsDashboardsView';
 import { SenStatsDataSourcesView } from './senstats/SenStatsDataSourcesView';
-import { SenStatsGroupsView } from './senstats/SenStatsGroupsView';
 import { SenStatsLoadingSkeleton } from './senstats/SenStatsLoadingSkeleton';
 import { SenStatsSenatorsView } from './senstats/SenStatsSenatorsView';
 
@@ -17,7 +15,7 @@ type SenStatsCommittee = SenStatsCommitteeDocument & { id: string };
 type SenStatsSyncStatus = SenStatsSyncStatusDocument;
 type SenStatsAttendance = SenStatsAttendanceDocument & { id: string };
 type SenStatsChange = SenStatsChangeLogDocument & { id: string };
-type SenStatsTab = 'senators' | 'dashboards' | 'groups' | 'committees' | 'sources' | 'admin' | 'changes';
+type SenStatsTab = 'senators' | 'dashboards' | 'committees' | 'sources' | 'changes';
 
 class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -134,7 +132,6 @@ function SenStatsDashboardContent() {
       && (provinceFilter === 'All' || senator.province === provinceFilter)
       && queryText.includes(searchTerm.trim().toLowerCase());
   }), [groupFilter, provinceFilter, searchTerm, senators]);
-  const senatorsByGroup = useMemo(() => groupOptions.filter((group) => group !== 'All').map((group) => ({ group, senators: senators.filter((senator) => senator.party === group) })), [groupOptions, senators]);
   const selectedSenator = senators.find((senator) => senator.id === selectedSenatorId) ?? filteredSenators[0] ?? senators[0];
 
   if (loading) return <SenStatsLoadingSkeleton />;
@@ -149,15 +146,13 @@ function SenStatsDashboardContent() {
       </div>
 
       <div className="senstats-tabs" role="tablist" aria-label="SenStats sections">
-        {(['senators', 'dashboards', 'groups', 'committees', 'sources', 'admin', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'groups' ? 'Groups' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : tab === 'admin' ? 'Admin' : 'Change log'}</button>)}
+        {(['senators', 'dashboards', 'committees', 'sources', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : 'Change log'}</button>)}
       </div>
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
-      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} />}
-      {activeTab === 'groups' && <SenStatsGroupsView groups={senatorsByGroup} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />}
+      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />}
       {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
-      {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? expenses.length} committeeCount={committees.length} attendanceCount={attendance.length} />}
-      {activeTab === 'admin' && <SenStatsAdminView status={syncStatus} />}
+      {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? expenses.length} committeeCount={syncStatus?.committeeCount ?? committees.length} attendanceCount={syncStatus?.attendanceCount ?? attendance.length} syncStatus={syncStatus} />}
       {activeTab === 'changes' && <SenStatsChangeLogView changes={changeLog} />}
     </section>
   );

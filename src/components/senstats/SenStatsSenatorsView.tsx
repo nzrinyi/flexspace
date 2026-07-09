@@ -41,10 +41,6 @@ function detailValue(senator: SenStatsSenatorDocument | undefined, keys: string[
   return '';
 }
 
-function sourceLabel(key: string) {
-  return key.replace(/-/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
-}
-
 function ExpenseSparkline({ expenses }: { expenses: Array<SenStatsExpenseDocument & { id: string }> }) {
   const rows = quarterlyExpenseRows(expenses).slice(-4);
   const totals = rows.map((row) => Object.entries(row).filter(([key]) => key !== 'quarter').reduce((sum, [, value]) => sum + Number(value || 0), 0));
@@ -62,7 +58,6 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
   const appointedBy = detailValue(selectedSenator, ['appointedOnAdviceOf', 'appointed-by', 'appointedBy', 'appointed on advice of']);
   const appointedDate = detailValue(selectedSenator, ['nominatedDate', 'appointed-date', 'appointedDate', 'summoned-to-the-senate', 'date-of-appointment']);
   const retirementDate = detailValue(selectedSenator, ['retirementDate', 'retirement-date', 'mandatory-retirement-date', 'retirement']);
-  const selectedProfileFields = selectedSenator ? Object.entries({ ...(selectedSenator.extraDetails ?? {}), ...(selectedSenator.profileDetails ?? {}) }).filter(([key, value]) => typeof value === 'string' && value && !['photoUrl', 'heading', 'nominatedDate', 'retirementDate', 'appointedOnAdviceOf'].includes(key)).slice(0, 10) : [];
   const selectedCommitteeMemberships = selectedSenator ? committees.filter((committee) => (committee.members ?? []).some((member) => member.senatorId === selectedSenator.id || member.name === selectedSenator.name)) : [];
 
   useEffect(() => {
@@ -121,7 +116,6 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
           <div className="senstats-stat expense-summary-card compact"><span>Visible expenses</span><strong>{expenses.length ? currency(totalExpenses) : 'No data available'}</strong><small>{expenseLoading ? 'Syncing expense records…' : `${expenses.length} quarterly records`}</small><ExpenseSparkline expenses={expenses} /></div>
         </section>
         {selectedCommitteeMemberships.length > 0 && <div className="senstats-profile-data committee-memberships"><strong>Committee memberships</strong>{selectedCommitteeMemberships.map((committee) => { const member = committee.members?.find((item) => item.senatorId === selectedSenator.id || item.name === selectedSenator.name); return <p key={committee.id}><span>{committee.code}</span><small>{committee.name}{member?.role ? ` · ${member.role}` : ''}</small></p>; })}</div>}
-        {selectedProfileFields.length > 0 && <div className="senstats-profile-data"><strong>Additional Senate profile data</strong>{selectedProfileFields.map(([key, value]) => <p key={key}><span>{sourceLabel(key)}</span><small>{String(value)}</small></p>)}</div>}
         <SenStatsExpenseChart expenses={expenses} loading={expenseLoading} />
       </aside>}
     </div>

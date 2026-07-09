@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { SenStatsAttendanceDocument, SenStatsSenatorDocument } from '../../types';
+import { SenStatsGroupsView } from './SenStatsGroupsView';
 import { groupClassName, groupLabel } from './SenStatsHelpers';
 
 type DashboardTab = 'groups' | 'retirement' | 'attendance';
@@ -28,10 +29,11 @@ function senatorAge(retirementDate: string) {
   return year ? 75 - Math.max(year - new Date().getFullYear(), 0) : undefined;
 }
 
-export function SenStatsDashboardsView({ senators, attendance }: { senators: SenStatsSenatorDocument[]; attendance: Array<SenStatsAttendanceDocument & { id: string }> }) {
+export function SenStatsDashboardsView({ senators, attendance, recentlyChangedSenatorIds }: { senators: SenStatsSenatorDocument[]; attendance: Array<SenStatsAttendanceDocument & { id: string }>; recentlyChangedSenatorIds: Set<string> }) {
   const [activeDashboard, setActiveDashboard] = useState<DashboardTab>('groups');
   const [retirementSort, setRetirementSort] = useState<RetirementSort>('date');
-  const groups = useMemo(() => Array.from(senators.reduce((map, senator) => map.set(senator.party, (map.get(senator.party) ?? 0) + 1), new Map<string, number>())).sort((a, b) => b[1] - a[1]), [senators]);
+  const groupedSenators = useMemo(() => Array.from(senators.reduce((map, senator) => { const group = senator.party || 'Unknown'; return map.set(group, [...(map.get(group) ?? []), senator]); }, new Map<string, SenStatsSenatorDocument[]>())).sort((a, b) => b[1].length - a[1].length).map(([group, groupSenators]) => ({ group, senators: groupSenators })), [senators]);
+  const groups = useMemo(() => groupedSenators.map(({ group, senators: groupSenators }) => [group, groupSenators.length] as [string, number]), [groupedSenators]);
   const retirementRows = useMemo(() => senators.map((senator) => {
     const retirementDate = detailValue(senator, ['retirementDate', 'retirement-date', 'mandatory-retirement-date', 'retirement']);
     const appointedDate = detailValue(senator, ['nominatedDate', 'appointed-date', 'appointedDate', 'summoned-to-the-senate', 'date-of-appointment']);
@@ -51,9 +53,12 @@ export function SenStatsDashboardsView({ senators, attendance }: { senators: Sen
       {(['groups', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
     </div>
 
-    {activeDashboard === 'groups' && <div className="dashboard-card-grid">
-      {groups.map(([group, count]) => <article key={group} className={`dashboard-metric-card ${groupClassName(group)}`}><span>{groupLabel(group)}</span><strong>{count}</strong><small>{Math.round((count / Math.max(senators.length, 1)) * 100)}% of current senators</small></article>)}
-    </div>}
+    {activeDashboard === 'groups' && <>
+      <div className="dashboard-card-grid">
+        {groups.map(([group, count]) => <article key={group} className={`dashboard-metric-card ${groupClassName(group)}`}><span>{groupLabel(group)}</span><strong>{count}</strong><small>{Math.round((count / Math.max(senators.length, 1)) * 100)}% of current senators</small></article>)}
+      </div>
+      <SenStatsGroupsView groups={groupedSenators} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />
+    </>}
 
     {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure</strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="dashboard-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, age, yearsServed }) => <div role="row" key={senator.id} className={groupClassName(senator.party)}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span>{retirementDate || 'Not synced'}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></div>)}</div></div>}
 

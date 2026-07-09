@@ -1,8 +1,11 @@
+import type { SenStatsSyncStatusDocument } from '../../types';
+
 interface SenStatsDataSourcesViewProps {
   senatorCount: number;
   expenseCount: number;
   committeeCount: number;
   attendanceCount: number;
+  syncStatus: SenStatsSyncStatusDocument | null;
 }
 
 const officialSources = [
@@ -25,14 +28,28 @@ const fieldSources = [
   { field: 'Affiliation changes', source: 'Differences observed between consecutive public roster syncs.' },
 ];
 
-export function SenStatsDataSourcesView({ senatorCount, expenseCount, committeeCount, attendanceCount }: SenStatsDataSourcesViewProps) {
+function formatSyncDate(value: SenStatsSyncStatusDocument['finishedAt']) {
+  if (!value) return 'Never synced';
+  if (typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') return value.toDate().toLocaleString();
+  return String(value);
+}
+
+function sourceStatus(syncStatus: SenStatsSyncStatusDocument | null, count: number) {
+  if (!syncStatus) return 'No sync status has been written yet.';
+  const date = formatSyncDate(syncStatus.finishedAt);
+  const errors = syncStatus.errors ?? [];
+  if (count > 0) return `Last completed ${date}.`;
+  return errors.length ? `Last attempted ${date}; errors: ${errors.join(' ')}` : `Last attempted ${date}; no records were written.`;
+}
+
+export function SenStatsDataSourcesView({ senatorCount, expenseCount, committeeCount, attendanceCount, syncStatus }: SenStatsDataSourcesViewProps) {
   return (
     <section className="data-sources-view" aria-label="SenStats data sources">
       <div className="source-overview-grid">
-        <article className="source-card primary"><span>Senators loaded</span><strong>{senatorCount}</strong><small>Read from the public Senate roster.</small></article>
-        <article className="source-card"><span>Expense records</span><strong>{expenseCount}</strong><small>Read from Senate proactive disclosure expense pages.</small></article>
-        <article className="source-card"><span>Committees</span><strong>{committeeCount}</strong><small>Read from public Senate committee pages.</small></article>
-        <article className="source-card"><span>Attendance rows</span><strong>{attendanceCount}</strong><small>Read from the Senate attendance register.</small></article>
+        <article className="source-card primary"><span>Senators loaded</span><strong>{senatorCount}</strong><small>{sourceStatus(syncStatus, senatorCount)}</small></article>
+        <article className="source-card"><span>Expense records</span><strong>{expenseCount}</strong><small>{sourceStatus(syncStatus, expenseCount)}</small></article>
+        <article className="source-card"><span>Committees</span><strong>{committeeCount}</strong><small>{sourceStatus(syncStatus, committeeCount)}</small></article>
+        <article className="source-card"><span>Attendance rows</span><strong>{attendanceCount}</strong><small>{sourceStatus(syncStatus, attendanceCount)}</small></article>
       </div>
 
       <div className="source-card source-wide">
@@ -51,8 +68,8 @@ export function SenStatsDataSourcesView({ senatorCount, expenseCount, committeeC
       </div>
 
       <div className="source-card source-wide">
-        <div className="source-heading"><span>Collection notes</span><strong>Operational workarounds</strong></div>
-        <p className="muted">If the Senate pages time out, manually export the public roster, proactive disclosure expense table, or attendance register as CSV and load them through a controlled import. If photos are missing or hotlink-blocked, mirror official profile images with a separate low-frequency image job rather than fetching every profile during the daily sync.</p>
+        <div className="source-heading"><span>Latest sync result</span><strong>{syncStatus?.status ?? 'No sync status yet'}</strong></div>
+        <p className="muted">{syncStatus ? `Finished ${formatSyncDate(syncStatus.finishedAt)} with ${syncStatus.errorCount ?? 0} reported errors. ${(syncStatus.errors ?? []).join(' ') || 'No source-level errors were reported.'}` : 'The next scheduled ingestion run will write source-level status here.'}</p>
       </div>
     </section>
   );
