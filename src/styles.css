@@ -488,7 +488,7 @@ a { color: var(--accent); font-weight: 700; }
 /* SenStats senator photos and richer profile metadata */
 .senator-list button { grid-template-columns: auto 1fr; align-items: center; }
 .senator-avatar { grid-row: span 3; position: relative; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 14px; overflow: hidden; background: #eef2ff; color: #4338ca !important; font-weight: 950; }
-.senator-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.senator-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center center; display: block; }
 .senator-avatar i { font-style: normal; }
 .selected-senator-card { align-items: start; }
 .selected-senator-card img { width: min(150px, 45vw); aspect-ratio: 4 / 5; object-fit: cover; border-radius: 18px; border: 1px solid #e8edf7; box-shadow: 0 12px 28px rgba(15,23,42,.1); }
@@ -795,7 +795,7 @@ input, select, textarea { max-width: 100%; }
 .senator-detail-overview { display: grid; gap: 14px; border: 1px solid color-mix(in srgb, var(--group-color, #64748b) 24%, #e8edf7); border-top: 8px solid var(--group-color, #64748b); border-radius: 24px; background: linear-gradient(180deg, color-mix(in srgb, var(--group-color, #64748b) 7%, #fff), #fff 44%); padding: 16px; box-shadow: 0 16px 36px rgba(15,23,42,.08); }
 .senator-detail-overview.group-gro { border-top-color: #94a3b8; }
 .detail-identity-card { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: center; }
-.detail-identity-card > img { width: min(140px, 32vw); aspect-ratio: 4 / 5; object-fit: cover; border-radius: 18px; border: 1px solid #e8edf7; box-shadow: 0 12px 28px rgba(15,23,42,.1); }
+.detail-identity-card > img { width: min(140px, 32vw); aspect-ratio: 4 / 5; object-fit: cover; object-position: center top; display: block; border-radius: 18px; border: 1px solid #e8edf7; box-shadow: 0 12px 28px rgba(15,23,42,.1); }
 .detail-identity-card > div { display: grid; gap: 6px; min-width: 0; }
 .detail-identity-card span, .detail-section-card.compact .source-heading span { color: #64748b; font-size: .74rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
 .detail-identity-card strong { color: #0f172a; font-size: clamp(1.25rem, 2.4vw, 1.85rem); line-height: 1.05; }
