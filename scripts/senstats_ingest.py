@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -120,11 +120,11 @@ def session() -> requests.Session:
     return http
 
 
-def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True) -> requests.Response | None:
+def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None) -> requests.Response | None:
     try:
         polite_delay()
         request_timeout = timeout or int(os.getenv("SENSTATS_REQUEST_TIMEOUT", "20"))
-        response = http.get(url, timeout=request_timeout)
+        response = http.get(url, timeout=request_timeout, headers=headers)
         response.raise_for_status()
         if expect_json and "json" not in response.headers.get("content-type", ""):
             LOGGER.warning("Expected JSON but got %s from %s", response.headers.get("content-type"), url)
@@ -427,6 +427,34 @@ def parse_expenses_from_csv(text: str, source_url: str, senators_by_name: dict[s
 
 
 
+def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -> list[str]:
+    """Return the browser XHR endpoint URLs used by the Senate proactive page.
+
+    The proactive disclosure page is hash-routed in the browser, so fetching
+    `/en/proactive/summary/?Year=...` directly often returns only the shell.
+    The browser Network tab shows a `GetProActiveData` XHR that returns the
+    rendered table partial. Include the hash filter in the `url` parameter so
+    the partial is filtered the same way users see it in the UI.
+    """
+    hash_path = f"/en/proactive/summary/#?Year={year}&Quarter={quarter}&Member=Senators"
+    base_params = {
+        "displayFor": display_for,
+        "isHashRouted": "true",
+        "url": hash_path,
+        "root": "undefined",
+        "Lang": "en",
+    }
+    query = urlencode(base_params)
+    endpoint_paths = [
+        "/umbraco/Surface/ProActiveSurface/GetProActiveData",
+        "/umbraco/Surface/ProActiveDisclosureSurface/GetProActiveData",
+        "/umbraco/Surface/ProActiveDisclosure/GetProActiveData",
+        "/umbraco/Surface/ProActive/GetProActiveData",
+        "/en/proactive/summary/GetProActiveData",
+    ]
+    return [f"https://sencanada.ca{path}?{query}" for path in endpoint_paths]
+
+
 def proactive_api_candidates(year: int, quarter: int) -> list[str]:
     query = f"Year={year}&Quarter={quarter}&Member=Senators"
     lower_query = f"year={year}&quarter={quarter}&member=Senators"
@@ -468,25 +496,51 @@ def parse_expenses_from_json_payload(payload: Any, source_url: str, senators_by_
 
 
 def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name: dict[str, SenatorRecord]) -> list[ExpenseRecord]:
-    if os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() != "true":
-        LOGGER.info("Skipping proactive disclosure API probing; set SENSTATS_PROBE_PROACTIVE_APIS=true after capturing the exact Network/XHR endpoint.")
-        return []
     current_year = datetime.now(timezone.utc).year
     records: list[ExpenseRecord] = []
     for year in [current_year, current_year - 1]:
         for quarter in range(1, 5):
-            for url in proactive_api_candidates(year, quarter):
-                response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
+            quarter_records: list[ExpenseRecord] = []
+            for url in proactive_data_urls(year, quarter):
+                response = safe_get(
+                    http,
+                    url,
+                    timeout=12,
+                    log_failures=False,
+                    headers={"Referer": f"{SENATE_DISCLOSURE_URL}/#?Year={year}&Quarter={quarter}&Member=Senators"},
+                )
                 if response is None:
                     continue
+                content_type = response.headers.get("content-type", "").lower()
                 try:
-                    parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
-                except json.JSONDecodeError:
-                    parsed = parse_expenses_from_html(response.text, url, senators_by_name)
+                    if "json" in content_type:
+                        parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
+                    else:
+                        parsed = parse_expenses_from_html(response.text, url, senators_by_name)
+                        parsed.extend(parse_expenses_from_embedded_json(response.text, url, senators_by_name))
+                except Exception as exc:  # noqa: BLE001 - endpoint shape is external and may change
+                    LOGGER.warning("Expense XHR parse failed for %s: %s", url, exc)
+                    continue
                 if parsed:
-                    LOGGER.info("Parsed %s expense rows from proactive disclosure API candidate %s", len(parsed), url)
-                    records.extend(parsed)
+                    LOGGER.info("Parsed %s expense rows from proactive disclosure XHR %s", len(parsed), url)
+                    quarter_records.extend(parsed)
                     break
+            if not quarter_records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() == "true":
+                for url in proactive_api_candidates(year, quarter):
+                    response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
+                    if response is None:
+                        continue
+                    try:
+                        parsed = parse_expenses_from_json_payload(response.json(), url, senators_by_name)
+                    except json.JSONDecodeError:
+                        parsed = parse_expenses_from_html(response.text, url, senators_by_name)
+                    if parsed:
+                        LOGGER.info("Parsed %s expense rows from proactive disclosure API candidate %s", len(parsed), url)
+                        quarter_records.extend(parsed)
+                        break
+            records.extend(quarter_records)
+    if not records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() != "true":
+        LOGGER.info("No expenses parsed from captured GetProActiveData XHR endpoints; optional legacy API probing remains disabled unless SENSTATS_PROBE_PROACTIVE_APIS=true.")
     return records
 
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
@@ -508,7 +562,7 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
         except Exception as exc:  # noqa: BLE001 - ingestion should log and continue
             LOGGER.warning("Expense parse failed for %s: %s", link, exc)
     if not records:
-        LOGGER.warning("No expense rows parsed from proactive disclosure API candidates or summary pages. If this continues, capture the browser Network/XHR endpoint used by %s and add it to proactive_api_candidates().", SENATE_EXPENSE_SUMMARY_FILTER_URL)
+        LOGGER.warning("No expense rows parsed from the captured GetProActiveData XHR endpoints or fallback summary pages. If this continues, copy the full GetProActiveData request URL from the browser Network tab and update proactive_data_urls().")
     LOGGER.info("Parsed %s expense records", len(records))
     return records
 
