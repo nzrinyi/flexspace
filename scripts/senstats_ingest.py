@@ -433,10 +433,10 @@ def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -
     The proactive disclosure page is hash-routed in the browser, so fetching
     `/en/proactive/summary/?Year=...` directly often returns only the shell.
     The browser Network tab shows a `GetProActiveData` XHR that returns the
-    rendered table partial. The observed request keeps the route path in the
-    `url` parameter (not the hash filter), so try that canonical shape first;
-    hash-filter variants remain as fallbacks. Operators can override this with
-    `SENSTATS_PROACTIVE_XHR_URL` and may use `{year}` / `{quarter}` placeholders.
+    rendered table partial. The current public endpoint is the
+    `ProActiveAjax/GetProActiveData` surface with Year/Quarter/Member filters;
+    older route/hash variants remain as fallbacks. Operators can override this
+    with `SENSTATS_PROACTIVE_XHR_URL` and may use `{year}` / `{quarter}` placeholders.
     """
     configured = os.getenv("SENSTATS_PROACTIVE_XHR_URL", "").strip()
     if configured:
@@ -448,24 +448,33 @@ def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -
 
     route_path = "/en/proactive/summary/"
     hash_path = f"/en/proactive/summary/#?Year={year}&Quarter={quarter}&Member=Senators"
+    page_url = "https://sencanada.ca/en/proactive/summary/"
+    ajax_query = urlencode({
+        "displayFor": display_for,
+        "isHashRouted": "true",
+        "Year": year,
+        "Quarter": quarter,
+        "Member": "Senators",
+        "pageUrl": page_url,
+        "root": "undefined",
+        "Lang": "en",
+    })
     route_query = urlencode({"displayFor": display_for, "isHashRouted": "true", "url": route_path, "root": "undefined", "Lang": "en"})
     hash_query = urlencode({"displayFor": display_for, "isHashRouted": "true", "url": hash_path, "root": "undefined", "Lang": "en"})
     endpoint_paths = [
-        # This casing/shape matches the browser Network entry reported for the public page.
-        "/en/ProActive/Summary/GetProActiveData",
-        "/en/proactive/summary/GetProActiveData",
-        # Older/alternate Umbraco MVC route names kept as fallbacks.
-        "/umbraco/Surface/ProActiveSurface/GetProActiveData",
-        "/umbraco/Surface/ProActiveDisclosureSurface/GetProActiveData",
-        "/umbraco/Surface/ProActiveDisclosure/GetProActiveData",
-        "/umbraco/Surface/ProActive/GetProActiveData",
+        # This is the current browser Network/XHR endpoint shape for the public page.
+        f"/umbraco/surface/ProActiveAjax/GetProActiveData?{ajax_query}",
+        # Older/alternate route shapes kept as fallbacks.
+        f"/en/ProActive/Summary/GetProActiveData?{route_query}",
+        f"/en/proactive/summary/GetProActiveData?{route_query}",
+        f"/umbraco/Surface/ProActiveSurface/GetProActiveData?{route_query}",
+        f"/umbraco/Surface/ProActiveDisclosureSurface/GetProActiveData?{route_query}",
+        f"/umbraco/Surface/ProActiveDisclosure/GetProActiveData?{route_query}",
+        f"/umbraco/Surface/ProActive/GetProActiveData?{route_query}",
+        f"/en/ProActive/Summary/GetProActiveData?{hash_query}",
+        f"/en/proactive/summary/GetProActiveData?{hash_query}",
     ]
-    urls: list[str] = []
-    for path in endpoint_paths:
-        urls.append(f"https://sencanada.ca{path}?{route_query}")
-    for path in endpoint_paths[:2]:
-        urls.append(f"https://sencanada.ca{path}?{hash_query}")
-    return list(dict.fromkeys(urls))
+    return list(dict.fromkeys(f"https://sencanada.ca{path}" for path in endpoint_paths))
 
 
 def proactive_api_candidates(year: int, quarter: int) -> list[str]:
