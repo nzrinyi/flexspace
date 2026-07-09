@@ -971,3 +971,7 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-dashboard.senstats-dark .dashboard-overview-banner strong { color: var(--sen-text); }
 .senstats-dashboard.senstats-dark .dashboard-overview-banner span,
 .senstats-dashboard.senstats-dark .dashboard-overview-banner small { color: var(--sen-muted); }
+.attendance-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.dashboard-table.attendance-table.expanded > div { grid-template-columns: minmax(170px, 1.2fr) minmax(86px, .5fr) minmax(88px, .55fr) repeat(6, minmax(76px, .42fr)); }
+@media (max-width: 980px) { .dashboard-table.attendance-table.expanded { overflow-x: auto; } .dashboard-table.attendance-table.expanded > div { min-width: 860px; } }
+@media (max-width: 760px) { .dashboard-table.attendance-table.expanded > div { min-width: 0; grid-template-columns: 1fr; } }
