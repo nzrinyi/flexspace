@@ -618,10 +618,10 @@ def committee_links(http: requests.Session) -> list[tuple[str, str]]:
                 links[code] = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")
     if links:
         return sorted(links.items())
-    if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "false").lower() == "true":
+    if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "true").lower() == "true":
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
         fallback_codes = ["AEFA", "AGFO", "APPA", "AOVS", "BANC", "CIBA", "CONF", "ENEV", "FISH", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
-        return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")) for code in fallback_codes]
+        return [(code, urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")) for code in fallback_codes]
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
     return []
 
@@ -655,8 +655,9 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
 def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[CommitteeRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     committees: list[CommitteeRecord] = []
+    committee_timeout = int(os.getenv("SENSTATS_COMMITTEE_TIMEOUT", "10"))
     for code, url in committee_links(http):
-        response = safe_get(http, url)
+        response = safe_get(http, url, timeout=committee_timeout)
         if response is None:
             continue
         try:
@@ -869,37 +870,47 @@ def parse_attendance_records(html: str, senators_by_name: dict[str, SenatorRecor
     as_of_match = re.search(r"Information as of\s+([A-Za-z]+\s+\d{4})", page_text)
     as_of = as_of_match.group(1) if as_of_match else ""
     records: list[AttendanceRecord] = []
+
+    def append_record(cells: list[str]) -> None:
+        if len(cells) < 7 or cells[0].lower() in {"name", "a", "b", "c", "d", "f", "g", "h", "i", "k", "l", "m", "o", "p", "q", "r", "s", "t", "v", "w", "y"}:
+            return
+        name, party = cells[0], cells[1]
+        if not name or not any(char.isdigit() for char in " ".join(cells[2:])):
+            return
+        matched = match_senator_from_text(name, senators_by_name)
+        senator_id = matched.senator_id if matched else stable_id(name)
+        records.append(AttendanceRecord(
+            senator_id=senator_id,
+            senator_name=matched.name if matched else name,
+            party=party_label(party),
+            sitting_days=parse_int(cells[2]),
+            present=parse_int(cells[3]),
+            other_public_business=parse_int(cells[4]),
+            illness=parse_int(cells[5]),
+            leave=parse_int(cells[6]),
+            session=session,
+            as_of=as_of,
+            source_url=SENATE_ATTENDANCE_URL,
+            raw={"cells": cells},
+        ))
+
     for table in soup.find_all("table"):
-        rows = table.find_all("tr")
-        for row in rows:
-            cells = [cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])]
-            if len(cells) < 7 or cells[0].lower() in {"name", "a", "b", "c", "d", "f", "g", "h", "i", "k", "l", "m", "o", "p", "q", "r", "s", "t", "v", "w", "y"}:
-                continue
-            name, party = cells[0], cells[1]
-            if not name or not any(char.isdigit() for char in " ".join(cells[2:])):
-                continue
-            matched = match_senator_from_text(name, senators_by_name)
-            senator_id = matched.senator_id if matched else stable_id(name)
-            records.append(AttendanceRecord(
-                senator_id=senator_id,
-                senator_name=matched.name if matched else name,
-                party=party_label(party),
-                sitting_days=parse_int(cells[2]),
-                present=parse_int(cells[3]),
-                other_public_business=parse_int(cells[4]),
-                illness=parse_int(cells[5]),
-                leave=parse_int(cells[6]),
-                session=session,
-                as_of=as_of,
-                source_url=SENATE_ATTENDANCE_URL,
-                raw={"cells": cells},
-            ))
+        for row in table.find_all("tr"):
+            append_record([cell.get_text(" ", strip=True) for cell in row.find_all(["td", "th"])])
+
+    if not records:
+        party_pattern = r"(?:C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)"
+        line_pattern = re.compile(rf"^(.+?)\s+({party_pattern})\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$", re.IGNORECASE)
+        for line in soup.get_text("\n", strip=True).splitlines():
+            match = line_pattern.match(" ".join(line.split()))
+            if match:
+                append_record([match.group(1), match.group(2), match.group(3), match.group(4), match.group(5), match.group(6), match.group(7)])
     return records
 
 
 def fetch_attendance_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[AttendanceRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
-    response = safe_get(http, SENATE_ATTENDANCE_URL)
+    response = safe_get(http, SENATE_ATTENDANCE_URL, timeout=int(os.getenv("SENSTATS_ATTENDANCE_TIMEOUT", "10")))
     if response is None:
         return []
     try:
@@ -980,9 +991,9 @@ def main() -> int:
             LOGGER.error("Failed to write empty-sync status: %s", exc, exc_info=True)
             return 1
         return 0
+    attendance = fetch_attendance_records(http, senators)
     expenses = fetch_expense_records(http, senators)
     committees = fetch_committee_records(http, senators)
-    attendance = fetch_attendance_records(http, senators)
     try:
         db = firestore_client()
         existing = existing_senator_snapshot(db)
