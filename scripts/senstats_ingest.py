@@ -466,16 +466,19 @@ def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -
     endpoint_paths = [
         # This is the current browser Network/XHR endpoint shape for the public page.
         f"/umbraco/surface/ProActiveAjax/GetProActiveData?{ajax_query}",
-        # Older/alternate route shapes kept as fallbacks.
-        f"/en/ProActive/Summary/GetProActiveData?{route_query}",
-        f"/en/proactive/summary/GetProActiveData?{route_query}",
-        f"/umbraco/Surface/ProActiveSurface/GetProActiveData?{route_query}",
-        f"/umbraco/Surface/ProActiveDisclosureSurface/GetProActiveData?{route_query}",
-        f"/umbraco/Surface/ProActiveDisclosure/GetProActiveData?{route_query}",
-        f"/umbraco/Surface/ProActive/GetProActiveData?{route_query}",
-        f"/en/ProActive/Summary/GetProActiveData?{hash_query}",
-        f"/en/proactive/summary/GetProActiveData?{hash_query}",
     ]
+    if os.getenv("SENSTATS_PROACTIVE_ROUTE_FALLBACKS", "false").lower() == "true":
+        endpoint_paths.extend([
+            # Older/alternate route shapes kept as opt-in fallbacks.
+            f"/en/ProActive/Summary/GetProActiveData?{route_query}",
+            f"/en/proactive/summary/GetProActiveData?{route_query}",
+            f"/umbraco/Surface/ProActiveSurface/GetProActiveData?{route_query}",
+            f"/umbraco/Surface/ProActiveDisclosureSurface/GetProActiveData?{route_query}",
+            f"/umbraco/Surface/ProActiveDisclosure/GetProActiveData?{route_query}",
+            f"/umbraco/Surface/ProActive/GetProActiveData?{route_query}",
+            f"/en/ProActive/Summary/GetProActiveData?{hash_query}",
+            f"/en/proactive/summary/GetProActiveData?{hash_query}",
+        ])
     return list(dict.fromkeys(f"https://sencanada.ca{path}" for path in endpoint_paths))
 
 
