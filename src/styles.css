@@ -975,3 +975,68 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .dashboard-table.attendance-table.expanded > div { grid-template-columns: minmax(170px, 1.2fr) minmax(86px, .5fr) minmax(88px, .55fr) repeat(6, minmax(76px, .42fr)); }
 @media (max-width: 980px) { .dashboard-table.attendance-table.expanded { overflow-x: auto; } .dashboard-table.attendance-table.expanded > div { min-width: 860px; } }
 @media (max-width: 760px) { .dashboard-table.attendance-table.expanded > div { min-width: 0; grid-template-columns: 1fr; } }
+
+/* Mobile containment pass: keep SenStats pages inside the viewport */
+.senstats-dashboard, .senstats-dashboard * { min-width: 0; }
+.senstats-dashboard { overflow: hidden; }
+.senstats-tabs { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+.senstats-tabs button { white-space: nowrap; }
+.senstats-dashboard .source-card,
+.senstats-dashboard .senator-list-panel,
+.senstats-dashboard .senator-drilldown,
+.senstats-dashboard .dashboard-table,
+.senstats-dashboard .source-table,
+.senstats-dashboard .senstats-profile-data { max-width: 100%; }
+.senstats-dashboard .source-link-list a,
+.senstats-dashboard .source-table > div,
+.senstats-dashboard .dashboard-table > div,
+.senstats-dashboard .senstats-profile-data p { overflow-wrap: anywhere; }
+.senstats-dashboard .senator-list-panel,
+.senstats-dashboard .source-table,
+.senstats-dashboard .dashboard-table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media (max-width: 760px) {
+  .shell { width: min(100%, calc(100% - 16px)); padding: 18px 0; }
+  .card { padding: clamp(16px, 5vw, 22px); border-radius: 22px; }
+  .hero { margin-bottom: 14px; }
+  .hero-topline { flex-wrap: nowrap; }
+  .senstats-tabs { display: flex; gap: 6px; justify-content: flex-start; padding: 5px; border-radius: 20px; }
+  .senstats-tabs button { flex: 0 0 auto; padding: 10px 12px; font-size: .86rem; }
+  .nested-tabs { width: 100%; }
+  .senstats-filter-bar { padding: 12px; border-radius: 18px; }
+  .senstats-filters.compact { grid-template-columns: 1fr !important; }
+  .source-overview-grid,
+  .dashboard-card-grid,
+  .attendance-summary-grid,
+  .senstats-detail-grid { grid-template-columns: 1fr !important; }
+  .source-heading { grid-template-columns: 1fr; align-items: start; }
+  .source-heading a,
+  .source-heading select { width: 100%; max-width: 100%; }
+  .source-link-list a { grid-template-columns: 1fr; }
+  .senator-list-panel { width: 100%; }
+  .senator-table { min-width: 620px; }
+  .senator-workspace.with-details .senator-table,
+  .senator-workspace:not(.with-details) .senator-table { min-width: 620px; }
+  .detail-identity-card { grid-template-columns: 1fr; text-align: left; }
+  .detail-identity-card > img,
+  .detail-identity-card .profile-fallback { justify-self: start; max-width: 160px; }
+  .profile-actions { width: 100%; }
+  .profile-actions a,
+  .profile-actions button { flex: 1 1 140px; text-align: center; }
+  .dashboard-table { border: 0; gap: 10px; background: transparent; overflow-x: visible; }
+  .dashboard-table > div,
+  .dashboard-table.attendance-table.expanded > div { min-width: 0; grid-template-columns: 1fr; border: 1px solid var(--sen-border, #e8edf7); border-left-width: 5px; border-radius: 14px; background: var(--sen-surface, #fff); }
+  .dashboard-table .source-table-head { display: none; }
+  .source-table { border: 0; gap: 10px; background: transparent; }
+  .source-table > div { grid-template-columns: 1fr; border: 1px solid var(--sen-border, #e8edf7); border-radius: 14px; }
+  .source-table .source-table-head { display: none; }
+  .expense-chart-row { grid-template-columns: 1fr; gap: 6px; }
+  .expense-chart-stack { height: auto; min-height: 28px; }
+}
+@media (max-width: 420px) {
+  .shell { width: 100%; padding: 10px 0; }
+  .hero.card,
+  .senstats-dashboard.card { border-left: 0; border-right: 0; border-radius: 0; }
+  .app-name { font-size: .88rem; letter-spacing: .11em; }
+  .theme-toggle { padding: 8px 10px; font-size: .72rem; }
+  .senstats-tabs button { font-size: .8rem; padding: 9px 10px; }
+}
