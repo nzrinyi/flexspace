@@ -825,7 +825,9 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         row = card.find_parent("div", class_="row")
         if row is None:
             continue
-        anchor = row.find("a", href=True)
+        anchors = row.find_all("a", href=True)
+        anchor = next((candidate for candidate in anchors if candidate.get_text(" ", strip=True)), None)
+        profile_anchor = anchor or (anchors[0] if anchors else None)
         role_heading = row.find(["h3", "h4"])
         detail_text = row.get_text(" ", strip=True)
         party = ""
@@ -834,7 +836,7 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         if affiliation_match:
             party = affiliation_match.group(1)
             province = affiliation_match.group(2)
-        append_member(anchor.get_text(" ", strip=True) if anchor else "", role_heading.get_text(" ", strip=True) if role_heading else "Member", party, province, str(anchor["href"]) if anchor else "")
+        append_member(anchor.get_text(" ", strip=True) if anchor else "", role_heading.get_text(" ", strip=True) if role_heading else "Member", party, province, str(profile_anchor["href"]) if profile_anchor else "")
 
     for senator_name, senator in senators_by_name.items():
         if senator.senator_id in seen or senator_name.lower() not in raw_text.lower():
@@ -867,7 +869,10 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         if response is None:
             continue
         try:
-            committees.append(parse_committee_page(response.text, source_url, code, senators_by_name, senators_by_profile))
+            committee = parse_committee_page(response.text, source_url, code, senators_by_name, senators_by_profile)
+            if not committee.members:
+                LOGGER.warning("Committee %s parsed from %s but contained no member rows; please copy the Network-tab Response body for that GetCommitteeMembership request if this persists.", code, source_url)
+            committees.append(committee)
         except Exception as exc:  # noqa: BLE001
             LOGGER.error("Committee parse failed for %s: %s", source_url, exc, exc_info=True)
     LOGGER.info("Parsed %s committee records", len(committees))
