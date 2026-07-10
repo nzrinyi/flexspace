@@ -219,9 +219,9 @@ def session() -> requests.Session:
     return http
 
 
-def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None) -> requests.Response | None:
+def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None, retry_attempts: int | None = None) -> requests.Response | None:
     request_timeout = timeout or config_int("request_timeout", 20, "SENSTATS_REQUEST_TIMEOUT")
-    max_attempts = max(config_int("request_retry_attempts", 3, "SENSTATS_REQUEST_RETRY_ATTEMPTS"), 1)
+    max_attempts = max(retry_attempts if retry_attempts is not None else config_int("request_retry_attempts", 3, "SENSTATS_REQUEST_RETRY_ATTEMPTS"), 1)
     backoff_seconds = config_float("request_retry_backoff_seconds", 2.0, "SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS")
     for attempt in range(1, max_attempts + 1):
         polite_delay()
@@ -1007,6 +1007,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     committee_timeout = config_int("committee_timeout", 10, "SENSTATS_COMMITTEE_TIMEOUT")
     membership_timeout = config_int("committee_membership_timeout", max(committee_timeout, 30), "SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT")
     membership_attempts = max(config_int("committee_membership_attempts", 3, "SENSTATS_COMMITTEE_MEMBERSHIP_ATTEMPTS"), 1)
+    membership_retry_attempts = max(config_int("committee_request_retry_attempts", 1, "SENSTATS_COMMITTEE_REQUEST_RETRY_ATTEMPTS"), 1)
     session_id = str(config_value("committee_session_id", "32", "SENSTATS_COMMITTEE_SESSION_ID"))
     for link in committee_links(http):
         code = link["code"]
@@ -1023,7 +1024,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             attempts = membership_attempts if membership_url and option_index == 1 else 1
             timeout = membership_timeout if membership_url else committee_timeout
             for attempt in range(1, attempts + 1):
-                response = safe_get(http, candidate_url, timeout=timeout, headers=candidate_headers, log_failures=attempt == attempts)
+                response = safe_get(http, candidate_url, timeout=timeout, headers=candidate_headers, log_failures=attempt == attempts, retry_attempts=membership_retry_attempts if membership_url else None)
                 if response is not None:
                     break
                 if attempt < attempts:
