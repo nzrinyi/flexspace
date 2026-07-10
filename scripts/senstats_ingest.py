@@ -72,6 +72,7 @@ KNOWN_COMMITTEE_NAMES = {
 }
 DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: configure-SENSTATS_CONTACT_EMAIL)"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
+STATIC_SENATE_PAGE_FAILURES = 0
 
 logging.basicConfig(
     level=logging.INFO,
@@ -220,7 +221,36 @@ def session() -> requests.Session:
     return http
 
 
+
+def is_static_senate_page(url: str) -> bool:
+    parsed = urlparse(url)
+    path = parsed.path.lower().rstrip("/")
+    return parsed.netloc.lower().endswith("sencanada.ca") and (path == "/en/attendance" or path.startswith("/en/committees/"))
+
+
+def note_static_senate_page_failure(url: str) -> None:
+    global STATIC_SENATE_PAGE_FAILURES
+    if is_static_senate_page(url):
+        STATIC_SENATE_PAGE_FAILURES += 1
+
+
+def reset_static_senate_page_failures(url: str) -> None:
+    global STATIC_SENATE_PAGE_FAILURES
+    if is_static_senate_page(url):
+        STATIC_SENATE_PAGE_FAILURES = 0
+
+
+def static_senate_page_circuit_open(url: str) -> bool:
+    if not is_static_senate_page(url):
+        return False
+    threshold = config_int("senate_static_page_failure_abort_after", 2, "SENSTATS_STATIC_PAGE_FAILURE_ABORT_AFTER")
+    return threshold > 0 and STATIC_SENATE_PAGE_FAILURES >= threshold
+
 def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None, retry_attempts: int | None = None) -> requests.Response | None:
+    if static_senate_page_circuit_open(url):
+        if log_failures:
+            LOGGER.warning("Skipping %s because %s previous static Senate page requests failed in this run", url, STATIC_SENATE_PAGE_FAILURES)
+        return None
     request_timeout = timeout or config_int("request_timeout", 20, "SENSTATS_REQUEST_TIMEOUT")
     max_attempts = max(retry_attempts if retry_attempts is not None else config_int("request_retry_attempts", 3, "SENSTATS_REQUEST_RETRY_ATTEMPTS"), 1)
     backoff_seconds = config_float("request_retry_backoff_seconds", 2.0, "SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS")
@@ -229,6 +259,7 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
         try:
             response = http.get(url, timeout=request_timeout, headers=headers)
             response.raise_for_status()
+            reset_static_senate_page_failures(url)
             if expect_json and "json" not in response.headers.get("content-type", ""):
                 LOGGER.warning("Expected JSON but got %s from %s", response.headers.get("content-type"), url)
             return response
@@ -243,6 +274,7 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
                 continue
             if log_failures:
                 LOGGER.warning("Skipping %s after HTTP %s", url, status_code or "unknown")
+            note_static_senate_page_failure(url)
             return None
         except requests.Timeout as exc:
             if attempt < max_attempts:
@@ -253,6 +285,7 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
                 continue
             if log_failures:
                 LOGGER.warning("Skipping %s after timeout: %s", url, exc)
+            note_static_senate_page_failure(url)
             return None
         except requests.RequestException as exc:
             if attempt < max_attempts:
@@ -263,6 +296,7 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
                 continue
             if log_failures:
                 LOGGER.warning("Skipping %s after request failure: %s", url, exc)
+            note_static_senate_page_failure(url)
             return None
     return None
 

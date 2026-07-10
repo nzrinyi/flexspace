@@ -32,6 +32,7 @@
   "proactive_timeout": 10,
   "probe_proactive_apis": false,
   "static_proactive_timeout": 8,
+  "senate_static_page_failure_abort_after": 2,
   "committee_list_timeout": 20,
   "skip_committee_directory_page": true,
   "use_committee_fallback": true,
