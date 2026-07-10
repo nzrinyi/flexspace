@@ -248,7 +248,7 @@ def static_senate_page_circuit_open(url: str) -> bool:
     threshold = config_int("senate_static_page_failure_abort_after", 2, "SENSTATS_STATIC_PAGE_FAILURE_ABORT_AFTER")
     return threshold > 0 and STATIC_SENATE_PAGE_FAILURES >= threshold
 
-def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None, retry_attempts: int | None = None) -> requests.Response | None:
+def safe_request(http: requests.Session, method: str, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None, retry_attempts: int | None = None, data: dict[str, str] | None = None) -> requests.Response | None:
     if static_senate_page_circuit_open(url):
         if log_failures:
             LOGGER.warning("Skipping %s because %s previous static Senate page requests failed in this run", url, STATIC_SENATE_PAGE_FAILURES)
@@ -259,7 +259,7 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
     for attempt in range(1, max_attempts + 1):
         polite_delay()
         try:
-            response = http.get(url, timeout=request_timeout, headers=headers)
+            response = http.request(method, url, timeout=request_timeout, headers=headers, data=data)
             response.raise_for_status()
             reset_static_senate_page_failures(url)
             if expect_json and "json" not in response.headers.get("content-type", ""):
@@ -301,6 +301,14 @@ def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, tim
             note_static_senate_page_failure(url)
             return None
     return None
+
+
+def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None, retry_attempts: int | None = None) -> requests.Response | None:
+    return safe_request(http, "GET", url, expect_json=expect_json, timeout=timeout, log_failures=log_failures, headers=headers, retry_attempts=retry_attempts)
+
+
+def safe_post(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None, retry_attempts: int | None = None, data: dict[str, str] | None = None) -> requests.Response | None:
+    return safe_request(http, "POST", url, expect_json=expect_json, timeout=timeout, log_failures=log_failures, headers=headers, retry_attempts=retry_attempts, data=data)
 
 
 def stable_id(value: str) -> str:
@@ -945,7 +953,7 @@ def committee_request_headers(code: str) -> dict[str, str]:
     }
 
 
-def committee_membership_request_options(code: str, membership_url: str, page_url: str, session_id: str) -> list[tuple[str, dict[str, str] | None]]:
+def committee_membership_request_options(code: str, membership_url: str, page_url: str, session_id: str) -> list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]]:
     """Return live committee membership sources in the order most likely to include rows.
 
     The rendered committee page often contains the empty shell while the member cards are
@@ -955,23 +963,54 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
     """
     headers = committee_request_headers(code)
     membership_page = page_url or urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
-    candidates: list[tuple[str, dict[str, str] | None]] = []
-    if membership_url:
-        candidates.append((with_cache_buster(membership_url), headers))
-        candidates.append((membership_url, headers))
-        if SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL in membership_url:
-            candidates.append((with_cache_buster(membership_url.replace(SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL, SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL)), headers))
-    code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id, "Lang": "en"}
-    candidates.append((with_cache_buster(f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"), headers))
-    candidates.append((membership_page, None))
+    candidates: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = []
 
-    deduped: list[tuple[str, dict[str, str] | None]] = []
-    seen_urls: set[str] = set()
-    for url, candidate_headers in candidates:
-        if not url or url in seen_urls:
+    def ajax_post_candidate(url: str) -> tuple[str, str, dict[str, str], dict[str, str]] | None:
+        parsed = urlparse(url)
+        query = {key: values[-1] for key, values in parse_qs(parsed.query).items() if values}
+        data = {
+            "CommitteeId": query.get("CommitteeId", ""),
+            "CommitteeCode": query.get("CommitteeCode", code.upper()),
+            "SessionId": query.get("SessionId", session_id),
+            "Lang": query.get("Lang", "en"),
+        }
+        data = {key: value for key, value in data.items() if value}
+        if not data.get("CommitteeId") and not data.get("CommitteeCode"):
+            return None
+        post_headers = {
+            **headers,
+            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        }
+        return ("POST", f"{parsed.scheme}://{parsed.netloc}{parsed.path}", post_headers, data)
+
+    if membership_url:
+        post_candidate = ajax_post_candidate(membership_url)
+        if post_candidate:
+            candidates.append(post_candidate)
+        candidates.append(("GET", with_cache_buster(membership_url), headers, None))
+        candidates.append(("GET", membership_url, headers, None))
+        if SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL in membership_url:
+            corrected_url = membership_url.replace(SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL, SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL)
+            corrected_post_candidate = ajax_post_candidate(corrected_url)
+            if corrected_post_candidate:
+                candidates.append(corrected_post_candidate)
+            candidates.append(("GET", with_cache_buster(corrected_url), headers, None))
+    code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id, "Lang": "en"}
+    code_candidate_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"
+    code_post_candidate = ajax_post_candidate(code_candidate_url)
+    if code_post_candidate:
+        candidates.append(code_post_candidate)
+    candidates.append(("GET", with_cache_buster(code_candidate_url), headers, None))
+    candidates.append(("GET", membership_page, None, None))
+
+    deduped: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = []
+    seen_requests: set[str] = set()
+    for method, url, candidate_headers, candidate_data in candidates:
+        dedupe_key = f"{method}:{url}:{urlencode(candidate_data or {})}"
+        if not url or dedupe_key in seen_requests:
             continue
-        seen_urls.add(url)
-        deduped.append((url, candidate_headers))
+        seen_requests.add(dedupe_key)
+        deduped.append((method, url, candidate_headers, candidate_data))
     return deduped
 
 
@@ -1212,14 +1251,22 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             continue
         parsed_committee: CommitteeRecord | None = None
         candidate_count = 0
-        for candidate_count, (candidate_url, candidate_headers) in enumerate(committee_membership_request_options(code, membership_url, url, session_id), start=1):
-            LOGGER.info("Fetching committee %s membership candidate %s from %s", code, candidate_count, candidate_url)
-            response = safe_get(
+        for candidate_count, (candidate_method, candidate_url, candidate_headers, candidate_data) in enumerate(committee_membership_request_options(code, membership_url, url, session_id), start=1):
+            LOGGER.info("Fetching committee %s membership candidate %s via %s from %s", code, candidate_count, candidate_method, candidate_url)
+            request_kwargs = {
+                "timeout": committee_timeout,
+                "headers": candidate_headers,
+                "retry_attempts": committee_retry_attempts,
+            }
+            response = safe_post(
                 http,
                 candidate_url,
-                timeout=committee_timeout,
-                headers=candidate_headers,
-                retry_attempts=committee_retry_attempts,
+                data=candidate_data,
+                **request_kwargs,
+            ) if candidate_method == "POST" else safe_get(
+                http,
+                candidate_url,
+                **request_kwargs,
             )
             if response is None:
                 continue
