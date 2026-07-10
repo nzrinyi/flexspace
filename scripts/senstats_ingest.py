@@ -140,6 +140,17 @@ def config_bool(key: str, default: bool, env_name: str | None = None) -> bool:
     return bool(value)
 
 
+def validate_config() -> None:
+    if not str(config_value("proactive_xhr_url", "", "SENSTATS_PROACTIVE_XHR_URL") or "").strip():
+        LOGGER.warning("No proactive_xhr_url configured; proactive expenses will use built-in XHR candidates.")
+    committee_ids = config_value("committee_ids", {}, None)
+    if not isinstance(committee_ids, (dict, list)) or not committee_ids:
+        LOGGER.warning("No committee_ids configured; committee sync will fall back to discovery where possible.")
+
+
+validate_config()
+
+
 @dataclass(frozen=True)
 class SenatorRecord:
     senator_id: str
@@ -209,27 +220,50 @@ def session() -> requests.Session:
 
 
 def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None) -> requests.Response | None:
-    try:
+    request_timeout = timeout or config_int("request_timeout", 20, "SENSTATS_REQUEST_TIMEOUT")
+    max_attempts = max(config_int("request_retry_attempts", 3, "SENSTATS_REQUEST_RETRY_ATTEMPTS"), 1)
+    backoff_seconds = config_float("request_retry_backoff_seconds", 2.0, "SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS")
+    for attempt in range(1, max_attempts + 1):
         polite_delay()
-        request_timeout = timeout or config_int("request_timeout", 20, "SENSTATS_REQUEST_TIMEOUT")
-        response = http.get(url, timeout=request_timeout, headers=headers)
-        response.raise_for_status()
-        if expect_json and "json" not in response.headers.get("content-type", ""):
-            LOGGER.warning("Expected JSON but got %s from %s", response.headers.get("content-type"), url)
-        return response
-    except requests.HTTPError as exc:
-        if log_failures:
-            status_code = exc.response.status_code if exc.response is not None else "unknown"
-            LOGGER.warning("Skipping %s after HTTP %s", url, status_code)
-        return None
-    except requests.Timeout as exc:
-        if log_failures:
-            LOGGER.warning("Skipping %s after timeout: %s", url, exc)
-        return None
-    except requests.RequestException as exc:
-        if log_failures:
-            LOGGER.warning("Skipping %s after request failure: %s", url, exc)
-        return None
+        try:
+            response = http.get(url, timeout=request_timeout, headers=headers)
+            response.raise_for_status()
+            if expect_json and "json" not in response.headers.get("content-type", ""):
+                LOGGER.warning("Expected JSON but got %s from %s", response.headers.get("content-type"), url)
+            return response
+        except requests.HTTPError as exc:
+            status_code = exc.response.status_code if exc.response is not None else 0
+            retryable = status_code in {408, 429} or status_code >= 500
+            if retryable and attempt < max_attempts:
+                sleep_for = backoff_seconds * (2 ** (attempt - 1))
+                if log_failures:
+                    LOGGER.warning("Retrying %s after HTTP %s (%s/%s) in %.1fs", url, status_code, attempt + 1, max_attempts, sleep_for)
+                time.sleep(sleep_for)
+                continue
+            if log_failures:
+                LOGGER.warning("Skipping %s after HTTP %s", url, status_code or "unknown")
+            return None
+        except requests.Timeout as exc:
+            if attempt < max_attempts:
+                sleep_for = backoff_seconds * (2 ** (attempt - 1))
+                if log_failures:
+                    LOGGER.warning("Retrying %s after timeout (%s/%s) in %.1fs: %s", url, attempt + 1, max_attempts, sleep_for, exc)
+                time.sleep(sleep_for)
+                continue
+            if log_failures:
+                LOGGER.warning("Skipping %s after timeout: %s", url, exc)
+            return None
+        except requests.RequestException as exc:
+            if attempt < max_attempts:
+                sleep_for = backoff_seconds * (2 ** (attempt - 1))
+                if log_failures:
+                    LOGGER.warning("Retrying %s after request failure (%s/%s) in %.1fs: %s", url, attempt + 1, max_attempts, sleep_for, exc)
+                time.sleep(sleep_for)
+                continue
+            if log_failures:
+                LOGGER.warning("Skipping %s after request failure: %s", url, exc)
+            return None
+    return None
 
 
 def stable_id(value: str) -> str:
@@ -806,6 +840,12 @@ def configured_committee_membership_urls() -> dict[str, str]:
     return urls
 
 
+def has_explicit_committee_config() -> bool:
+    configured_ids = config_value("committee_ids", None, None)
+    configured_urls = config_value("committee_membership_urls", None, None)
+    return bool(configured_ids or configured_urls or os.getenv("SENSTATS_COMMITTEE_IDS") or os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_URLS"))
+
+
 def committee_id_from_membership_url(url: str) -> str:
     params = parse_qs(urlparse(url).query)
     values = params.get("CommitteeId") or params.get("committeeId")
@@ -854,6 +894,15 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
     configured_ids = configured_committee_ids()
     configured_membership_urls = configured_committee_membership_urls()
+    if has_explicit_committee_config():
+        LOGGER.info("Using configured committee IDs/URLs; skipping committee link discovery.")
+        configured_codes = sorted(set(configured_ids) | set(configured_membership_urls), key=lambda code: (KNOWN_COMMITTEE_CODES.index(code) if code in KNOWN_COMMITTEE_CODES else 999, code))
+        return [{
+            "code": code,
+            "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
+            "committeeId": committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""),
+            "membershipUrl": configured_membership_urls.get(code, ""),
+        } for code in configured_codes]
     response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=config_int("committee_list_timeout", 20, "SENSTATS_COMMITTEE_LIST_TIMEOUT"), log_failures=False)
     links: dict[str, dict[str, str]] = {}
     if response is not None:

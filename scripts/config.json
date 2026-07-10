@@ -1,14 +1,31 @@
 {
   "proactive_xhr_url": "",
   "committee_ids": {
-    "AEFA": 1008
+    "AEFA": 1008,
+    "AGFO": 1009,
+    "AOVS": 1010,
+    "APPA": 1011,
+    "BANC": 1012,
+    "CIBA": 1013,
+    "CONF": 1014,
+    "ENEV": 1015,
+    "LCJC": 1016,
+    "NFFN": 1017,
+    "OLLO": 1018,
+    "POFO": 1019,
+    "RIDR": 1020,
+    "RPRD": 1021,
+    "SECD": 1022,
+    "SELE": 1023,
+    "SOCI": 1024,
+    "TRCM": 1025
   },
   "committee_membership_urls": {},
   "committee_session_id": 32,
   "check_static_pages": false,
-  "request_delay_seconds": 2,
+  "request_delay_seconds": 5,
   "request_delay_jitter_seconds": 3,
-  "request_timeout": 20,
+  "request_timeout": 60,
   "senator_photo_timeout": 20,
   "proactive_route_fallbacks": false,
   "max_proactive_xhr_attempts": 80,
@@ -19,8 +36,10 @@
   "skip_committee_directory_page": true,
   "use_committee_fallback": true,
   "committee_timeout": 10,
-  "committee_membership_timeout": 30,
+  "committee_membership_timeout": 90,
   "committee_membership_attempts": 3,
   "skip_committee_page_fallback": true,
-  "attendance_timeout": 10
+  "attendance_timeout": 10,
+  "request_retry_attempts": 3,
+  "request_retry_backoff_seconds": 2
 }
