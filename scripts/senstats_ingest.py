@@ -48,6 +48,7 @@ SENATE_COMMITTEE_LIST_AJAX_URL = "https://sencanada.ca/umbraco/surface/Committee
 SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeMembership"
 
 KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "CONF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
+KNOWN_COMMITTEE_IDS = {"AEFA": "1008"}
 KNOWN_COMMITTEE_NAMES = {
     "AEFA": "Foreign Affairs and International Trade",
     "AGFO": "Agriculture and Forestry",
@@ -683,6 +684,27 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
     return records
 
 
+
+def configured_committee_ids() -> dict[str, str]:
+    raw = os.getenv("SENSTATS_COMMITTEE_IDS", "")
+    ids = dict(KNOWN_COMMITTEE_IDS)
+    if not raw:
+        return ids
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            ids.update({str(code).upper(): str(value) for code, value in parsed.items() if value})
+            return ids
+    except json.JSONDecodeError:
+        pass
+    for pair in raw.split(","):
+        if "=" not in pair:
+            continue
+        code, value = pair.split("=", 1)
+        if code.strip() and value.strip():
+            ids[code.strip().upper()] = value.strip()
+    return ids
+
 def committee_id_from_markup(html: str, code: str) -> str | None:
     windows = [match.start() for match in re.finditer(re.escape(code), html, flags=re.IGNORECASE)]
     for start in windows:
@@ -694,6 +716,7 @@ def committee_id_from_markup(html: str, code: str) -> str | None:
 
 
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
+    configured_ids = configured_committee_ids()
     response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=int(os.getenv("SENSTATS_COMMITTEE_LIST_TIMEOUT", "20")), log_failures=False)
     links: dict[str, dict[str, str]] = {}
     if response is not None:
@@ -707,7 +730,7 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                     links[code] = {
                         "code": code,
                         "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
-                        "committeeId": committee_id_from_markup(response.text, code) or "",
+                        "committeeId": committee_id_from_markup(response.text, code) or configured_ids.get(code, ""),
                     }
     if not links:
         response = safe_get(http, SENATE_COMMITTEES_URL)
@@ -722,13 +745,13 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                         links[code] = {
                             "code": code,
                             "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
-                            "committeeId": committee_id_from_markup(response.text, code) or "",
+                            "committeeId": committee_id_from_markup(response.text, code) or configured_ids.get(code, ""),
                         }
     if links:
         return [links[code] for code in sorted(links)]
     if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "true").lower() == "true":
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-        return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": ""} for code in KNOWN_COMMITTEE_CODES]
+        return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": configured_ids.get(code, "")} for code in KNOWN_COMMITTEE_CODES]
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
     return []
 
@@ -798,6 +821,9 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         url = link["url"]
         committee_id = link.get("committeeId", "")
         membership_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id, 'Lang': 'en'})}" if committee_id else ""
+        if not membership_url and os.getenv("SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK", "true").lower() == "true":
+            LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS to include it.", code)
+            continue
         source_url = membership_url or url
         response = safe_get(http, source_url, timeout=committee_timeout)
         if response is None:
