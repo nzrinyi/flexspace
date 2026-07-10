@@ -21,6 +21,7 @@ import unicodedata
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
@@ -78,6 +79,65 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler(LOG_PATH, encoding="utf-8")],
 )
 LOGGER = logging.getLogger("senstats_ingest")
+CONFIG_PATH = Path(__file__).with_name("config.json")
+
+
+def load_config() -> dict[str, Any]:
+    """Load public, non-secret ingestion settings from scripts/config.json."""
+    if not CONFIG_PATH.exists():
+        LOGGER.info("No %s file found; using built-in defaults and environment overrides.", CONFIG_PATH)
+        return {}
+    try:
+        with CONFIG_PATH.open("r", encoding="utf-8") as handle:
+            data = json.load(handle)
+    except json.JSONDecodeError as exc:
+        LOGGER.error("Unable to parse %s: %s. Falling back to built-in defaults and environment overrides.", CONFIG_PATH, exc)
+        return {}
+    except OSError as exc:
+        LOGGER.error("Unable to read %s: %s. Falling back to built-in defaults and environment overrides.", CONFIG_PATH, exc)
+        return {}
+    if not isinstance(data, dict):
+        LOGGER.error("%s must contain a JSON object. Falling back to built-in defaults and environment overrides.", CONFIG_PATH)
+        return {}
+    return data
+
+
+CONFIG = load_config()
+
+
+def config_value(key: str, default: Any = None, env_name: str | None = None) -> Any:
+    if env_name:
+        env_value = os.getenv(env_name)
+        if env_value not in (None, ""):
+            return env_value
+    return CONFIG.get(key, default)
+
+
+def config_int(key: str, default: int, env_name: str | None = None) -> int:
+    value = config_value(key, default, env_name)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        LOGGER.warning("Invalid integer config for %s=%r; using %s", key, value, default)
+        return default
+
+
+def config_float(key: str, default: float, env_name: str | None = None) -> float:
+    value = config_value(key, default, env_name)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        LOGGER.warning("Invalid numeric config for %s=%r; using %s", key, value, default)
+        return default
+
+
+def config_bool(key: str, default: bool, env_name: str | None = None) -> bool:
+    value = config_value(key, default, env_name)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+    return bool(value)
 
 
 @dataclass(frozen=True)
@@ -135,12 +195,14 @@ class AttendanceRecord:
 
 def polite_delay() -> None:
     """Randomized 2-5 second delay to avoid hammering public sites."""
-    time.sleep(random.uniform(2, 5))
+    base_delay = config_float("request_delay_seconds", 2.0, "SENSTATS_REQUEST_DELAY_SECONDS")
+    jitter = config_float("request_delay_jitter_seconds", 3.0, "SENSTATS_REQUEST_DELAY_JITTER_SECONDS")
+    time.sleep(max(base_delay, 0) + random.uniform(0, max(jitter, 0)))
 
 
 def session() -> requests.Session:
     contact_email = os.getenv("SENSTATS_CONTACT_EMAIL", "configure-SENSTATS_CONTACT_EMAIL")
-    user_agent = os.getenv("SENSTATS_USER_AGENT", f"Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: {contact_email})")
+    user_agent = config_value("user_agent", f"Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: {contact_email})", "SENSTATS_USER_AGENT")
     http = requests.Session()
     http.headers.update({"User-Agent": user_agent or DEFAULT_USER_AGENT, "Accept": "application/json,text/html,*/*", "X-Requested-With": "XMLHttpRequest"})
     return http
@@ -149,7 +211,7 @@ def session() -> requests.Session:
 def safe_get(http: requests.Session, url: str, *, expect_json: bool = False, timeout: int | None = None, log_failures: bool = True, headers: dict[str, str] | None = None) -> requests.Response | None:
     try:
         polite_delay()
-        request_timeout = timeout or int(os.getenv("SENSTATS_REQUEST_TIMEOUT", "20"))
+        request_timeout = timeout or config_int("request_timeout", 20, "SENSTATS_REQUEST_TIMEOUT")
         response = http.get(url, timeout=request_timeout, headers=headers)
         response.raise_for_status()
         if expect_json and "json" not in response.headers.get("content-type", ""):
@@ -230,7 +292,7 @@ def profile_url_key(value: str) -> str:
 
 def fetch_senator_tile_photo_urls(http: requests.Session) -> dict[str, str]:
     """Read senator images from the official tile XHR endpoint."""
-    response = safe_get(http, SENATE_SENATORS_TILES_AJAX_URL, timeout=int(os.getenv("SENSTATS_SENATOR_PHOTO_TIMEOUT", "20")), log_failures=False)
+    response = safe_get(http, SENATE_SENATORS_TILES_AJAX_URL, timeout=config_int("senator_photo_timeout", 20, "SENSTATS_SENATOR_PHOTO_TIMEOUT"), log_failures=False)
     if response is None:
         return {}
     soup = BeautifulSoup(response.text, "html.parser")
@@ -502,7 +564,7 @@ def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -
     older route/hash variants remain as fallbacks. Operators can override this
     with `SENSTATS_PROACTIVE_XHR_URL` and may use `{year}` / `{quarter}` placeholders.
     """
-    configured = os.getenv("SENSTATS_PROACTIVE_XHR_URL", "").strip()
+    configured = str(config_value("proactive_xhr_url", "", "SENSTATS_PROACTIVE_XHR_URL") or "").strip()
     if configured:
         return [
             item.strip().format(year=year, quarter=quarter, display_for=display_for)
@@ -529,7 +591,7 @@ def proactive_data_urls(year: int, quarter: int, display_for: str = "Summary") -
         # This is the current browser Network/XHR endpoint shape for the public page.
         f"/umbraco/surface/ProActiveAjax/GetProActiveData?{ajax_query}",
     ]
-    if os.getenv("SENSTATS_PROACTIVE_ROUTE_FALLBACKS", "false").lower() == "true":
+    if config_bool("proactive_route_fallbacks", False, "SENSTATS_PROACTIVE_ROUTE_FALLBACKS"):
         endpoint_paths.extend([
             # Older/alternate route shapes kept as opt-in fallbacks.
             f"/en/ProActive/Summary/GetProActiveData?{route_query}",
@@ -601,8 +663,8 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
     periods = expense_periods()
     records: list[ExpenseRecord] = []
     attempted_urls: set[str] = set()
-    max_attempts = int(os.getenv("SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS", "80"))
-    timeout_seconds = int(os.getenv("SENSTATS_PROACTIVE_TIMEOUT", "10"))
+    max_attempts = config_int("max_proactive_xhr_attempts", 80, "SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS")
+    timeout_seconds = config_int("proactive_timeout", 10, "SENSTATS_PROACTIVE_TIMEOUT")
     LOGGER.info("Checking Senate proactive disclosure GetProActiveData XHR candidates for %s quarters back to Q3 2016 (max %s attempts)", len(periods), max_attempts)
     for year, quarter in periods:
         quarter_records: list[ExpenseRecord] = []
@@ -638,7 +700,7 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
                 break
         if len(attempted_urls) >= max_attempts and not quarter_records:
             break
-        if not quarter_records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() == "true":
+        if not quarter_records and config_bool("probe_proactive_apis", False, "SENSTATS_PROBE_PROACTIVE_APIS"):
             for url in proactive_api_candidates(year, quarter):
                 response = safe_get(http, url, expect_json=True, timeout=8, log_failures=False)
                 if response is None:
@@ -652,18 +714,18 @@ def fetch_expenses_from_candidate_apis(http: requests.Session, senators_by_name:
                     quarter_records.extend(parsed)
                     break
         records.extend(quarter_records)
-    if not records and os.getenv("SENSTATS_PROBE_PROACTIVE_APIS", "false").lower() != "true":
+    if not records and not config_bool("probe_proactive_apis", False, "SENSTATS_PROBE_PROACTIVE_APIS"):
         LOGGER.info("No expenses parsed from captured GetProActiveData XHR endpoints. If the public page still shows expenses, set SENSTATS_PROACTIVE_XHR_URL to the full copied request URL; optional legacy API probing remains disabled unless SENSTATS_PROBE_PROACTIVE_APIS=true.")
     return records
 
 def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[ExpenseRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     records = fetch_expenses_from_candidate_apis(http, senators_by_name)
-    check_static_pages = os.getenv("SENSTATS_CHECK_STATIC_PROACTIVE_PAGES", "false").lower() == "true"
+    check_static_pages = config_bool("check_static_pages", False, "SENSTATS_CHECK_STATIC_PROACTIVE_PAGES")
     if not records and check_static_pages:
         LOGGER.info("Checking %s proactive disclosure summary/detail pages for static expense rows", len(disclosure_summary_pages()))
         for link in disclosure_summary_pages():
-            response = safe_get(http, link, timeout=int(os.getenv("SENSTATS_STATIC_PROACTIVE_TIMEOUT", "8")), log_failures=False)
+            response = safe_get(http, link, timeout=config_int("static_proactive_timeout", 8, "SENSTATS_STATIC_PROACTIVE_TIMEOUT"), log_failures=False)
             if response is None:
                 continue
             try:
@@ -686,8 +748,15 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
 
 
 def configured_committee_ids() -> dict[str, str]:
-    raw = os.getenv("SENSTATS_COMMITTEE_IDS", "")
     ids = dict(KNOWN_COMMITTEE_IDS)
+    configured = config_value("committee_ids", None, None)
+    if isinstance(configured, dict):
+        ids.update({str(code).upper(): str(value) for code, value in configured.items() if value})
+    elif isinstance(configured, list):
+        for code, value in zip(KNOWN_COMMITTEE_CODES, configured):
+            if value:
+                ids[code] = str(value)
+    raw = os.getenv("SENSTATS_COMMITTEE_IDS", "")
     if not raw:
         return ids
     try:
@@ -715,8 +784,11 @@ def configured_committee_membership_urls() -> dict[str, str]:
     pairs. URLs without a code in the pair are ignored because the membership
     endpoint only exposes CommitteeId/SessionId, not the acronym.
     """
-    raw = os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_URLS", "").strip()
     urls: dict[str, str] = {}
+    configured = config_value("committee_membership_urls", None, None)
+    if isinstance(configured, dict):
+        urls.update({str(code).upper(): str(url) for code, url in configured.items() if code and url})
+    raw = os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_URLS", "").strip()
     if not raw:
         return urls
     try:
@@ -782,7 +854,7 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
     configured_ids = configured_committee_ids()
     configured_membership_urls = configured_committee_membership_urls()
-    response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=int(os.getenv("SENSTATS_COMMITTEE_LIST_TIMEOUT", "20")), log_failures=False)
+    response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=config_int("committee_list_timeout", 20, "SENSTATS_COMMITTEE_LIST_TIMEOUT"), log_failures=False)
     links: dict[str, dict[str, str]] = {}
     if response is not None:
         soup = BeautifulSoup(response.text, "html.parser")
@@ -798,7 +870,7 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                         "committeeId": committee_id_from_markup(response.text, code) or committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""),
                         "membershipUrl": configured_membership_urls.get(code, ""),
                     }
-    if not links and os.getenv("SENSTATS_SKIP_COMMITTEE_DIRECTORY_PAGE", "true").lower() != "true":
+    if not links and not config_bool("skip_committee_directory_page", True, "SENSTATS_SKIP_COMMITTEE_DIRECTORY_PAGE"):
         response = safe_get(http, SENATE_COMMITTEES_URL)
         if response is not None:
             soup = BeautifulSoup(response.text, "html.parser")
@@ -816,7 +888,7 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                         }
     if links:
         return [links[code] for code in sorted(links)]
-    if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "true").lower() == "true":
+    if config_bool("use_committee_fallback", True, "SENSTATS_USE_COMMITTEE_FALLBACK"):
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
         return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""), "membershipUrl": configured_membership_urls.get(code, "")} for code in KNOWN_COMMITTEE_CODES]
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
@@ -883,16 +955,16 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     senators_by_name = {senator.name: senator for senator in senators}
     senators_by_profile = {profile_url_key(str((senator.profile_details or {}).get("profileUrl") or "")): senator for senator in senators if (senator.profile_details or {}).get("profileUrl")}
     committees: list[CommitteeRecord] = []
-    committee_timeout = int(os.getenv("SENSTATS_COMMITTEE_TIMEOUT", "10"))
-    membership_timeout = int(os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT", str(max(committee_timeout, 30))))
-    membership_attempts = max(int(os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_ATTEMPTS", "3")), 1)
-    session_id = os.getenv("SENSTATS_COMMITTEE_SESSION_ID", "32")
+    committee_timeout = config_int("committee_timeout", 10, "SENSTATS_COMMITTEE_TIMEOUT")
+    membership_timeout = config_int("committee_membership_timeout", max(committee_timeout, 30), "SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT")
+    membership_attempts = max(config_int("committee_membership_attempts", 3, "SENSTATS_COMMITTEE_MEMBERSHIP_ATTEMPTS"), 1)
+    session_id = str(config_value("committee_session_id", "32", "SENSTATS_COMMITTEE_SESSION_ID"))
     for link in committee_links(http):
         code = link["code"]
         url = link["url"]
         committee_id = link.get("committeeId", "")
         membership_url = link.get("membershipUrl", "") or (f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id, 'Lang': 'en'})}" if committee_id else "")
-        if not membership_url and os.getenv("SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK", "true").lower() == "true":
+        if not membership_url and config_bool("skip_committee_page_fallback", True, "SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK"):
             LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS or SENSTATS_COMMITTEE_MEMBERSHIP_URLS to include it.", code)
             continue
         response = None
@@ -1192,7 +1264,7 @@ def parse_attendance_records(html: str, senators_by_name: dict[str, SenatorRecor
 
 def fetch_attendance_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[AttendanceRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
-    response = safe_get(http, SENATE_ATTENDANCE_URL, timeout=int(os.getenv("SENSTATS_ATTENDANCE_TIMEOUT", "10")))
+    response = safe_get(http, SENATE_ATTENDANCE_URL, timeout=config_int("attendance_timeout", 10, "SENSTATS_ATTENDANCE_TIMEOUT"))
     if response is None:
         return []
     try:
