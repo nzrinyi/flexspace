@@ -170,6 +170,8 @@ export interface SenStatsSenatorDocument {
 
 export interface SenStatsExpenseDocument {
   id?: string;
+  senatorId?: string;
+  senatorName?: string;
   quarter: string;
   amount: number;
   category: string;

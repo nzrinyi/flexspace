@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import type { SenStatsAttendanceDocument, SenStatsSenatorDocument } from '../../types';
+import type { SenStatsAttendanceDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../../types';
+import { SenStatsExpensesDashboardView } from './SenStatsExpensesDashboardView';
 import { SenStatsGroupsView } from './SenStatsGroupsView';
 import { groupClassName, groupLabel } from './SenStatsHelpers';
 
-type DashboardTab = 'groups' | 'retirement' | 'attendance';
+type DashboardTab = 'groups' | 'retirement' | 'attendance' | 'expenses';
 type AttendanceView = 'senators' | 'groups' | 'provinces';
 type RetirementSort = 'date' | 'served';
 type AttendanceSort = 'missed' | 'rate' | 'illness' | 'leave' | 'business';
@@ -64,7 +65,7 @@ function aggregateAttendance<T extends string>(rows: Array<SenStatsAttendanceDoc
   return Array.from(totals.values()).map((item) => ({ ...item, rate: item.sittingDays ? Math.round((item.present / item.sittingDays) * 100) : 0 })).sort((a, b) => a.rate - b.rate || b.missed - a.missed);
 }
 
-export function SenStatsDashboardsView({ senators, attendance, recentlyChangedSenatorIds, syncedAttendanceCount }: { senators: SenStatsSenatorDocument[]; attendance: Array<SenStatsAttendanceDocument & { id: string }>; recentlyChangedSenatorIds: Set<string>; syncedAttendanceCount: number }) {
+export function SenStatsDashboardsView({ senators, attendance, expenses, selectedSenator, onSelectSenator, expensesLoading, recentlyChangedSenatorIds, syncedAttendanceCount }: { senators: SenStatsSenatorDocument[]; attendance: Array<SenStatsAttendanceDocument & { id: string }>; expenses: Array<SenStatsExpenseDocument & { id: string }>; selectedSenator?: SenStatsSenatorDocument; onSelectSenator: (id: string) => void; expensesLoading: boolean; recentlyChangedSenatorIds: Set<string>; syncedAttendanceCount: number }) {
   const [activeDashboard, setActiveDashboard] = useState<DashboardTab>('groups');
   const [retirementSort, setRetirementSort] = useState<RetirementSort>('date');
   const [attendanceView, setAttendanceView] = useState<AttendanceView>('senators');
@@ -94,11 +95,11 @@ export function SenStatsDashboardsView({ senators, attendance, recentlyChangedSe
   return <section className="dashboards-view" aria-label="SenStats dashboards">
     <div className="dashboard-overview-banner">
       <span>Dashboards</span>
-      <strong>Group counts, retirement order, and attendance in one place</strong>
-      <small>Use the nested tabs below to switch between the three dashboard views.</small>
+      <strong>Group counts, expenses, retirement order, and attendance in one place</strong>
+      <small>Use the nested tabs below to switch between roster, expense, retirement, and attendance views.</small>
     </div>
     <div className="senstats-tabs nested-tabs" role="tablist" aria-label="Dashboards">
-      {(['groups', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
+      {(['groups', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
     </div>
 
     {activeDashboard === 'groups' && <>
@@ -107,6 +108,9 @@ export function SenStatsDashboardsView({ senators, attendance, recentlyChangedSe
       </div>
       <SenStatsGroupsView groups={groupedSenators} recentlyChangedSenatorIds={recentlyChangedSenatorIds} />
     </>}
+
+
+    {activeDashboard === 'expenses' && <SenStatsExpensesDashboardView senators={senators} expenses={expenses} selectedSenator={selectedSenator} onSelectSenator={onSelectSenator} loading={expensesLoading} />}
 
     {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure</strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="dashboard-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, age, yearsServed }) => <div role="row" key={senator.id} className={groupClassName(senator.party)}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span>{retirementDate || 'Not synced'}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></div>)}</div></div>}
 

@@ -38,6 +38,7 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
   const [committees, setCommittees] = useState<SenStatsCommittee[]>([]);
   const [selectedSenatorId, setSelectedSenatorId] = useState<string | null>(null);
   const [expenses, setExpenses] = useState<SenStatsExpense[]>([]);
+  const [allExpenses, setAllExpenses] = useState<SenStatsExpense[]>([]);
   const [recentlyChangedSenatorIds, setRecentlyChangedSenatorIds] = useState<Set<string>>(new Set());
   const [syncStatus, setSyncStatus] = useState<SenStatsSyncStatus | null>(null);
   const [changeLog, setChangeLog] = useState<SenStatsChange[]>([]);
@@ -47,6 +48,7 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [expenseLoading, setExpenseLoading] = useState(false);
+  const [allExpenseLoading, setAllExpenseLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
 
@@ -106,6 +108,23 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
     }, (snapshotError) => setError(snapshotError.message));
   }, []);
 
+
+  useEffect(() => {
+    setAllExpenseLoading(true);
+    return onSnapshot(collectionGroup(db, 'expenses'), (snapshot) => {
+      setAllExpenses(snapshot.docs.map((docSnapshot) => {
+        const data = docSnapshot.data() as SenStatsExpenseDocument;
+        const parentSenatorId = docSnapshot.ref.parent.parent?.id || '';
+        return { id: docSnapshot.id, ...data, senatorId: data.senatorId || parentSenatorId } as SenStatsExpense;
+      }));
+      setAllExpenseLoading(false);
+    }, (snapshotError) => {
+      console.warn('Unable to load SenStats expense rows', snapshotError);
+      setAllExpenses([]);
+      setAllExpenseLoading(false);
+    });
+  }, []);
+
   useEffect(() => {
     if (!selectedSenatorId) {
       setExpenses([]);
@@ -142,9 +161,9 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
       </div>
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
-      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} recentlyChangedSenatorIds={recentlyChangedSenatorIds} syncedAttendanceCount={syncStatus?.attendanceCount ?? 0} />}
+      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} expenses={allExpenses} selectedSenator={selectedSenator} onSelectSenator={setSelectedSenatorId} expensesLoading={allExpenseLoading} recentlyChangedSenatorIds={recentlyChangedSenatorIds} syncedAttendanceCount={syncStatus?.attendanceCount ?? 0} />}
       {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
-      {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? expenses.length} committeeCount={syncStatus?.committeeCount ?? committees.length} attendanceCount={syncStatus?.attendanceCount ?? attendance.length} syncStatus={syncStatus} />}
+      {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? allExpenses.length} committeeCount={syncStatus?.committeeCount ?? committees.length} attendanceCount={syncStatus?.attendanceCount ?? attendance.length} syncStatus={syncStatus} />}
       {activeTab === 'changes' && <SenStatsChangeLogView changes={changeLog} />}
     </section>
   );
