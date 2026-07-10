@@ -1,9 +1,95 @@
-import type { SenStatsCommitteeDocument } from '../../types';
+import { useMemo, useState } from 'react';
+import type { SenStatsCommitteeDocument, SenStatsCommitteeMember } from '../../types';
+import { groupClassName, groupLabel } from './SenStatsHelpers';
 
 interface SenStatsCommitteesViewProps {
   committees: Array<SenStatsCommitteeDocument & { id: string }>;
 }
 
+function isLeadershipRole(role = '') {
+  const normalized = role.toLowerCase();
+  return normalized.includes('chair');
+}
+
+function committeeMemberKey(committeeId: string, member: SenStatsCommitteeMember) {
+  return `${committeeId}-${member.senatorId || member.name}-${member.role || 'member'}`;
+}
+
+function CommitteeMemberRow({ member, committeeId }: { member: SenStatsCommitteeMember; committeeId: string }) {
+  const initials = member.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  return <li key={committeeMemberKey(committeeId, member)} className={`committee-member-row ${isLeadershipRole(member.role) ? 'leadership' : ''} ${groupClassName(member.party || '')}`}>
+    <span aria-hidden="true" className="member-initials">{initials || '—'}</span>
+    <div>
+      <strong>{member.name}</strong>
+      <small>{member.role || 'Member'}{member.party ? ` · ${groupLabel(member.party)}` : ''}{member.province ? ` · ${member.province}` : ''}</small>
+    </div>
+  </li>;
+}
+
 export function SenStatsCommitteesView({ committees }: SenStatsCommitteesViewProps) {
-  return <div className="committees-grid">{committees.length === 0 && <div className="senstats-chart-empty"><div className="empty-graphic" aria-hidden="true">☷</div><strong>No committee data available yet</strong><span>The next SenStats sync will attempt to read current committee pages and membership from the Senate website.</span></div>}{committees.map((committee) => <article key={committee.id} className="committee-card"><div><strong>{committee.name}</strong><span>{committee.code} · {committee.type || 'Committee'}</span></div><p className="muted">{committee.session || 'Current session'}</p><div className="committee-members">{(committee.members || []).length === 0 && <span>No members parsed yet</span>}{(committee.members || []).map((member) => <span key={`${committee.id}-${member.name}-${member.role}`}>{member.name}{member.role ? ` · ${member.role}` : ''}</span>)}</div></article>)}</div>;
+  const [searchTerm, setSearchTerm] = useState('');
+  const committeesWithMembers = useMemo(() => committees.filter((committee) => (committee.members || []).length > 0), [committees]);
+  const hiddenCommitteeCount = committees.length - committeesWithMembers.length;
+  const filteredCommittees = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+    if (!normalizedSearch) return committeesWithMembers;
+    return committeesWithMembers.filter((committee) => [
+      committee.code,
+      committee.name,
+      committee.type,
+      committee.session,
+      ...(committee.members || []).map((member) => member.name),
+    ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch));
+  }, [committeesWithMembers, searchTerm]);
+
+  if (committees.length === 0) {
+    return <div className="committee-empty-panel senstats-chart-empty">
+      <div className="committee-skeleton-stack" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </div>
+      <strong>No committee data available yet</strong>
+      <span>The next SenStats sync will attempt to read current committee pages and membership from the Senate website.</span>
+    </div>;
+  }
+
+  return <section className="committees-view">
+    <div className="committee-toolbar">
+      <div>
+        <span>Committees</span>
+        <strong>{committeesWithMembers.length} with member data</strong>
+        {hiddenCommitteeCount > 0 && <small>{hiddenCommitteeCount} empty committee{hiddenCommitteeCount === 1 ? '' : 's'} hidden until data is available.</small>}
+      </div>
+      <label>
+        Search committees
+        <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by committee, code, or senator…" />
+      </label>
+    </div>
+
+    {filteredCommittees.length === 0 ? <div className="senstats-chart-empty">
+      {committeesWithMembers.length === 0 ? <div className="committee-skeleton-stack" aria-hidden="true"><i /><i /><i /></div> : <div className="empty-graphic" aria-hidden="true">⌕</div>}
+      <strong>{committeesWithMembers.length === 0 ? 'No committee member rows yet' : 'No matching committee records'}</strong>
+      <span>{committeesWithMembers.length === 0 ? 'Committee cards stay hidden until at least one member row is available, so blank cards do not look broken.' : 'Try a different committee code, name, or senator.'}</span>
+    </div> : <div className="committees-grid">{filteredCommittees.map((committee) => {
+      const members = committee.members || [];
+      const leadership = members.filter((member) => isLeadershipRole(member.role));
+      const regularMembers = members.filter((member) => !isLeadershipRole(member.role));
+      return <article key={committee.id} className="committee-card">
+        <header className="committee-card-header">
+          <div>
+            <span>{committee.code} · {committee.type || 'Committee'}</span>
+            <strong>{committee.name}</strong>
+          </div>
+          <small>{committee.session || 'Current session'}</small>
+        </header>
+        {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${committee.name} leadership`}>
+          {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} />)}
+        </ul>}
+        <ul className="committee-member-list" aria-label={`${committee.name} members`}>
+          {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} />)}
+        </ul>
+      </article>;
+    })}</div>}
+  </section>;
 }
