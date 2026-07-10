@@ -183,7 +183,7 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
       {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} expenses={allExpenses} selectedSenator={selectedSenator} onSelectSenator={setSelectedSenatorId} expensesLoading={allExpenseLoading} recentlyChangedSenatorIds={recentlyChangedSenatorIds} syncedAttendanceCount={syncStatus?.attendanceCount ?? 0} />}
-      {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} />}
+      {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} senators={senators} />}
       {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? allExpenses.length} committeeCount={syncStatus?.committeeCount ?? committees.length} attendanceCount={syncStatus?.attendanceCount ?? attendance.length} syncStatus={syncStatus} />}
       {activeTab === 'changes' && <SenStatsChangeLogView changes={changeLog} />}
     </section>

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import type { SenStatsCommitteeDocument, SenStatsCommitteeMember } from '../../types';
+import type { SenStatsCommitteeDocument, SenStatsCommitteeMember, SenStatsSenatorDocument } from '../../types';
 import { groupClassName, groupLabel } from './SenStatsHelpers';
 
 interface SenStatsCommitteesViewProps {
   committees: Array<SenStatsCommitteeDocument & { id: string }>;
+  senators: SenStatsSenatorDocument[];
 }
 
 function isLeadershipRole(role = '') {
@@ -15,10 +16,11 @@ function committeeMemberKey(committeeId: string, member: SenStatsCommitteeMember
   return `${committeeId}-${member.senatorId || member.name}-${member.role || 'member'}`;
 }
 
-function CommitteeMemberRow({ member, committeeId }: { member: SenStatsCommitteeMember; committeeId: string }) {
+function CommitteeMemberRow({ member, committeeId, senator }: { member: SenStatsCommitteeMember; committeeId: string; senator?: SenStatsSenatorDocument }) {
   const initials = member.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  const photoUrl = senator?.photoUrl;
   return <li key={committeeMemberKey(committeeId, member)} className={`committee-member-row ${isLeadershipRole(member.role) ? 'leadership' : ''} ${groupClassName(member.party || '')}`}>
-    <span aria-hidden="true" className="member-initials">{initials || '—'}</span>
+    {photoUrl ? <img className="member-photo" src={photoUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span aria-hidden="true" className="member-initials">{initials || '—'}</span>}
     <div>
       <strong>{member.name}</strong>
       <small>{member.role || 'Member'}{member.party ? ` · ${groupLabel(member.party)}` : ''}{member.province ? ` · ${member.province}` : ''}</small>
@@ -26,8 +28,20 @@ function CommitteeMemberRow({ member, committeeId }: { member: SenStatsCommittee
   </li>;
 }
 
-export function SenStatsCommitteesView({ committees }: SenStatsCommitteesViewProps) {
+function uniqueMembers(members: SenStatsCommitteeMember[]) {
+  const seen = new Set<string>();
+  return members.filter((member) => {
+    const key = (member.senatorId || member.name || '').toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitteesViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const senatorsById = useMemo(() => new Map(senators.map((senator) => [senator.id, senator])), [senators]);
+  const senatorsByName = useMemo(() => new Map(senators.map((senator) => [senator.name.toLowerCase(), senator])), [senators]);
   const committeesWithMembers = useMemo(() => committees.filter((committee) => (committee.members || []).length > 0), [committees]);
   const hiddenCommitteeCount = committees.length - committeesWithMembers.length;
   const filteredCommittees = useMemo(() => {
@@ -73,23 +87,27 @@ export function SenStatsCommitteesView({ committees }: SenStatsCommitteesViewPro
       <span>{committeesWithMembers.length === 0 ? 'Committee cards stay hidden until at least one member row is available, so blank cards do not look broken.' : 'Try a different committee code, name, or senator.'}</span>
     </div> : <div className="committees-grid">{filteredCommittees.map((committee) => {
       const members = committee.members || [];
-      const leadership = members.filter((member) => isLeadershipRole(member.role));
-      const regularMembers = members.filter((member) => !isLeadershipRole(member.role));
-      return <article key={committee.id} className="committee-card">
-        <header className="committee-card-header">
+      const dedupedMembers = uniqueMembers(members);
+      const leadership = dedupedMembers.filter((member) => isLeadershipRole(member.role));
+      const regularMembers = dedupedMembers.filter((member) => !isLeadershipRole(member.role));
+      const nextMeeting = committee.nextMeetingDate || committee.nextMeeting || '';
+      return <details key={committee.id} className="committee-card" open>
+        <summary className="committee-card-header">
           <div>
             <span>{committee.code} · {committee.type || 'Committee'}</span>
             <strong>{committee.name}</strong>
+            <em>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
           </div>
           <small>{committee.session || 'Current session'}</small>
-        </header>
+        </summary>
+        {committee.sourceUrl && <a className="committee-official-link" href={committee.sourceUrl} target="_blank" rel="noreferrer">Official committee page</a>}
         {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${committee.name} leadership`}>
-          {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} />)}
+          {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
         </ul>}
         <ul className="committee-member-list" aria-label={`${committee.name} members`}>
-          {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} />)}
+          {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
         </ul>
-      </article>;
+      </details>;
     })}</div>}
   </section>;
 }

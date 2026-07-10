@@ -1271,7 +1271,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             if response is None:
                 continue
             try:
-                committee = parse_committee_page(response.text, candidate_url, code, senators_by_name, senators_by_profile)
+                committee = parse_committee_page(response.text, url or candidate_url, code, senators_by_name, senators_by_profile)
             except Exception as exc:  # noqa: BLE001
                 LOGGER.error("Committee parse failed for %s: %s", candidate_url, exc, exc_info=True)
                 write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_parse_error")
@@ -1619,6 +1619,14 @@ def write_committees(db: Any, committees: Iterable[CommitteeRecord]) -> None:
     count = 0
     now = firestore.SERVER_TIMESTAMP
     for committee in committees:
+        deduped_members: list[dict[str, str]] = []
+        seen_members: set[str] = set()
+        for member in committee.members:
+            member_key = (member.get("senatorId") or member.get("name") or "").lower()
+            if not member_key or member_key in seen_members:
+                continue
+            seen_members.add(member_key)
+            deduped_members.append(member)
         ref = db.collection("senstats_committees").document(committee.committee_id)
         batch.set(ref, {
             "id": committee.committee_id,
@@ -1627,7 +1635,7 @@ def write_committees(db: Any, committees: Iterable[CommitteeRecord]) -> None:
             "type": committee.committee_type,
             "session": committee.session,
             "sourceUrl": committee.source_url,
-            "members": committee.members,
+            "members": deduped_members,
             "updatedAt": now,
         }, merge=True)
         count += 1

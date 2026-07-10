@@ -195,6 +195,8 @@ export interface SenStatsCommitteeDocument {
   type?: string;
   session?: string;
   sourceUrl?: string;
+  nextMeeting?: string;
+  nextMeetingDate?: string;
   members: SenStatsCommitteeMember[];
   updatedAt?: Timestamp;
 }
