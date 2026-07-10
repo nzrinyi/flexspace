@@ -750,6 +750,25 @@ def committee_id_from_markup(html: str, code: str) -> str | None:
     return None
 
 
+def with_cache_buster(url: str) -> str:
+    if "_=" in url:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}_={int(time.time() * 1000)}"
+
+
+def committee_request_headers(code: str) -> dict[str, str]:
+    return {
+        "Accept": "text/plain, */*; q=0.01",
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Referer": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/"),
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+
+
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
     configured_ids = configured_committee_ids()
     configured_membership_urls = configured_committee_membership_urls()
@@ -769,7 +788,7 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                         "committeeId": committee_id_from_markup(response.text, code) or committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""),
                         "membershipUrl": configured_membership_urls.get(code, ""),
                     }
-    if not links:
+    if not links and os.getenv("SENSTATS_SKIP_COMMITTEE_DIRECTORY_PAGE", "true").lower() != "true":
         response = safe_get(http, SENATE_COMMITTEES_URL)
         if response is not None:
             soup = BeautifulSoup(response.text, "html.parser")
@@ -855,6 +874,8 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     senators_by_profile = {profile_url_key(str((senator.profile_details or {}).get("profileUrl") or "")): senator for senator in senators if (senator.profile_details or {}).get("profileUrl")}
     committees: list[CommitteeRecord] = []
     committee_timeout = int(os.getenv("SENSTATS_COMMITTEE_TIMEOUT", "10"))
+    membership_timeout = int(os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT", str(max(committee_timeout, 30))))
+    membership_attempts = max(int(os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_ATTEMPTS", "3")), 1)
     session_id = os.getenv("SENSTATS_COMMITTEE_SESSION_ID", "32")
     for link in committee_links(http):
         code = link["code"]
@@ -864,8 +885,16 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         if not membership_url and os.getenv("SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK", "true").lower() == "true":
             LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS or SENSTATS_COMMITTEE_MEMBERSHIP_URLS to include it.", code)
             continue
-        source_url = membership_url or url
-        response = safe_get(http, source_url, timeout=committee_timeout)
+        source_url = with_cache_buster(membership_url) if membership_url else url
+        attempts = membership_attempts if membership_url else 1
+        timeout = membership_timeout if membership_url else committee_timeout
+        response = None
+        for attempt in range(1, attempts + 1):
+            response = safe_get(http, source_url, timeout=timeout, headers=committee_request_headers(code) if membership_url else None, log_failures=attempt == attempts)
+            if response is not None:
+                break
+            if attempt < attempts:
+                LOGGER.warning("Retrying committee %s membership request (%s/%s)", code, attempt + 1, attempts)
         if response is None:
             continue
         try:
