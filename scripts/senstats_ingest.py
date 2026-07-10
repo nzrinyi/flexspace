@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable
-from urllib.parse import urlencode, urljoin
+from urllib.parse import parse_qs, urlencode, urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -705,6 +705,41 @@ def configured_committee_ids() -> dict[str, str]:
             ids[code.strip().upper()] = value.strip()
     return ids
 
+
+def configured_committee_membership_urls() -> dict[str, str]:
+    """Return optional full GetCommitteeMembership URLs keyed by committee code.
+
+    This is intentionally forgiving so a copied Network-tab URL can be pasted
+    directly into a GitHub Actions variable without needing a code change. Use
+    either JSON (`{"AEFA": "https://..."}`) or comma-separated `CODE=https://...`
+    pairs. URLs without a code in the pair are ignored because the membership
+    endpoint only exposes CommitteeId/SessionId, not the acronym.
+    """
+    raw = os.getenv("SENSTATS_COMMITTEE_MEMBERSHIP_URLS", "").strip()
+    urls: dict[str, str] = {}
+    if not raw:
+        return urls
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, dict):
+            return {str(code).upper(): str(url) for code, url in parsed.items() if code and url}
+    except json.JSONDecodeError:
+        pass
+    for pair in raw.split(","):
+        if "=" not in pair:
+            continue
+        code, value = pair.split("=", 1)
+        if code.strip() and value.strip():
+            urls[code.strip().upper()] = value.strip()
+    return urls
+
+
+def committee_id_from_membership_url(url: str) -> str:
+    params = parse_qs(urlparse(url).query)
+    values = params.get("CommitteeId") or params.get("committeeId")
+    return values[0] if values else ""
+
+
 def committee_id_from_markup(html: str, code: str) -> str | None:
     windows = [match.start() for match in re.finditer(re.escape(code), html, flags=re.IGNORECASE)]
     for start in windows:
@@ -717,6 +752,7 @@ def committee_id_from_markup(html: str, code: str) -> str | None:
 
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
     configured_ids = configured_committee_ids()
+    configured_membership_urls = configured_committee_membership_urls()
     response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=int(os.getenv("SENSTATS_COMMITTEE_LIST_TIMEOUT", "20")), log_failures=False)
     links: dict[str, dict[str, str]] = {}
     if response is not None:
@@ -730,7 +766,8 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                     links[code] = {
                         "code": code,
                         "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
-                        "committeeId": committee_id_from_markup(response.text, code) or configured_ids.get(code, ""),
+                        "committeeId": committee_id_from_markup(response.text, code) or committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""),
+                        "membershipUrl": configured_membership_urls.get(code, ""),
                     }
     if not links:
         response = safe_get(http, SENATE_COMMITTEES_URL)
@@ -745,13 +782,14 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                         links[code] = {
                             "code": code,
                             "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
-                            "committeeId": committee_id_from_markup(response.text, code) or configured_ids.get(code, ""),
+                            "committeeId": committee_id_from_markup(response.text, code) or committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""),
+                            "membershipUrl": configured_membership_urls.get(code, ""),
                         }
     if links:
         return [links[code] for code in sorted(links)]
     if os.getenv("SENSTATS_USE_COMMITTEE_FALLBACK", "true").lower() == "true":
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-        return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": configured_ids.get(code, "")} for code in KNOWN_COMMITTEE_CODES]
+        return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""), "membershipUrl": configured_membership_urls.get(code, "")} for code in KNOWN_COMMITTEE_CODES]
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
     return []
 
@@ -820,9 +858,9 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         code = link["code"]
         url = link["url"]
         committee_id = link.get("committeeId", "")
-        membership_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id, 'Lang': 'en'})}" if committee_id else ""
+        membership_url = link.get("membershipUrl", "") or (f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id, 'Lang': 'en'})}" if committee_id else "")
         if not membership_url and os.getenv("SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK", "true").lower() == "true":
-            LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS to include it.", code)
+            LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS or SENSTATS_COMMITTEE_MEMBERSHIP_URLS to include it.", code)
             continue
         source_url = membership_url or url
         response = safe_get(http, source_url, timeout=committee_timeout)
