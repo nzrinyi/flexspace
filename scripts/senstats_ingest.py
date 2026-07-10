@@ -885,7 +885,14 @@ def local_committee_html(code: str) -> tuple[str, str] | None:
     base_path = Path(configured_dir)
     if not base_path.is_absolute():
         base_path = SCRIPT_DIR / base_path
-    candidates = [base_path / f"{code.lower()}.html", base_path / f"{code.upper()}.html"]
+    candidates = [
+        base_path / f"{code.lower()}.html",
+        base_path / f"{code.lower()}.snippet.html",
+        base_path / f"{code.lower()}.txt",
+        base_path / f"{code.upper()}.html",
+        base_path / f"{code.upper()}.snippet.html",
+        base_path / f"{code.upper()}.txt",
+    ]
     for candidate in candidates:
         if candidate.exists():
             try:
