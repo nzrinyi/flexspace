@@ -827,6 +827,26 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
 
 
 
+
+def configured_committee_focus_codes() -> list[str]:
+    configured = config_value("committee_focus_codes", ["AEFA"], "SENSTATS_COMMITTEE_FOCUS_CODES")
+    if isinstance(configured, str):
+        values = [item.strip().upper() for item in re.split(r"[,\s]+", configured) if item.strip()]
+    elif isinstance(configured, list):
+        values = [str(item).strip().upper() for item in configured if str(item).strip()]
+    else:
+        values = []
+    return [code for code in values if code in KNOWN_COMMITTEE_CODES]
+
+
+def filter_committee_links_for_focus(links: list[dict[str, str]]) -> list[dict[str, str]]:
+    focus_codes = configured_committee_focus_codes()
+    if not focus_codes:
+        return links
+    LOGGER.info("Limiting committee scrape to focused committees: %s", ", ".join(focus_codes))
+    focus = set(focus_codes)
+    return [link for link in links if link.get("code") in focus]
+
 def configured_committee_ids() -> dict[str, str]:
     ids = dict(KNOWN_COMMITTEE_IDS)
     configured = config_value("committee_ids", None, None)
@@ -934,12 +954,12 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
     if has_explicit_committee_config():
         LOGGER.info("Using configured committee IDs/URLs; skipping committee link discovery.")
         configured_codes = sorted(set(configured_ids) | set(configured_membership_urls), key=lambda code: (KNOWN_COMMITTEE_CODES.index(code) if code in KNOWN_COMMITTEE_CODES else 999, code))
-        return [{
+        return filter_committee_links_for_focus([{
             "code": code,
             "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
             "committeeId": committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""),
             "membershipUrl": configured_membership_urls.get(code, ""),
-        } for code in configured_codes]
+        } for code in configured_codes])
     response = safe_get(http, SENATE_COMMITTEE_LIST_AJAX_URL, timeout=config_int("committee_list_timeout", 20, "SENSTATS_COMMITTEE_LIST_TIMEOUT"), log_failures=False)
     links: dict[str, dict[str, str]] = {}
     if response is not None:
@@ -973,10 +993,10 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
                             "membershipUrl": configured_membership_urls.get(code, ""),
                         }
     if links:
-        return [links[code] for code in sorted(links)]
+        return filter_committee_links_for_focus([links[code] for code in sorted(links)])
     if config_bool("use_committee_fallback", True, "SENSTATS_USE_COMMITTEE_FALLBACK"):
         LOGGER.warning("Could not discover committee links; using known Senate committee code fallback.")
-        return [{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""), "membershipUrl": configured_membership_urls.get(code, "")} for code in KNOWN_COMMITTEE_CODES]
+        return filter_committee_links_for_focus([{"code": code, "url": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"), "committeeId": committee_id_from_membership_url(configured_membership_urls.get(code, "")) or configured_ids.get(code, ""), "membershipUrl": configured_membership_urls.get(code, "")} for code in KNOWN_COMMITTEE_CODES])
     LOGGER.warning("Could not discover committee links; skipping committee page fetches this run. Set SENSTATS_USE_COMMITTEE_FALLBACK=true to try known committee URLs.")
     return []
 
@@ -1059,6 +1079,17 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
     return CommitteeRecord(stable_id(code), code, name, committee_type, session, source_url, members)
 
 
+
+def write_committee_debug_response(code: str, source_url: str, html: str) -> None:
+    if not config_bool("write_committee_debug_html", True, "SENSTATS_WRITE_COMMITTEE_DEBUG_HTML"):
+        return
+    debug_path = Path(f"senstats_committee_{code.lower()}_debug.html")
+    try:
+        debug_path.write_text(f"<!-- source: {source_url} -->\n" + html[:500000], encoding="utf-8")
+        LOGGER.warning("Wrote committee %s debug HTML to %s for artifact upload", code, debug_path)
+    except OSError as exc:
+        LOGGER.warning("Unable to write committee %s debug HTML: %s", code, exc)
+
 def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[CommitteeRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     senators_by_profile = {profile_url_key(str((senator.profile_details or {}).get("profileUrl") or "")): senator for senator in senators if (senator.profile_details or {}).get("profileUrl")}
@@ -1094,6 +1125,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             committee = parse_committee_page(response.text, source_url, code, senators_by_name, senators_by_profile)
             if not committee.members:
                 LOGGER.warning("Committee %s parsed from %s but contained no member rows.", code, source_url)
+                write_committee_debug_response(code, source_url, response.text)
             committees.append(committee)
         except Exception as exc:  # noqa: BLE001
             LOGGER.error("Committee parse failed for %s: %s", source_url, exc, exc_info=True)

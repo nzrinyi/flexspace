@@ -20,6 +20,9 @@
     "SOCI": 1024,
     "TRCM": 1025
   },
+  "committee_focus_codes": [
+    "AEFA"
+  ],
   "committee_membership_urls": {},
   "committee_session_id": 32,
   "check_static_pages": false,
@@ -37,6 +40,7 @@
   "skip_committee_directory_page": true,
   "use_committee_fallback": true,
   "skip_committee_page_fallback": true,
+  "write_committee_debug_html": true,
   "attendance_timeout": 10,
   "attendance_retry_attempts": 3,
   "request_retry_attempts": 3,
