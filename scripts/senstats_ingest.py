@@ -903,6 +903,34 @@ def existing_senator_snapshot(db: Any) -> dict[str, dict[str, Any]]:
         return {}
 
 
+def senators_from_snapshot(snapshot: dict[str, dict[str, Any]]) -> list[SenatorRecord]:
+    """Build minimal senator records from the last successful Firestore roster.
+
+    The Senate roster endpoint occasionally times out from GitHub-hosted runners.
+    Committee and attendance parsing can still proceed safely with the previous
+    roster because those writes are keyed separately and do not imply roster
+    retirements or group changes.
+    """
+    senators: list[SenatorRecord] = []
+    for senator_id, data in snapshot.items():
+        name = str(data.get("name") or "").strip()
+        if not name:
+            continue
+        senators.append(SenatorRecord(
+            senator_id=senator_id,
+            name=name,
+            party=party_label(str(data.get("party") or "")),
+            province=str(data.get("province") or "").strip(),
+            gender=str(data.get("gender") or "").strip(),
+            photo_url=str(data.get("photoUrl") or "").strip(),
+            source_url=str(data.get("sourceUrl") or SENATE_SENATORS_AJAX_URL),
+            profile_details=firestore_safe(data.get("profileDetails") or {}),
+            raw_data=firestore_safe(data),
+        ))
+    LOGGER.info("Loaded %s senators from the previous Firestore snapshot for related-data parsing", len(senators))
+    return senators
+
+
 def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterable[SenatorRecord], sync_id: str) -> list[dict[str, Any]]:
     current = {senator.senator_id: senator for senator in senators}
     changes: list[dict[str, Any]] = []
@@ -1193,24 +1221,32 @@ def main() -> int:
     errors: list[str] = []
     http = session()
     senators = fetch_current_senators(http)
+    db: Any | None = None
+    existing: dict[str, dict[str, Any]] = {}
+    related_senators = senators
     if not senators:
-        LOGGER.error("Aborting senator/expense/committee writes because senator metadata is empty.")
+        message = "No senator metadata was parsed from the public Senate roster; using the previous Firestore roster for committee/attendance parsing only."
+        LOGGER.error(message)
+        errors.append(message)
         try:
             db = firestore_client()
-            write_sync_status(db, sync_id=sync_id, started_at=started_at, senators=[], expenses=[], committees=[], attendance=[], change_count=0, errors=["No senator metadata was parsed from the public Senate roster."])
+            existing = existing_senator_snapshot(db)
+            related_senators = senators_from_snapshot(existing)
         except Exception as exc:  # noqa: BLE001
-            LOGGER.error("Failed to write empty-sync status: %s", exc, exc_info=True)
-            return 1
-        return 0
-    attendance = fetch_attendance_records(http, senators)
-    committees = fetch_committee_records(http, senators)
-    expenses = fetch_expense_records(http, senators)
+            LOGGER.error("Unable to load previous senator snapshot for related-data parsing: %s", exc, exc_info=True)
+            related_senators = []
+    attendance = fetch_attendance_records(http, related_senators)
+    committees = fetch_committee_records(http, related_senators)
+    expenses = fetch_expense_records(http, related_senators) if related_senators else []
     try:
-        db = firestore_client()
-        existing = existing_senator_snapshot(db)
-        changes = detect_roster_changes(existing, senators, sync_id)
-        write_party_affiliation_history(db, senators)
-        write_senators(db, senators)
+        db = db or firestore_client()
+        if senators:
+            existing = existing_senator_snapshot(db)
+            changes = detect_roster_changes(existing, senators, sync_id)
+            write_party_affiliation_history(db, senators)
+            write_senators(db, senators)
+        else:
+            changes = []
         write_expenses(db, expenses)
         write_committees(db, committees)
         write_attendance(db, attendance)
