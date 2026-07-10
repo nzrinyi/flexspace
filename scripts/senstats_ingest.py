@@ -1434,10 +1434,11 @@ def expense_doc_id(expense: ExpenseRecord) -> str:
 def write_expenses(db: Any, expenses: Iterable[ExpenseRecord]) -> None:
     batch = db.batch()
     count = 0
+    operation_count = 0
     now = firestore.SERVER_TIMESTAMP
     for expense in expenses:
-        ref = db.collection("senstats_senators").document(expense.senator_id).collection("expenses").document(expense_doc_id(expense))
-        batch.set(ref, {
+        doc_id = expense_doc_id(expense)
+        payload = {
             "senatorId": expense.senator_id,
             "senatorName": expense.senator_name,
             "quarter": expense.quarter,
@@ -1446,12 +1447,18 @@ def write_expenses(db: Any, expenses: Iterable[ExpenseRecord]) -> None:
             "sourceUrl": expense.source_url,
             "raw": expense.raw,
             "createdAt": now,
-        }, merge=True)
+        }
+        senator_ref = db.collection("senstats_senators").document(expense.senator_id).collection("expenses").document(doc_id)
+        dashboard_ref = db.collection("senstats_expenses").document(doc_id)
+        batch.set(senator_ref, payload, merge=True)
+        batch.set(dashboard_ref, payload, merge=True)
         count += 1
-        if count % 450 == 0:
+        operation_count += 2
+        if operation_count >= 440:
             batch.commit()
             batch = db.batch()
-    if count % 450:
+            operation_count = 0
+    if operation_count:
         batch.commit()
     LOGGER.info("Wrote %s expense documents", count)
 

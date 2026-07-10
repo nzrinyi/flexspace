@@ -111,7 +111,7 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
 
   useEffect(() => {
     setAllExpenseLoading(true);
-    return onSnapshot(collectionGroup(db, 'expenses'), (snapshot) => {
+    return onSnapshot(collection(db, 'senstats_expenses'), (snapshot) => {
       setAllExpenses(snapshot.docs.map((docSnapshot) => {
         const data = docSnapshot.data() as SenStatsExpenseDocument;
         const parentSenatorId = docSnapshot.ref.parent.parent?.id || '';

@@ -90,6 +90,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /senstats_expenses/{expenseId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
     match /{path=**}/expenses/{expenseId} {
       allow read: if signedIn();
       allow write: if false;
