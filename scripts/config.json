@@ -22,6 +22,8 @@
   },
   "committee_membership_urls": {},
   "committee_session_id": 32,
+  "committee_prefer_static_pages": true,
+  "committee_try_xhr_after_static_failure": false,
   "check_static_pages": false,
   "request_delay_seconds": 5,
   "request_delay_jitter_seconds": 3,

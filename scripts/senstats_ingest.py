@@ -878,17 +878,23 @@ def committee_request_headers(code: str) -> dict[str, str]:
 
 
 def committee_membership_request_options(code: str, membership_url: str, page_url: str) -> list[tuple[str, dict[str, str] | None]]:
+    membership_page = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
+    if config_bool("committee_prefer_static_pages", True, "SENSTATS_COMMITTEE_PREFER_STATIC_PAGES"):
+        if not config_bool("committee_try_xhr_after_static_failure", False, "SENSTATS_COMMITTEE_TRY_XHR_AFTER_STATIC_FAILURE"):
+            return [(membership_page, None)]
+        static_first = [(membership_page, None)]
+    else:
+        static_first = []
     if not membership_url:
-        return [(page_url, None)]
+        return static_first or [(page_url, None)]
     options: list[tuple[str, dict[str, str] | None]] = [
         (with_cache_buster(membership_url), committee_request_headers(code)),
         (membership_url, committee_request_headers(code)),
         (membership_url, None),
     ]
-    membership_page = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")
     if membership_page != page_url:
         options.append((membership_page, None))
-    return options
+    return static_first + options
 
 
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
