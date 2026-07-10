@@ -839,7 +839,7 @@ def fetch_expense_records(http: requests.Session, senators: Iterable[SenatorReco
 
 
 def configured_committee_focus_codes() -> list[str]:
-    configured = config_value("committee_focus_codes", ["AEFA"], "SENSTATS_COMMITTEE_FOCUS_CODES")
+    configured = config_value("committee_focus_codes", [], "SENSTATS_COMMITTEE_FOCUS_CODES")
     if isinstance(configured, str):
         values = [item.strip().upper() for item in re.split(r"[,\s]+", configured) if item.strip()]
     elif isinstance(configured, list):
