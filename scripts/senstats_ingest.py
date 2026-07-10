@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import html as html_lib
 import io
 import json
 import logging
@@ -1024,8 +1025,46 @@ def committee_links(http: requests.Session) -> list[dict[str, str]]:
     return []
 
 
+def extract_committee_html_payload(raw: str) -> str:
+    """Decode the CommitteeAjax response into parseable HTML.
+
+    The Senate endpoint can return the member-card markup directly, as a JSON string,
+    or as escaped HTML inside a JSON object. Normalize those variants before passing
+    the content to BeautifulSoup.
+    """
+    def strings_from_payload(payload: Any) -> Iterable[str]:
+        if isinstance(payload, str):
+            yield payload
+        elif isinstance(payload, dict):
+            for value in payload.values():
+                yield from strings_from_payload(value)
+        elif isinstance(payload, list):
+            for value in payload:
+                yield from strings_from_payload(value)
+
+    candidates = [raw or ""]
+    stripped = (raw or "").strip()
+    if stripped:
+        try:
+            parsed = json.loads(stripped)
+            candidates.extend(strings_from_payload(parsed))
+        except json.JSONDecodeError:
+            pass
+
+    best = candidates[0]
+    for candidate in candidates:
+        decoded = html_lib.unescape(candidate)
+        decoded = re.sub(r"\\u([0-9a-fA-F]{4})", lambda match: chr(int(match.group(1), 16)), decoded)
+        decoded = decoded.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t").replace('\\"', '"').replace("\\/", "/")
+        if "sc-committee-members-dynamic-content-list" in decoded or "sc-committee-members-dynamic-content-member-card" in decoded:
+            return decoded
+        if decoded.count("<") > best.count("<"):
+            best = decoded
+    return best
+
+
 def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord], senators_by_profile: dict[str, SenatorRecord]) -> CommitteeRecord:
-    soup = BeautifulSoup(html, "html.parser")
+    soup = BeautifulSoup(extract_committee_html_payload(html), "html.parser")
     heading = soup.find("h1")
     name = heading.get_text(" ", strip=True) if heading else KNOWN_COMMITTEE_NAMES.get(code.upper(), code)
     raw_text = soup.get_text("\n", strip=True)
