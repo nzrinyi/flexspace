@@ -26,6 +26,18 @@ export function groupLabel(group: string) {
   return group;
 }
 
+
+export function groupFullName(group: string) {
+  const normalized = group.toLowerCase();
+  if (normalized.includes('independent senators') || normalized === 'isg') return 'Independent Senators Group';
+  if (normalized.includes('progressive') || normalized === 'psg') return 'Progressive Senate Group';
+  if (normalized.includes('canadian senators') || normalized === 'csg') return 'Canadian Senators Group';
+  if (normalized.includes('government') || normalized === 'gro') return 'Government Representative Office';
+  if (normalized.includes('conservative') || normalized === 'cpc' || normalized === 'c') return 'Conservative Party of Canada';
+  if (normalized.includes('non-affiliated') || normalized.includes('non affiliated')) return 'Non-affiliated senator';
+  return group || 'Unknown group';
+}
+
 export function categoryKey(category: string) {
   const normalized = category.toLowerCase();
   if (normalized.includes('travel')) return 'Travel';

@@ -943,9 +943,32 @@ def committee_request_headers(code: str) -> dict[str, str]:
     }
 
 
-def committee_membership_request_options(code: str, membership_url: str, page_url: str) -> list[tuple[str, dict[str, str] | None]]:
-    membership_page = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
-    return [(membership_page, None)]
+def committee_membership_request_options(code: str, membership_url: str, page_url: str, session_id: str) -> list[tuple[str, dict[str, str] | None]]:
+    """Return live committee membership sources in the order most likely to include rows.
+
+    The rendered committee page often contains the empty shell while the member cards are
+    delivered by the same Umbraco XHR endpoint that powers the page. Try that XHR first
+    (with the headers the site expects), then fall back to the human-readable page only
+    for diagnostics.
+    """
+    headers = committee_request_headers(code)
+    membership_page = page_url or urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
+    candidates: list[tuple[str, dict[str, str] | None]] = []
+    if membership_url:
+        candidates.append((with_cache_buster(membership_url), headers))
+        candidates.append((membership_url, headers))
+    code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id, "Lang": "en"}
+    candidates.append((with_cache_buster(f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"), headers))
+    candidates.append((membership_page, None))
+
+    deduped: list[tuple[str, dict[str, str] | None]] = []
+    seen_urls: set[str] = set()
+    for url, candidate_headers in candidates:
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        deduped.append((url, candidate_headers))
+    return deduped
 
 
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
@@ -1080,10 +1103,12 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
 
 
 
-def write_committee_debug_response(code: str, source_url: str, html: str) -> None:
+def write_committee_debug_response(code: str, source_url: str, html: str, suffix: str = "") -> None:
     if not config_bool("write_committee_debug_html", True, "SENSTATS_WRITE_COMMITTEE_DEBUG_HTML"):
         return
-    debug_path = Path(f"senstats_committee_{code.lower()}_debug.html")
+    safe_suffix = re.sub(r"[^a-zA-Z0-9_-]+", "_", suffix.strip("_ "))
+    suffix_part = f"_{safe_suffix}" if safe_suffix else ""
+    debug_path = Path(f"senstats_committee_{code.lower()}{suffix_part}_debug.html")
     try:
         debug_path.write_text(f"<!-- source: {source_url} -->\n" + html[:500000], encoding="utf-8")
         LOGGER.warning("Wrote committee %s debug HTML to %s for artifact upload", code, debug_path)
@@ -1105,11 +1130,10 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         if not membership_url and config_bool("skip_committee_page_fallback", True, "SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK"):
             LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS or SENSTATS_COMMITTEE_MEMBERSHIP_URLS to include it.", code)
             continue
-        response = None
-        source_url = ""
-        for candidate_url, candidate_headers in committee_membership_request_options(code, membership_url, url):
-            source_url = candidate_url
-            LOGGER.info("Fetching committee %s membership from %s", code, candidate_url)
+        parsed_committee: CommitteeRecord | None = None
+        candidate_count = 0
+        for candidate_count, (candidate_url, candidate_headers) in enumerate(committee_membership_request_options(code, membership_url, url, session_id), start=1):
+            LOGGER.info("Fetching committee %s membership candidate %s from %s", code, candidate_count, candidate_url)
             response = safe_get(
                 http,
                 candidate_url,
@@ -1117,18 +1141,24 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
                 headers=candidate_headers,
                 retry_attempts=committee_retry_attempts,
             )
-            if response is not None:
+            if response is None:
+                continue
+            try:
+                committee = parse_committee_page(response.text, candidate_url, code, senators_by_name, senators_by_profile)
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.error("Committee parse failed for %s: %s", candidate_url, exc, exc_info=True)
+                write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_parse_error")
+                continue
+            if committee.members:
+                LOGGER.info("Parsed %s committee %s member rows from %s", len(committee.members), code, candidate_url)
+                parsed_committee = committee
                 break
-        if response is None:
+            LOGGER.warning("Committee %s candidate %s from %s contained no member rows.", code, candidate_count, candidate_url)
+            write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_empty")
+        if parsed_committee is None:
+            LOGGER.warning("Committee %s produced no member rows from %s live candidate(s); skipping empty committee document this run.", code, candidate_count)
             continue
-        try:
-            committee = parse_committee_page(response.text, source_url, code, senators_by_name, senators_by_profile)
-            if not committee.members:
-                LOGGER.warning("Committee %s parsed from %s but contained no member rows.", code, source_url)
-                write_committee_debug_response(code, source_url, response.text)
-            committees.append(committee)
-        except Exception as exc:  # noqa: BLE001
-            LOGGER.error("Committee parse failed for %s: %s", source_url, exc, exc_info=True)
+        committees.append(parsed_committee)
     LOGGER.info("Parsed %s committee records", len(committees))
     return committees
 

@@ -520,7 +520,8 @@ a { color: var(--accent); font-weight: 700; }
 .senator-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #64748b; padding: 10px 12px; text-align: left; font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; border-bottom: 1px solid #e8edf7; }
 .senator-table td { padding: 9px 12px; border-bottom: 1px solid #edf2f7; color: #25324a; font-weight: 800; vertical-align: middle; }
 .senator-table tr { border-left: 7px solid var(--group-color, transparent); cursor: pointer; }
-.senator-table tbody tr:hover, .senator-table tbody tr.active { background: color-mix(in srgb, var(--group-color, #64748b) 8%, #fff); }
+.senator-table tbody tr:hover { background: color-mix(in srgb, var(--group-color, #64748b) 8%, #fff); }
+.senator-table tbody tr.active { background: color-mix(in srgb, var(--group-color, #2563eb) 16%, #fff); box-shadow: inset 4px 0 0 var(--group-color, #2563eb), inset 0 0 0 999px color-mix(in srgb, var(--group-color, #2563eb) 4%, transparent); }
 .senator-table strong { color: #0f172a; }
 .senator-table em { display: inline-flex; width: fit-content; border-radius: 999px; background: var(--group-pill-bg, #f1f5f9); color: var(--group-text, #334155); border: 1px solid color-mix(in srgb, var(--group-color, #64748b) 35%, #e8edf7); padding: 4px 8px; font-size: .72rem; font-style: normal; font-weight: 900; }
 .senator-table .senator-avatar { width: 36px; height: 36px; border-radius: 12px; }
@@ -649,8 +650,8 @@ input, select, textarea { max-width: 100%; }
 .expense-chart-legend { display: flex; flex-wrap: wrap; gap: 8px; }
 .expense-chart-legend span { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e8edf7; border-radius: 999px; background: #fff; color: #475569; padding: 6px 9px; font-size: .76rem; font-weight: 900; }
 .expense-chart-legend i { width: 9px; height: 9px; border-radius: 999px; }
-.expense-chart-bars { display: grid; gap: 10px; }
-.expense-chart-row { display: grid; grid-template-columns: minmax(74px,.4fr) minmax(120px,1fr) minmax(82px,.45fr); gap: 10px; align-items: center; }
+.expense-chart-bars { display: grid; gap: 14px; }
+.expense-chart-row { display: grid; grid-template-columns: minmax(74px,.4fr) minmax(120px,1fr) minmax(82px,.45fr); gap: 10px; align-items: center; padding: 3px 0; }
 .expense-chart-row > span { color: #475569; font-size: .78rem; font-weight: 950; }
 .expense-chart-row strong { justify-self: end; color: #0f172a; font-size: .86rem; }
 .expense-chart-stack { display: flex; height: 22px; overflow: hidden; border-radius: 999px; background: #edf2f7; box-shadow: inset 0 0 0 1px #e2e8f0; }
@@ -697,8 +698,8 @@ input, select, textarea { max-width: 100%; }
 /* Richer SenStats senator details */
 .senstats-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
 .senstats-detail-grid p { display: grid; gap: 5px; margin: 0; border: 1px solid #e8edf7; border-radius: 16px; background: #fff; padding: 12px; }
-.senstats-detail-grid span { color: #64748b; font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
-.senstats-detail-grid strong { color: #0f172a; font-size: .96rem; overflow-wrap: anywhere; }
+.senstats-detail-grid span { color: #64748b; font-size: .66rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.senstats-detail-grid strong { color: #0f172a; font-size: 1.04rem; font-weight: 950; overflow-wrap: anywhere; }
 .committee-memberships small { line-height: 1.45; }
 @media (max-width: 560px) { .senstats-detail-grid { grid-template-columns: 1fr; } }
 
@@ -740,7 +741,7 @@ input, select, textarea { max-width: 100%; }
 .party-avatar { background: var(--group-pill-bg, #eef2ff); color: var(--group-text, #3730a3) !important; border: 1px solid color-mix(in srgb, var(--group-color, #64748b) 35%, #e8edf7); box-shadow: inset 0 0 0 3px #fff, 0 8px 18px rgba(15,23,42,.08); }
 .party-avatar i { color: var(--group-text, #3730a3); }
 .profile-fallback { width: min(150px, 45vw); height: auto; aspect-ratio: 4 / 5; border-radius: 18px; font-size: 2.5rem; }
-.detail-group-pill { display: inline-flex; align-items: center; gap: 5px; width: fit-content; border-radius: 999px; background: var(--group-pill-bg, #f1f5f9); color: var(--group-text, #334155); border: 1px solid color-mix(in srgb, var(--group-color, #64748b) 35%, #e8edf7); padding: 3px 8px; font-size: .72rem; font-weight: 950; }
+.detail-group-pill { display: inline-flex; align-items: center; gap: 5px; width: fit-content; border-radius: 999px; background: var(--group-pill-bg, #f1f5f9); color: var(--group-text, #334155); border: 1px solid color-mix(in srgb, var(--group-color, #64748b) 35%, #e8edf7); padding: 3px 8px; font-size: .72rem; font-weight: 950; cursor: help; }
 .detail-section-card { display: grid; gap: 12px; border: 1px solid #e8edf7; border-radius: 20px; background: #fff; padding: 16px; }
 .expense-summary-card { grid-template-columns: minmax(0, 1fr) minmax(140px, .55fr); align-items: center; }
 .expense-summary-card > span, .expense-summary-card > strong, .expense-summary-card > small { grid-column: 1; }
@@ -935,9 +936,12 @@ input, select, textarea { max-width: 100%; }
   color: var(--sen-link-text);
 }
 .senstats-dashboard .senator-table tbody tr:hover,
-.senstats-dashboard .senator-table tbody tr.active,
 .senstats-dashboard .group-senator-row:hover {
   background: var(--sen-row-hover);
+}
+.senstats-dashboard .senator-table tbody tr.active {
+  background: color-mix(in srgb, var(--group-color, #2563eb) 18%, var(--sen-surface));
+  box-shadow: inset 4px 0 0 var(--group-color, #2563eb), inset 0 0 0 999px color-mix(in srgb, var(--group-color, #2563eb) 4%, transparent);
 }
 .senstats-dashboard .senator-detail-overview {
   background: linear-gradient(180deg, color-mix(in srgb, var(--group-color, #64748b) 8%, var(--sen-surface)), var(--sen-surface) 44%);
@@ -950,6 +954,12 @@ input, select, textarea { max-width: 100%; }
   border-left-color: var(--sen-border-strong) !important;
   border-top-color: var(--sen-border-strong);
 }
+
+.senstats-empty-state { border: 1px dashed var(--sen-border, #cbd5e1) !important; border-radius: 14px; background: color-mix(in srgb, var(--group-color, #64748b) 5%, var(--sen-surface, #fff)); padding: 10px !important; }
+.senstats-empty-state span { color: var(--sen-muted, #64748b); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
+.senstats-empty-state small { color: var(--sen-text-2, #475569); }
+.senstats-group-key span, .senator-table em, .dashboard-table em { cursor: help; transition: transform .16s ease, box-shadow .16s ease; }
+.senstats-group-key span:hover, .senator-table em:hover, .dashboard-table em:hover { transform: translateY(-1px); box-shadow: 0 8px 16px color-mix(in srgb, var(--group-color, #64748b) 18%, transparent); }
 
 /* SenStats shell-level dark mode: cover the real page background, not only cards */
 body.senstats-body-dark { background: #020617; color: #e2e8f0; }

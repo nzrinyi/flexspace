@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument } from '../../types';
-import { currency, groupClassName, groupLabel, quarterlyExpenseRows } from './SenStatsHelpers';
+import { currency, groupClassName, groupFullName, groupLabel, quarterlyExpenseRows } from './SenStatsHelpers';
 import { SenStatsExpenseChart } from './SenStatsExpenseChart';
 
 interface SenStatsSenatorsViewProps {
@@ -68,7 +68,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
 
   return <>
     <div className="senstats-group-key" aria-label="Group colour legend">
-      {groupOptions.filter((group) => group !== 'All').map((group) => <span key={group} className={groupClassName(group)}><i />{groupLabel(group)}</span>)}
+      {groupOptions.filter((group) => group !== 'All').map((group) => <span key={group} className={groupClassName(group)} title={groupFullName(group)}><i />{groupLabel(group)}</span>)}
     </div>
     <section className="senstats-filter-bar" aria-label="Senator filters">
       <div className="filter-rail-heading"><span>Refine senators</span><strong>{filteredSenators.length}</strong><small>of {senators.length}</small></div>
@@ -88,7 +88,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
             {filteredSenators.map((senator) => {
               const photoUrl = senatorPhotoUrl(senator);
               const active = senator.id === selectedSenator?.id && detailsOpen;
-              return <tr key={senator.id} className={`${active ? 'active ' : ''}${groupClassName(senator.party)}`} onClick={() => { onSelectSenator(senator.id); setDetailsOpen(true); }} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { onSelectSenator(senator.id); setDetailsOpen(true); } }}><td><span className="senator-avatar party-avatar">{photoUrl && <img src={photoUrl} alt="" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.hidden = true; }} />}<i aria-hidden="true">{senator.name.slice(0, 1)}</i></span></td><td><strong>{senator.name}</strong><small>{senator.province}</small></td><td className="optional-col">{senator.province}</td><td><em title={senator.party}><i aria-hidden="true" />{groupLabel(senator.party)}</em></td><td className="history-col">{recentlyChangedSenatorIds.has(senator.id) ? <span className="history-badge" title="Recent affiliation change">↻</span> : '—'}</td></tr>;
+              return <tr key={senator.id} className={`${active ? 'active ' : ''}${groupClassName(senator.party)}`} onClick={() => { onSelectSenator(senator.id); setDetailsOpen(true); }} tabIndex={0} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { onSelectSenator(senator.id); setDetailsOpen(true); } }}><td><span className="senator-avatar party-avatar">{photoUrl && <img src={photoUrl} alt="" referrerPolicy="no-referrer" onError={(event) => { event.currentTarget.hidden = true; }} />}<i aria-hidden="true">{senator.name.slice(0, 1)}</i></span></td><td><strong>{senator.name}</strong><small>{senator.province}</small></td><td className="optional-col">{senator.province}</td><td><em title={groupFullName(senator.party)}><i aria-hidden="true" />{groupLabel(senator.party)}</em></td><td className="history-col">{recentlyChangedSenatorIds.has(senator.id) ? <span className="history-badge" title="Recent affiliation change">↻</span> : '—'}</td></tr>;
             })}
           </tbody>
         </table>}
@@ -100,7 +100,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
             <div>
               <span>Profile</span>
               <strong>{selectedSenator.name}</strong>
-              <small>{selectedSenator.province} · <b className="detail-group-pill"><i aria-hidden="true" />{groupLabel(selectedSenator.party)}</b></small>
+              <small>{selectedSenator.province} · <b className="detail-group-pill" title={groupFullName(selectedSenator.party)}><i aria-hidden="true" />{groupLabel(selectedSenator.party)}</b></small>
               <span className="profile-actions">{selectedProfileUrl && <a href={selectedProfileUrl} target="_blank" rel="noreferrer">Official profile</a>}<button type="button" onClick={() => setDetailsOpen(false)}>Close</button></span>
             </div>
           </div>
@@ -115,7 +115,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
           </div>
           <div className="senstats-stat expense-summary-card compact"><span>Visible expenses</span><strong>{expenses.length ? currency(totalExpenses) : 'No data available'}</strong><small>{expenseLoading ? 'Syncing expense records…' : `${expenses.length} quarterly records`}</small><ExpenseSparkline expenses={expenses} /></div>
         </section>
-        {selectedCommitteeMemberships.length > 0 && <div className="senstats-profile-data committee-memberships"><strong>Committee memberships</strong>{selectedCommitteeMemberships.map((committee) => { const member = committee.members?.find((item) => item.senatorId === selectedSenator.id || item.name === selectedSenator.name); return <p key={committee.id}><span>{committee.code}</span><small>{committee.name}{member?.role ? ` · ${member.role}` : ''}</small></p>; })}</div>}
+        <div className="senstats-profile-data committee-memberships"><strong>Committee memberships</strong>{selectedCommitteeMemberships.length === 0 ? <p className="senstats-empty-state"><span>No records</span><small>No committee memberships are available for this senator yet.</small></p> : selectedCommitteeMemberships.map((committee) => { const member = committee.members?.find((item) => item.senatorId === selectedSenator.id || item.name === selectedSenator.name); return <p key={committee.id}><span>{committee.code}</span><small>{committee.name}{member?.role ? ` · ${member.role}` : ''}</small></p>; })}</div>
         <SenStatsExpenseChart expenses={expenses} loading={expenseLoading} />
       </aside>}
     </div>
