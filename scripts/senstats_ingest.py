@@ -877,24 +877,37 @@ def committee_request_headers(code: str) -> dict[str, str]:
     }
 
 
+def committee_source_mode() -> str:
+    mode = str(config_value("committee_source_mode", "static", "SENSTATS_COMMITTEE_SOURCE_MODE") or "static").strip().lower()
+    aliases = {
+        "page": "static",
+        "pages": "static",
+        "static_only": "static",
+        "xhr_only": "xhr",
+        "ajax": "xhr",
+        "static_first": "static_then_xhr",
+    }
+    mode = aliases.get(mode, mode)
+    if mode not in {"static", "xhr", "static_then_xhr"}:
+        LOGGER.warning("Unknown committee_source_mode=%r; using static pages only.", mode)
+        return "static"
+    return mode
+
+
 def committee_membership_request_options(code: str, membership_url: str, page_url: str) -> list[tuple[str, dict[str, str] | None]]:
     membership_page = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
-    if config_bool("committee_prefer_static_pages", True, "SENSTATS_COMMITTEE_PREFER_STATIC_PAGES"):
-        if not config_bool("committee_try_xhr_after_static_failure", False, "SENSTATS_COMMITTEE_TRY_XHR_AFTER_STATIC_FAILURE"):
-            return [(membership_page, None)]
-        static_first = [(membership_page, None)]
-    else:
-        static_first = []
-    if not membership_url:
-        return static_first or [(page_url, None)]
-    options: list[tuple[str, dict[str, str] | None]] = [
+    mode = committee_source_mode()
+    static_option = [(membership_page, None)]
+    if mode == "static" or not membership_url:
+        return static_option
+    xhr_options: list[tuple[str, dict[str, str] | None]] = [
         (with_cache_buster(membership_url), committee_request_headers(code)),
         (membership_url, committee_request_headers(code)),
         (membership_url, None),
     ]
-    if membership_page != page_url:
-        options.append((membership_page, None))
-    return static_first + options
+    if mode == "xhr":
+        return xhr_options
+    return static_option + xhr_options
 
 
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
@@ -1027,10 +1040,12 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         source_url = ""
         for option_index, (candidate_url, candidate_headers) in enumerate(committee_membership_request_options(code, membership_url, url), start=1):
             source_url = candidate_url
-            attempts = membership_attempts if membership_url and option_index == 1 else 1
-            timeout = membership_timeout if membership_url else committee_timeout
+            is_xhr_candidate = "CommitteeAjax/GetCommitteeMembership" in candidate_url
+            attempts = membership_attempts if is_xhr_candidate and option_index == 1 else 1
+            timeout = membership_timeout if is_xhr_candidate else committee_timeout
+            retry_attempts = membership_retry_attempts if is_xhr_candidate else 1
             for attempt in range(1, attempts + 1):
-                response = safe_get(http, candidate_url, timeout=timeout, headers=candidate_headers, log_failures=attempt == attempts, retry_attempts=membership_retry_attempts if membership_url else None)
+                response = safe_get(http, candidate_url, timeout=timeout, headers=candidate_headers, log_failures=attempt == attempts, retry_attempts=retry_attempts)
                 if response is not None:
                     break
                 if attempt < attempts:
