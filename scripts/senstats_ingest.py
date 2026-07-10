@@ -1142,7 +1142,45 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
 
 
 
+def committee_debug_summary(raw_html: str) -> dict[str, Any]:
+    decoded_html = extract_committee_html_payload(raw_html)
+    search_terms = [
+        "sc-committee-members-dynamic-content-list",
+        "sc-committee-members-dynamic-content-member-card",
+        "Committee members",
+        "Peter M. Boehm",
+        "GetCommitteeMembership",
+        "CommitteeId",
+        "AEFA",
+    ]
+    first_hit = next((term for term in search_terms if term in decoded_html or term in raw_html), "")
+    haystack = decoded_html if first_hit and first_hit in decoded_html else raw_html
+    hit_index = haystack.find(first_hit) if first_hit else -1
+    if hit_index >= 0:
+        start = max(0, hit_index - 240)
+        end = min(len(haystack), hit_index + 760)
+        excerpt = " ".join(haystack[start:end].split())
+    else:
+        excerpt = " ".join(haystack[:1000].split())
+    return {
+        "rawLength": len(raw_html or ""),
+        "decodedLength": len(decoded_html or ""),
+        "contains": {term: (term in raw_html or term in decoded_html) for term in search_terms},
+        "excerpt": excerpt[:1000],
+    }
+
+
 def write_committee_debug_response(code: str, source_url: str, html: str, suffix: str = "") -> None:
+    summary = committee_debug_summary(html)
+    LOGGER.warning(
+        "Committee %s debug summary for %s: rawLength=%s decodedLength=%s contains=%s excerpt=%s",
+        code,
+        source_url,
+        summary["rawLength"],
+        summary["decodedLength"],
+        summary["contains"],
+        summary["excerpt"],
+    )
     if not config_bool("write_committee_debug_html", True, "SENSTATS_WRITE_COMMITTEE_DEBUG_HTML"):
         return
     safe_suffix = re.sub(r"[^a-zA-Z0-9_-]+", "_", suffix.strip("_ "))

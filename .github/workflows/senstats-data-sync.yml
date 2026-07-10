@@ -52,7 +52,7 @@ jobs:
           SENSTATS_REQUEST_RETRY_ATTEMPTS: ${{ vars.SENSTATS_REQUEST_RETRY_ATTEMPTS || '' }}
           SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS: ${{ vars.SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS || '' }}
 
-      - name: Upload ingestion error log
+      - name: Upload ingestion debug artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
