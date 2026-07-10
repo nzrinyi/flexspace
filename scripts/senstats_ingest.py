@@ -47,7 +47,8 @@ SENATE_SENATORS_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/Ge
 SENATE_SENATORS_TILES_AJAX_URL = "https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorstiles"
 SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
 SENATE_COMMITTEE_LIST_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeListPartialView?parlsession=&Lang=en"
-SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeMembership"
+SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteesAjax/GetCommitteeMembership"
+SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeMembership"
 
 KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "CONF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
 KNOWN_COMMITTEE_IDS = {"AEFA": "1008"}
@@ -958,6 +959,8 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
     if membership_url:
         candidates.append((with_cache_buster(membership_url), headers))
         candidates.append((membership_url, headers))
+        if SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL in membership_url:
+            candidates.append((with_cache_buster(membership_url.replace(SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL, SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL)), headers))
     code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id, "Lang": "en"}
     candidates.append((with_cache_buster(f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"), headers))
     candidates.append((membership_page, None))

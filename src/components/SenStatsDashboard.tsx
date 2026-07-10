@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { collection, collectionGroup, doc, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { collection, collectionGroup, doc, getDocs, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { SenStatsAffiliationHistoryDocument, SenStatsAttendanceDocument, SenStatsChangeLogDocument, SenStatsCommitteeDocument, SenStatsExpenseDocument, SenStatsSenatorDocument, SenStatsSyncStatusDocument } from '../types';
 import { SenStatsChangeLogView } from './senstats/SenStatsChangeLogView';
@@ -112,11 +112,12 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
   useEffect(() => {
     setAllExpenseLoading(true);
     return onSnapshot(collection(db, 'senstats_expenses'), (snapshot) => {
-      setAllExpenses(snapshot.docs.map((docSnapshot) => {
+      const nextExpenses = snapshot.docs.map((docSnapshot) => {
         const data = docSnapshot.data() as SenStatsExpenseDocument;
         const parentSenatorId = docSnapshot.ref.parent.parent?.id || '';
         return { id: docSnapshot.id, ...data, senatorId: data.senatorId || parentSenatorId } as SenStatsExpense;
-      }));
+      });
+      setAllExpenses((currentExpenses) => (nextExpenses.length || currentExpenses.length === 0 ? nextExpenses : currentExpenses));
       setAllExpenseLoading(false);
     }, (snapshotError) => {
       console.warn('Unable to load SenStats expense rows', snapshotError);
@@ -124,6 +125,26 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
       setAllExpenseLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!senators.length || allExpenses.length > 0) return undefined;
+    let cancelled = false;
+    setAllExpenseLoading(true);
+    Promise.all(senators.map(async (senator) => {
+      const snapshot = await getDocs(collection(db, 'senstats_senators', senator.id, 'expenses'));
+      return snapshot.docs.map((docSnapshot) => ({ id: docSnapshot.id, ...docSnapshot.data(), senatorId: senator.id, senatorName: senator.name }) as SenStatsExpense);
+    })).then((expenseGroups) => {
+      if (!cancelled) {
+        const flattened = expenseGroups.flat();
+        if (flattened.length) setAllExpenses(flattened);
+        setAllExpenseLoading(false);
+      }
+    }).catch((snapshotError) => {
+      console.warn('Unable to load nested SenStats expense fallback rows', snapshotError);
+      if (!cancelled) setAllExpenseLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [allExpenses.length, senators]);
 
   useEffect(() => {
     if (!selectedSenatorId) {
