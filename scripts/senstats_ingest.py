@@ -358,15 +358,26 @@ def fetch_current_senators(http: requests.Session) -> list[SenatorRecord]:
 
 
 def party_label(value: str) -> str:
-    labels = {
-        "C": "CPC",
-        "CSG": "CSG",
-        "GRO": "GRO",
-        "ISG": "ISG",
-        "PSG": "PSG",
-        "Non-affiliated": "Non-affiliated",
+    raw = " ".join(str(value or "").replace("\xa0", " ").split())
+    compact = re.sub(r"[^a-z0-9]+", "", raw.lower())
+    aliases = {
+        "c": "CPC",
+        "conservative": "CPC",
+        "conservatives": "CPC",
+        "conservativepartyofcanada": "CPC",
+        "cpc": "CPC",
+        "csg": "CSG",
+        "canadiansenatorsgroup": "CSG",
+        "gro": "GRO",
+        "governmentrepresentativeoffice": "GRO",
+        "isg": "ISG",
+        "independentsenatorsgroup": "ISG",
+        "psg": "PSG",
+        "progressivesenategroup": "PSG",
+        "nonaffiliated": "Non-affiliated",
+        "independent": "Non-affiliated",
     }
-    return labels.get(value.strip(), value.strip() or "Independent/Unknown")
+    return aliases.get(compact, raw or "Independent/Unknown")
 
 
 def party_compare_key(value: Any) -> str:
@@ -980,6 +991,28 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
             province = affiliation_match.group(2)
         append_member(anchor.get_text(" ", strip=True) if anchor else "", role_heading.get_text(" ", strip=True) if role_heading else "Member", party, province, str(profile_anchor["href"]) if profile_anchor else "")
 
+    text_lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    role_tokens = {"chair", "deputy chair", "member", "ex officio"}
+    affiliation_pattern = re.compile(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", re.IGNORECASE)
+    for index, line in enumerate(text_lines):
+        normalized_role = " ".join(line.split()).lower()
+        if normalized_role not in role_tokens:
+            continue
+        name_text = ""
+        party = ""
+        province = ""
+        for candidate in text_lines[index + 1:index + 5]:
+            if not name_text and candidate.lower() not in role_tokens and not affiliation_pattern.search(candidate):
+                name_text = candidate
+                continue
+            affiliation_match = affiliation_pattern.search(candidate)
+            if affiliation_match:
+                party = affiliation_match.group(1)
+                province = affiliation_match.group(2)
+                break
+        if name_text:
+            append_member(name_text, line, party, province, "")
+
     for senator_name, senator in senators_by_name.items():
         if senator.senator_id in seen or senator_name.lower() not in raw_text.lower():
             continue
@@ -1103,13 +1136,14 @@ def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterabl
             })
             continue
         previous_party = party_label(str(previous.get("party") or ""))
-        if previous_party and party_compare_key(previous_party) != party_compare_key(senator.party):
+        new_party = party_label(senator.party)
+        if previous_party and party_compare_key(previous_party) != party_compare_key(new_party):
             changes.append({
                 "type": "group_change",
                 "senatorId": senator_id,
                 "senatorName": senator.name,
                 "previousParty": previous_party,
-                "newParty": senator.party,
+                "newParty": new_party,
                 "previousProvince": str(previous.get("province") or ""),
                 "newProvince": senator.province,
                 "sourceUrl": senator.source_url,
