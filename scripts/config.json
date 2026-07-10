@@ -1,5 +1,9 @@
 {
   "proactive_xhr_url": "",
+  "sync_senators": true,
+  "sync_attendance": true,
+  "sync_committees": true,
+  "sync_expenses": true,
   "committee_ids": {
     "AEFA": 1008,
     "AGFO": 1009,

@@ -1643,6 +1643,10 @@ def main() -> int:
     started_at = datetime.now(timezone.utc)
     sync_id = started_at.strftime("%Y%m%dT%H%M%SZ")
     errors: list[str] = []
+    sync_senators = config_bool("sync_senators", True, "SENSTATS_SYNC_SENATORS")
+    sync_attendance = config_bool("sync_attendance", True, "SENSTATS_SYNC_ATTENDANCE")
+    sync_committees = config_bool("sync_committees", True, "SENSTATS_SYNC_COMMITTEES")
+    sync_expenses = config_bool("sync_expenses", True, "SENSTATS_SYNC_EXPENSES")
     http = session()
     senators = fetch_current_senators(http)
     db: Any | None = None
@@ -1659,29 +1663,32 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001
             LOGGER.error("Unable to load previous senator snapshot for related-data parsing: %s", exc, exc_info=True)
             related_senators = []
-    attendance = fetch_attendance_records(http, related_senators)
-    committees = fetch_committee_records(http, related_senators)
-    expenses = fetch_expense_records(http, related_senators) if related_senators else []
+    attendance = fetch_attendance_records(http, related_senators) if sync_attendance else []
+    committees = fetch_committee_records(http, related_senators) if sync_committees else []
+    expenses = fetch_expense_records(http, related_senators) if sync_expenses and related_senators else []
     try:
         db = db or firestore_client()
-        if senators:
+        if sync_senators and senators:
             existing = existing_senator_snapshot(db)
             changes = detect_roster_changes(existing, senators, sync_id)
             write_party_affiliation_history(db, senators)
             write_senators(db, senators)
         else:
             changes = []
-        write_expenses(db, expenses)
-        write_committees(db, committees)
-        write_attendance(db, attendance)
+        if sync_expenses:
+            write_expenses(db, expenses)
+        if sync_committees:
+            write_committees(db, committees)
+        if sync_attendance:
+            write_attendance(db, attendance)
         change_count = write_change_log(db, changes)
-        if not expenses:
+        if sync_expenses and not expenses:
             errors.append("No expense rows were parsed from the public proactive disclosure summary pages.")
-        if not committees:
+        if sync_committees and not committees:
             errors.append("No committee rows were parsed from the public committees directory.")
-        if not attendance:
+        if sync_attendance and not attendance:
             errors.append("No attendance rows were parsed from the public attendance register.")
-        if not any(senator.photo_url for senator in senators):
+        if sync_senators and not any(senator.photo_url for senator in senators):
             errors.append("The public roster response did not expose usable senator photo URLs.")
         write_sync_status(db, sync_id=sync_id, started_at=started_at, senators=senators, expenses=expenses, committees=committees, attendance=attendance, change_count=change_count, errors=errors)
     except Exception as exc:  # noqa: BLE001
