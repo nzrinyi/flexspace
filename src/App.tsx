@@ -133,11 +133,19 @@ function App() {
 
 
 function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) => void }) {
-  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open existing app</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Blank workspace ready for the next app build-out.</span><small>Open blank app</small></button></div></section></main>;
+  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">FlexSpace launcher</p><h2>Choose a workspace app</h2></div><span>Double-click an app name in either app header to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, shared notes, quotes, test-drive planning, and decision support.</span><small>Open CarMatch</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Canadian Senate dashboard with senators, groups, committees, expenses, public sources, sync status, and change history.</span><small>Open SenStats</small></button></div></section></main>;
 }
 
 function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
-  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button></div></section><SenStatsDashboard /></main>;
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('senstats.darkMode') === 'true');
+
+  useEffect(() => {
+    localStorage.setItem('senstats.darkMode', String(darkMode));
+    document.body.classList.toggle('senstats-body-dark', darkMode);
+    return () => document.body.classList.remove('senstats-body-dark');
+  }, [darkMode]);
+
+  return <main className={`shell senstats-shell ${darkMode ? 'senstats-shell-dark' : ''}`}><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="theme-toggle" type="button" onClick={() => setDarkMode((current) => !current)} aria-pressed={darkMode}>{darkMode ? 'Light mode' : 'Dark mode'}</button></div></section><SenStatsDashboard darkMode={darkMode} /></main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {
