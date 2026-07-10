@@ -1046,6 +1046,9 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     membership_attempts = max(config_int("committee_membership_attempts", 3, "SENSTATS_COMMITTEE_MEMBERSHIP_ATTEMPTS"), 1)
     membership_retry_attempts = max(config_int("committee_request_retry_attempts", 1, "SENSTATS_COMMITTEE_REQUEST_RETRY_ATTEMPTS"), 1)
     session_id = str(config_value("committee_session_id", "32", "SENSTATS_COMMITTEE_SESSION_ID"))
+    timeout_abort_after = max(config_int("committee_network_timeout_abort_after", 2, "SENSTATS_COMMITTEE_NETWORK_TIMEOUT_ABORT_AFTER"), 0)
+    consecutive_network_failures = 0
+    local_fallback_hint_logged = False
     for link in committee_links(http):
         code = link["code"]
         url = link["url"]
@@ -1057,6 +1060,9 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         response = None
         source_url = ""
         local_html = local_committee_html(code)
+        if local_html is None and not local_fallback_hint_logged:
+            LOGGER.warning("No local committee HTML files found in configured committee_html_dir; if GitHub Actions cannot reach sencanada committee pages, add scripts/committee_html/<committee-code>.html files from the public page responses.")
+            local_fallback_hint_logged = True
         if local_html is not None:
             html, source_url = local_html
             try:
@@ -1083,7 +1089,16 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             if response is not None:
                 break
         if response is None:
+            consecutive_network_failures += 1
+            if timeout_abort_after and consecutive_network_failures >= timeout_abort_after:
+                LOGGER.error(
+                    "Aborting remaining committee network fetches after %s consecutive failures. "
+                    "GitHub Actions cannot currently reach Senate committee pages; add local HTML files under scripts/committee_html to populate committee data.",
+                    consecutive_network_failures,
+                )
+                break
             continue
+        consecutive_network_failures = 0
         try:
             committee = parse_committee_page(response.text, source_url, code, senators_by_name, senators_by_profile)
             if not committee.members:

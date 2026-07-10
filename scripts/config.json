@@ -40,6 +40,7 @@
   "skip_committee_directory_page": true,
   "use_committee_fallback": true,
   "committee_timeout": 8,
+  "committee_network_timeout_abort_after": 2,
   "committee_membership_timeout": 20,
   "committee_membership_attempts": 1,
   "skip_committee_page_fallback": true,
