@@ -759,14 +759,24 @@ def with_cache_buster(url: str) -> str:
 
 def committee_request_headers(code: str) -> dict[str, str]:
     return {
-        "Accept": "text/plain, */*; q=0.01",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Accept": "text/html,text/plain,*/*; q=0.01",
         "Referer": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/"),
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
         "X-Requested-With": "XMLHttpRequest",
     }
+
+
+def committee_membership_request_options(code: str, membership_url: str, page_url: str) -> list[tuple[str, dict[str, str] | None]]:
+    if not membership_url:
+        return [(page_url, None)]
+    options: list[tuple[str, dict[str, str] | None]] = [
+        (with_cache_buster(membership_url), committee_request_headers(code)),
+        (membership_url, committee_request_headers(code)),
+        (membership_url, None),
+    ]
+    membership_page = urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1?v=committee-members")
+    if membership_page != page_url:
+        options.append((membership_page, None))
+    return options
 
 
 def committee_links(http: requests.Session) -> list[dict[str, str]]:
@@ -885,16 +895,20 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         if not membership_url and os.getenv("SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK", "true").lower() == "true":
             LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS or SENSTATS_COMMITTEE_MEMBERSHIP_URLS to include it.", code)
             continue
-        source_url = with_cache_buster(membership_url) if membership_url else url
-        attempts = membership_attempts if membership_url else 1
-        timeout = membership_timeout if membership_url else committee_timeout
         response = None
-        for attempt in range(1, attempts + 1):
-            response = safe_get(http, source_url, timeout=timeout, headers=committee_request_headers(code) if membership_url else None, log_failures=attempt == attempts)
+        source_url = ""
+        for option_index, (candidate_url, candidate_headers) in enumerate(committee_membership_request_options(code, membership_url, url), start=1):
+            source_url = candidate_url
+            attempts = membership_attempts if membership_url and option_index == 1 else 1
+            timeout = membership_timeout if membership_url else committee_timeout
+            for attempt in range(1, attempts + 1):
+                response = safe_get(http, candidate_url, timeout=timeout, headers=candidate_headers, log_failures=attempt == attempts)
+                if response is not None:
+                    break
+                if attempt < attempts:
+                    LOGGER.warning("Retrying committee %s membership request (%s/%s)", code, attempt + 1, attempts)
             if response is not None:
                 break
-            if attempt < attempts:
-                LOGGER.warning("Retrying committee %s membership request (%s/%s)", code, attempt + 1, attempts)
         if response is None:
             continue
         try:
