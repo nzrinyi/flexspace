@@ -23,6 +23,7 @@
   "committee_membership_urls": {},
   "committee_session_id": 32,
   "committee_source_mode": "static",
+  "committee_html_dir": "committee_html",
   "committee_prefer_static_pages": true,
   "committee_try_xhr_after_static_failure": false,
   "check_static_pages": false,
@@ -43,6 +44,7 @@
   "committee_membership_attempts": 1,
   "skip_committee_page_fallback": true,
   "attendance_timeout": 10,
+  "attendance_retry_attempts": 1,
   "request_retry_attempts": 3,
   "request_retry_backoff_seconds": 2,
   "committee_request_retry_attempts": 1

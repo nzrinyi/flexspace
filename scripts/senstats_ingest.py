@@ -79,7 +79,8 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout), logging.FileHandler(LOG_PATH, encoding="utf-8")],
 )
 LOGGER = logging.getLogger("senstats_ingest")
-CONFIG_PATH = Path(__file__).with_name("config.json")
+SCRIPT_DIR = Path(__file__).resolve().parent
+CONFIG_PATH = SCRIPT_DIR / "config.json"
 
 
 def load_config() -> dict[str, Any]:
@@ -877,6 +878,23 @@ def committee_request_headers(code: str) -> dict[str, str]:
     }
 
 
+def local_committee_html(code: str) -> tuple[str, str] | None:
+    configured_dir = str(config_value("committee_html_dir", "committee_html", "SENSTATS_COMMITTEE_HTML_DIR") or "").strip()
+    if not configured_dir:
+        return None
+    base_path = Path(configured_dir)
+    if not base_path.is_absolute():
+        base_path = SCRIPT_DIR / base_path
+    candidates = [base_path / f"{code.lower()}.html", base_path / f"{code.upper()}.html"]
+    for candidate in candidates:
+        if candidate.exists():
+            try:
+                return candidate.read_text(encoding="utf-8"), str(candidate)
+            except OSError as exc:
+                LOGGER.warning("Unable to read local committee HTML %s: %s", candidate, exc)
+    return None
+
+
 def committee_source_mode() -> str:
     mode = str(config_value("committee_source_mode", "static", "SENSTATS_COMMITTEE_SOURCE_MODE") or "static").strip().lower()
     aliases = {
@@ -1038,6 +1056,18 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             continue
         response = None
         source_url = ""
+        local_html = local_committee_html(code)
+        if local_html is not None:
+            html, source_url = local_html
+            try:
+                committee = parse_committee_page(html, source_url, code, senators_by_name, senators_by_profile)
+                if not committee.members:
+                    LOGGER.warning("Committee %s local HTML at %s parsed with no member rows.", code, source_url)
+                committees.append(committee)
+                continue
+            except Exception as exc:  # noqa: BLE001
+                LOGGER.error("Committee parse failed for local HTML %s: %s", source_url, exc, exc_info=True)
+                continue
         for option_index, (candidate_url, candidate_headers) in enumerate(committee_membership_request_options(code, membership_url, url), start=1):
             source_url = candidate_url
             is_xhr_candidate = "CommitteeAjax/GetCommitteeMembership" in candidate_url
@@ -1335,7 +1365,12 @@ def parse_attendance_records(html: str, senators_by_name: dict[str, SenatorRecor
 
 def fetch_attendance_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[AttendanceRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
-    response = safe_get(http, SENATE_ATTENDANCE_URL, timeout=config_int("attendance_timeout", 10, "SENSTATS_ATTENDANCE_TIMEOUT"))
+    response = safe_get(
+        http,
+        SENATE_ATTENDANCE_URL,
+        timeout=config_int("attendance_timeout", 10, "SENSTATS_ATTENDANCE_TIMEOUT"),
+        retry_attempts=config_int("attendance_retry_attempts", 1, "SENSTATS_ATTENDANCE_RETRY_ATTEMPTS"),
+    )
     if response is None:
         return []
     try:
