@@ -1321,6 +1321,42 @@ def existing_senator_snapshot(db: Any) -> dict[str, dict[str, Any]]:
         return {}
 
 
+def existing_committee_snapshot(db: Any) -> dict[str, dict[str, Any]]:
+    """Read the previous committee documents so transient Senate outages do not blank sync status."""
+    try:
+        return {doc.id: firestore_safe(doc.to_dict() or {}) for doc in db.collection("senstats_committees").stream()}
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.error("Unable to read existing committee snapshot for fallback: %s", exc, exc_info=True)
+        return {}
+
+
+def committees_from_snapshot(snapshot: dict[str, dict[str, Any]]) -> list[CommitteeRecord]:
+    committees: list[CommitteeRecord] = []
+    for doc_id, data in snapshot.items():
+        code = str(data.get("code") or doc_id).upper()
+        members = data.get("members") if isinstance(data.get("members"), list) else []
+        committees.append(CommitteeRecord(
+            committee_id=doc_id,
+            code=code,
+            name=str(data.get("name") or KNOWN_COMMITTEE_NAMES.get(code, code)),
+            committee_type=str(data.get("type") or "Committee"),
+            session=str(data.get("session") or "45-1"),
+            source_url=str(data.get("sourceUrl") or urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")),
+            members=[member for member in members if isinstance(member, dict)],
+        ))
+    return committees
+
+
+def merge_committee_fallbacks(current: list[CommitteeRecord], previous: list[CommitteeRecord]) -> list[CommitteeRecord]:
+    """Keep freshly parsed committees, and fill missing codes from the last good Firestore snapshot."""
+    merged = list(current)
+    current_codes = {committee.code.upper() for committee in current}
+    for committee in previous:
+        if committee.code.upper() not in current_codes and committee.members:
+            merged.append(committee)
+    return merged
+
+
 def senators_from_snapshot(snapshot: dict[str, dict[str, Any]]) -> list[SenatorRecord]:
     """Build minimal senator records from the last successful Firestore roster.
 
@@ -1680,6 +1716,17 @@ def main() -> int:
             related_senators = []
     attendance = fetch_attendance_records(http, related_senators) if sync_attendance else []
     committees = fetch_committee_records(http, related_senators) if sync_committees else []
+    if sync_committees:
+        try:
+            db = db or firestore_client()
+            previous_committees = committees_from_snapshot(existing_committee_snapshot(db))
+            if previous_committees:
+                merged_committees = merge_committee_fallbacks(committees, previous_committees)
+                if len(merged_committees) > len(committees):
+                    LOGGER.warning("Using %s previous committee document(s) as fallback for committees that could not be refreshed live this run.", len(merged_committees) - len(committees))
+                committees = merged_committees
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.error("Unable to load previous committee snapshot fallback: %s", exc, exc_info=True)
     expenses = fetch_expense_records(http, related_senators) if sync_expenses and related_senators else []
     try:
         db = db or firestore_client()
