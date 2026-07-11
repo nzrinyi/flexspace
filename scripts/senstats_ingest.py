@@ -1216,6 +1216,19 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
             line = markdown_link.group(1)
         return clean_display_name(line)
 
+    fallback_details_by_name = {clean_display_name(member["name"]): member for member in AEFA_FALLBACK_MEMBERS}
+    markdown_image_member_pattern = re.compile(r"\[!\[Image\s+\d+:\s*([^\]]+)\]\([^)]+\)\]\(([^)]+)\)")
+    for markdown_member_name, markdown_profile_url in markdown_image_member_pattern.findall(raw_text):
+        normalized_markdown_name = clean_display_name(markdown_member_name)
+        fallback_details = fallback_details_by_name.get(normalized_markdown_name, {})
+        append_member(
+            normalized_markdown_name,
+            str(fallback_details.get("role") or "Member"),
+            str(fallback_details.get("party") or ""),
+            str(fallback_details.get("province") or ""),
+            markdown_profile_url,
+        )
+
     text_lines = [cleaned for line in raw_text.splitlines() if (cleaned := clean_committee_text_line(line))]
     role_tokens = {"chair", "deputy chair", "member", "ex officio"}
     affiliation_pattern = re.compile(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", re.IGNORECASE)
