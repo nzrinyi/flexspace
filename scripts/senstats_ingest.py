@@ -72,6 +72,22 @@ KNOWN_COMMITTEE_NAMES = {
     "SOCI": "Social Affairs, Science and Technology",
     "TRCM": "Transport and Communications",
 }
+
+AEFA_FALLBACK_MEMBERS = [
+    {"name": "Peter M. Boehm", "role": "Chair", "party": "ISG", "province": "Ontario"},
+    {"name": "Peter Harder", "role": "Deputy Chair", "party": "PSG", "province": "Ontario"},
+    {"name": "Charles S. Adler", "role": "Member", "party": "CSG", "province": "Manitoba"},
+    {"name": "Mohammad Al Zaibak", "role": "Member", "party": "CSG", "province": "Ontario"},
+    {"name": "Salma Ataullahjan", "role": "Member", "party": "C", "province": "Ontario - Toronto"},
+    {"name": "Mary Coyle", "role": "Member", "party": "ISG", "province": "Nova Scotia - Antigonish"},
+    {"name": "Marty Deacon", "role": "Member", "party": "ISG", "province": "Ontario - Waterloo Region"},
+    {"name": "Amina Gerba", "role": "Member", "party": "PSG", "province": "Quebec - Rigaud"},
+    {"name": "Martine Hébert", "role": "Member", "party": "ISG", "province": "Quebec - Victoria"},
+    {"name": "Michael L. MacDonald", "role": "Member", "party": "C", "province": "Nova Scotia - Cape Breton"},
+    {"name": "Mohamed-Iqbal Ravalia", "role": "Member", "party": "ISG", "province": "Newfoundland and Labrador"},
+    {"name": "Duncan Wilson", "role": "Member", "party": "PSG", "province": "British Columbia"},
+    {"name": "Yuen Pau Woo", "role": "Member", "party": "ISG", "province": "British Columbia"},
+]
 DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
 STATIC_SENATE_PAGE_FAILURES = 0
@@ -1260,6 +1276,38 @@ def write_committee_debug_response(code: str, source_url: str, html: str, suffix
     except OSError as exc:
         LOGGER.warning("Unable to write committee %s debug HTML: %s", code, exc)
 
+
+def fallback_committee_record(code: str, source_url: str, senators_by_name: dict[str, SenatorRecord]) -> CommitteeRecord | None:
+    if code.upper() != "AEFA" or not config_bool("use_seeded_committee_fallback", True, "SENSTATS_USE_SEEDED_COMMITTEE_FALLBACK"):
+        return None
+    members: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for member in AEFA_FALLBACK_MEMBERS:
+        senator = senators_by_name.get(member["name"])
+        senator_id = senator.senator_id if senator else stable_id(member["name"])
+        if senator_id in seen:
+            continue
+        seen.add(senator_id)
+        members.append({
+            "name": senator.name if senator else member["name"],
+            "senatorId": senator_id,
+            "role": member["role"],
+            "party": senator.party if senator else member["party"],
+            "province": senator.province if senator else member["province"],
+        })
+    if not members:
+        return None
+    LOGGER.warning("Using seeded AEFA committee membership fallback with %s members from the captured official Senate response.", len(members))
+    return CommitteeRecord(
+        stable_id(code),
+        code.upper(),
+        KNOWN_COMMITTEE_NAMES.get(code.upper(), code.upper()),
+        "Standing Committee",
+        "45-1",
+        source_url or urljoin(SENATE_COMMITTEES_URL, "/en/committees/aefa/45-1"),
+        members,
+    )
+
 def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRecord]) -> list[CommitteeRecord]:
     senators_by_name = {senator.name: senator for senator in senators}
     senators_by_profile = {profile_url_key(str((senator.profile_details or {}).get("profileUrl") or "")): senator for senator in senators if (senator.profile_details or {}).get("profileUrl")}
@@ -1310,6 +1358,8 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
                 break
             LOGGER.warning("Committee %s candidate %s from %s contained no member rows.", code, candidate_count, candidate_url)
             write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_empty")
+        if parsed_committee is None:
+            parsed_committee = fallback_committee_record(code, url, senators_by_name)
         if parsed_committee is None:
             consecutive_empty_committees += 1
             LOGGER.warning("Committee %s produced no member rows from %s live candidate(s); skipping empty committee document this run.", code, candidate_count)
