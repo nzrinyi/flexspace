@@ -948,6 +948,19 @@ def with_cache_buster(url: str) -> str:
     return f"{url}{separator}_={int(time.time() * 1000)}"
 
 
+def committee_membership_url(committee_id: str, session_id: str) -> str:
+    # The live Senate endpoint currently responds to CommitteeId + SessionId; adding
+    # Lang=en has been observed to time out from GitHub Actions for AEFA.
+    return f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id})}"
+
+
+def without_lang_query_param(url: str) -> str:
+    parsed = urlparse(url)
+    params = [(key, value) for key, values in parse_qs(parsed.query, keep_blank_values=True).items() for value in values if key.lower() != "lang"]
+    query = urlencode(params)
+    return parsed._replace(query=query).geturl()
+
+
 def committee_request_headers(code: str) -> dict[str, str]:
     return {
         "Accept": "text/html,text/plain,*/*; q=0.01",
@@ -968,9 +981,9 @@ def committee_page_headers(code: str) -> dict[str, str]:
 def committee_membership_request_options(code: str, membership_url: str, page_url: str, session_id: str) -> list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]]:
     """Return live committee membership sources in the order most likely to include rows.
 
-    Prefer the official human-readable committee page first because the membership
-    markup is present there when the page is reachable, then fall back to the Umbraco
-    XHR candidates that have been intermittent from GitHub Actions.
+    Prefer the official human-readable committee page first because it exposes the
+    CommitteeId/SessionId needed by the membership endpoint, then probe the Umbraco
+    endpoint without the Lang parameter that has been timing out in GitHub Actions.
     """
     headers = committee_request_headers(code)
     membership_page = page_url or urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
@@ -995,23 +1008,24 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
         return ("POST", f"{parsed.scheme}://{parsed.netloc}{parsed.path}", post_headers, data)
 
     if membership_url:
+        membership_url = without_lang_query_param(membership_url)
+        candidates.append(("GET", with_cache_buster(membership_url), headers, None))
+        candidates.append(("GET", membership_url, headers, None))
         post_candidate = ajax_post_candidate(membership_url)
         if post_candidate:
             candidates.append(post_candidate)
-        candidates.append(("GET", with_cache_buster(membership_url), headers, None))
-        candidates.append(("GET", membership_url, headers, None))
         if SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL in membership_url:
             corrected_url = membership_url.replace(SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL, SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL)
             corrected_post_candidate = ajax_post_candidate(corrected_url)
             if corrected_post_candidate:
                 candidates.append(corrected_post_candidate)
             candidates.append(("GET", with_cache_buster(corrected_url), headers, None))
-    code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id, "Lang": "en"}
+    code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id}
     code_candidate_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"
+    candidates.append(("GET", with_cache_buster(code_candidate_url), headers, None))
     code_post_candidate = ajax_post_candidate(code_candidate_url)
     if code_post_candidate:
         candidates.append(code_post_candidate)
-    candidates.append(("GET", with_cache_buster(code_candidate_url), headers, None))
     # The human-readable committee page is already the first candidate. Do not append it
     # again after the XHR probes; that previously caused duplicate/debug noise.
 
@@ -1259,7 +1273,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
         code = link["code"]
         url = link["url"]
         committee_id = link.get("committeeId", "")
-        membership_url = link.get("membershipUrl", "") or (f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode({'CommitteeId': committee_id, 'SessionId': session_id, 'Lang': 'en'})}" if committee_id else "")
+        membership_url = link.get("membershipUrl", "") or (committee_membership_url(committee_id, session_id) if committee_id else "")
         if not membership_url and config_bool("skip_committee_page_fallback", True, "SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK"):
             LOGGER.warning("Skipping committee %s because no CommitteeId was discovered; set SENSTATS_COMMITTEE_IDS or SENSTATS_COMMITTEE_MEMBERSHIP_URLS to include it.", code)
             continue
