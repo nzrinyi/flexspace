@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { SenStatsCommitteeDocument, SenStatsCommitteeMember, SenStatsSenatorDocument } from '../../types';
 import { groupClassName, groupLabel } from './SenStatsHelpers';
-import { useSenatorSelect } from './SenatorSelectionContext';
 
 interface SenStatsCommitteesViewProps {
   committees: Array<SenStatsCommitteeDocument & { id: string }>;
@@ -18,18 +17,14 @@ function committeeMemberKey(committeeId: string, member: SenStatsCommitteeMember
 }
 
 function CommitteeMemberRow({ member, committeeId, senator }: { member: SenStatsCommitteeMember; committeeId: string; senator?: SenStatsSenatorDocument }) {
-  const { selectSenator } = useSenatorSelect();
   const initials = member.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
   const photoUrl = senator?.photoUrl;
-  const content = <>
+  return <li key={committeeMemberKey(committeeId, member)} className={`committee-member-row ${isLeadershipRole(member.role) ? 'leadership' : ''} ${groupClassName(member.party || '')}`}>
     {photoUrl ? <img className="member-photo" src={photoUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span aria-hidden="true" className="member-initials">{initials || '—'}</span>}
     <div>
       <strong>{member.name}</strong>
       <small>{member.role || 'Member'}{member.party ? ` · ${groupLabel(member.party)}` : ''}{member.province ? ` · ${member.province}` : ''}</small>
     </div>
-  </>;
-  return <li key={committeeMemberKey(committeeId, member)} className={`committee-member-row ${isLeadershipRole(member.role) ? 'leadership' : ''} ${groupClassName(member.party || '')}`}>
-    {senator ? <button type="button" className="senator-inline-trigger" onClick={() => selectSenator(senator.id, 'Committees')}>{content}</button> : content}
   </li>;
 }
 

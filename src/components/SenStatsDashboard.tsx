@@ -35,7 +35,6 @@ class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: 
 }
 
 function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
-  const { selectSenator } = useSenatorSelect();
   const [activeTab, setActiveTab] = useState<SenStatsTab>('senators');
   const [senators, setSenators] = useState<SenStatsSenator[]>([]);
   const [committees, setCommittees] = useState<SenStatsCommittee[]>([]);
@@ -184,17 +183,15 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
         {(['senators', 'dashboards', 'committees', 'sources', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : 'Change log'}</button>)}
       </div>
 
-      {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={(id) => { setSelectedSenatorId(id); selectSenator(id, 'Senators'); }} />}
-      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} expenses={allExpenses} selectedSenator={selectedSenator} onSelectSenator={(id) => { setSelectedSenatorId(id); selectSenator(id, 'Dashboards'); }} expensesLoading={allExpenseLoading} recentlyChangedSenatorIds={recentlyChangedSenatorIds} syncedAttendanceCount={syncStatus?.attendanceCount ?? 0} />}
+      {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} expenses={expenses} committees={committees} expenseLoading={expenseLoading} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} recentlyChangedSenatorIds={recentlyChangedSenatorIds} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={setSelectedSenatorId} />}
+      {activeTab === 'dashboards' && <SenStatsDashboardsView senators={senators} attendance={attendance} expenses={allExpenses} selectedSenator={selectedSenator} onSelectSenator={setSelectedSenatorId} expensesLoading={allExpenseLoading} recentlyChangedSenatorIds={recentlyChangedSenatorIds} syncedAttendanceCount={syncStatus?.attendanceCount ?? 0} />}
       {activeTab === 'committees' && <SenStatsCommitteesView committees={committees} senators={senators} />}
       {activeTab === 'sources' && <SenStatsDataSourcesView senatorCount={senators.length} expenseCount={syncStatus?.expenseCount ?? allExpenses.length} committeeCount={syncStatus?.committeeCount ?? committees.length} attendanceCount={syncStatus?.attendanceCount ?? attendance.length} syncStatus={syncStatus} />}
       {activeTab === 'changes' && <SenStatsChangeLogView changes={changeLog} />}
-      <SenatorProfileDrawer senators={senators} committees={committees} expenses={allExpenses} />
-      <SenatorCommandPalette senators={senators} />
     </section>
   );
 }
 
 export function SenStatsDashboard({ darkMode }: { darkMode: boolean }) {
-  return <SenStatsErrorBoundary><SenatorSelectionProvider><SenStatsDashboardContent darkMode={darkMode} /></SenatorSelectionProvider></SenStatsErrorBoundary>;
+  return <SenStatsErrorBoundary><SenStatsDashboardContent darkMode={darkMode} /></SenStatsErrorBoundary>;
 }
