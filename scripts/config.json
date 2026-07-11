@@ -24,7 +24,7 @@
     "SOCI": 1024,
     "TRCM": 1025
   },
-  "committee_focus_codes": [],
+  "committee_focus_codes": ["AEFA"],
   "committee_membership_urls": {},
   "committee_session_id": 32,
   "check_static_pages": false,
