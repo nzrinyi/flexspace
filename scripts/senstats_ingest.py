@@ -49,6 +49,7 @@ SENATE_COMMITTEES_URL = "https://sencanada.ca/en/committees/"
 SENATE_COMMITTEE_LIST_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeListPartialView?parlsession=&Lang=en"
 SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteesAjax/GetCommitteeMembership"
 SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeMembership"
+JINA_READER_BASE_URL = "https://r.jina.ai/"
 
 KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "CONF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
 KNOWN_COMMITTEE_IDS = {"AEFA": "1008"}
@@ -977,6 +978,18 @@ def without_lang_query_param(url: str) -> str:
     return parsed._replace(query=query).geturl()
 
 
+def reader_url_for(url: str) -> str:
+    return f"{JINA_READER_BASE_URL}{url}"
+
+
+def committee_reader_headers() -> dict[str, str]:
+    return {
+        "Accept": "text/markdown,text/plain,*/*;q=0.8",
+        "Accept-Language": "en-CA,en;q=0.9",
+        "X-No-Cache": "true",
+    }
+
+
 def committee_request_headers(code: str) -> dict[str, str]:
     return {
         "Accept": "text/html,text/plain,*/*; q=0.01",
@@ -1027,6 +1040,8 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
         membership_url = without_lang_query_param(membership_url)
         candidates.append(("GET", with_cache_buster(membership_url), headers, None))
         candidates.append(("GET", membership_url, headers, None))
+        if config_bool("use_reader_committee_fallback", True, "SENSTATS_USE_READER_COMMITTEE_FALLBACK"):
+            candidates.append(("GET", reader_url_for(membership_url), committee_reader_headers(), None))
         post_candidate = ajax_post_candidate(membership_url)
         if post_candidate:
             candidates.append(post_candidate)
@@ -1039,6 +1054,8 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
     code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id}
     code_candidate_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"
     candidates.append(("GET", with_cache_buster(code_candidate_url), headers, None))
+    if config_bool("use_reader_committee_fallback", True, "SENSTATS_USE_READER_COMMITTEE_FALLBACK"):
+        candidates.append(("GET", reader_url_for(code_candidate_url), committee_reader_headers(), None))
     code_post_candidate = ajax_post_candidate(code_candidate_url)
     if code_post_candidate:
         candidates.append(code_post_candidate)
@@ -1191,7 +1208,15 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
             province = affiliation_match.group(2)
         append_member(anchor.get_text(" ", strip=True) if anchor else "", role_heading.get_text(" ", strip=True) if role_heading else "Member", party, province, str(profile_anchor["href"]) if profile_anchor else "")
 
-    text_lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    def clean_committee_text_line(line: str) -> str:
+        line = re.sub(r"^#+\s*", "", line.strip())
+        line = re.sub(r"^[-*]\s*", "", line)
+        markdown_link = re.match(r"\[([^\]]+)\]\([^)]+\)", line)
+        if markdown_link:
+            line = markdown_link.group(1)
+        return clean_display_name(line)
+
+    text_lines = [cleaned for line in raw_text.splitlines() if (cleaned := clean_committee_text_line(line))]
     role_tokens = {"chair", "deputy chair", "member", "ex officio"}
     affiliation_pattern = re.compile(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", re.IGNORECASE)
     for index, line in enumerate(text_lines):
@@ -1202,7 +1227,8 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         party = ""
         province = ""
         for candidate in text_lines[index + 1:index + 5]:
-            if not name_text and candidate.lower() not in role_tokens and not affiliation_pattern.search(candidate):
+            normalized_candidate = " ".join(candidate.split()).lower()
+            if not name_text and normalized_candidate not in role_tokens and not affiliation_pattern.search(candidate):
                 name_text = candidate
                 continue
             affiliation_match = affiliation_pattern.search(candidate)

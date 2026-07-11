@@ -52,5 +52,6 @@
   "attendance_retry_attempts": 3,
   "request_retry_attempts": 3,
   "request_retry_backoff_seconds": 2,
-  "use_seeded_committee_fallback": true
+  "use_seeded_committee_fallback": true,
+  "use_reader_committee_fallback": true
 }
