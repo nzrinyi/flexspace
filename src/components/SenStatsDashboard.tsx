@@ -7,6 +7,8 @@ import { SenStatsCommitteesView } from './senstats/SenStatsCommitteesView';
 import { SenStatsDashboardsView } from './senstats/SenStatsDashboardsView';
 import { SenStatsDataSourcesView } from './senstats/SenStatsDataSourcesView';
 import { SenStatsLoadingSkeleton } from './senstats/SenStatsLoadingSkeleton';
+import { SenatorCommandPalette, SenatorProfileDrawer } from './senstats/SenatorProfileDrawer';
+import { SenatorSelectionProvider, useSenatorSelect } from './senstats/SenatorSelectionContext';
 import { SenStatsSenatorsView } from './senstats/SenStatsSenatorsView';
 
 type SenStatsSenator = SenStatsSenatorDocument;
