@@ -1174,15 +1174,19 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
     committee_type = "Standing Committee" if "Standing" in raw_text[:500] else "Committee"
     members: list[dict[str, str]] = []
     seen: set[str] = set()
+    seen_names: set[str] = set()
 
     def append_member(name_text: str, role: str, party: str = "", province: str = "", profile_url: str = "") -> None:
         normalized_name = clean_display_name(name_text)
         senator = senators_by_profile.get(profile_url_key(profile_url)) if profile_url else None
         senator = senator or senators_by_name.get(normalized_name)
         key = senator.senator_id if senator else stable_id(normalized_name or profile_url)
-        if not key or key in seen:
+        name_key = stable_id(normalized_name)
+        if not key or key in seen or (name_key and name_key in seen_names):
             return
         seen.add(key)
+        if name_key:
+            seen_names.add(name_key)
         members.append({
             "name": senator.name if senator else normalized_name,
             "senatorId": senator.senator_id if senator else key,
