@@ -72,7 +72,7 @@ KNOWN_COMMITTEE_NAMES = {
     "SOCI": "Social Affairs, Science and Technology",
     "TRCM": "Transport and Communications",
 }
-DEFAULT_USER_AGENT = "Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: configure-SENSTATS_CONTACT_EMAIL)"
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
 LOG_PATH = os.getenv("SENSTATS_ERROR_LOG", "senstats_ingest_errors.log")
 STATIC_SENATE_PAGE_FAILURES = 0
 
@@ -216,10 +216,13 @@ def polite_delay() -> None:
 
 
 def session() -> requests.Session:
-    contact_email = os.getenv("SENSTATS_CONTACT_EMAIL", "configure-SENSTATS_CONTACT_EMAIL")
-    user_agent = config_value("user_agent", f"Mozilla/5.0 (compatible; SenStats-Data-Sync/1.0; +https://flexspace-1.web.app; Contact: {contact_email})", "SENSTATS_USER_AGENT")
+    user_agent = config_value("user_agent", DEFAULT_USER_AGENT, "SENSTATS_USER_AGENT")
     http = requests.Session()
-    http.headers.update({"User-Agent": user_agent or DEFAULT_USER_AGENT, "Accept": "application/json,text/html,*/*", "X-Requested-With": "XMLHttpRequest"})
+    http.headers.update({
+        "User-Agent": user_agent or DEFAULT_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,application/json;q=0.8,*/*;q=0.7",
+        "Accept-Language": "en-CA,en;q=0.9",
+    })
     return http
 
 
@@ -948,22 +951,30 @@ def with_cache_buster(url: str) -> str:
 def committee_request_headers(code: str) -> dict[str, str]:
     return {
         "Accept": "text/html,text/plain,*/*; q=0.01",
-        "Referer": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/"),
+        "Accept-Language": "en-CA,en;q=0.9",
+        "Referer": urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1"),
         "X-Requested-With": "XMLHttpRequest",
+    }
+
+
+def committee_page_headers(code: str) -> dict[str, str]:
+    return {
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-CA,en;q=0.9",
+        "Referer": SENATE_COMMITTEES_URL,
     }
 
 
 def committee_membership_request_options(code: str, membership_url: str, page_url: str, session_id: str) -> list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]]:
     """Return live committee membership sources in the order most likely to include rows.
 
-    The rendered committee page often contains the empty shell while the member cards are
-    delivered by the same Umbraco XHR endpoint that powers the page. Try that XHR first
-    (with the headers the site expects), then fall back to the human-readable page only
-    for diagnostics.
+    Prefer the official human-readable committee page first because the membership
+    markup is present there when the page is reachable, then fall back to the Umbraco
+    XHR candidates that have been intermittent from GitHub Actions.
     """
     headers = committee_request_headers(code)
     membership_page = page_url or urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
-    candidates: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = []
+    candidates: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = [("GET", membership_page, committee_page_headers(code), None)]
 
     def ajax_post_candidate(url: str) -> tuple[str, str, dict[str, str], dict[str, str]] | None:
         parsed = urlparse(url)
@@ -1001,7 +1012,8 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
     if code_post_candidate:
         candidates.append(code_post_candidate)
     candidates.append(("GET", with_cache_buster(code_candidate_url), headers, None))
-    candidates.append(("GET", membership_page, None, None))
+    # The human-readable committee page is already the first candidate. Do not append it
+    # again after the XHR probes; that previously caused duplicate/debug noise.
 
     deduped: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = []
     seen_requests: set[str] = set()
