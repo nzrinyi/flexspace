@@ -1238,9 +1238,11 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     senators_by_name = {senator.name: senator for senator in senators}
     senators_by_profile = {profile_url_key(str((senator.profile_details or {}).get("profileUrl") or "")): senator for senator in senators if (senator.profile_details or {}).get("profileUrl")}
     committees: list[CommitteeRecord] = []
-    committee_timeout = config_int("attendance_timeout", 10, "SENSTATS_ATTENDANCE_TIMEOUT")
-    committee_retry_attempts = config_int("attendance_retry_attempts", 3, "SENSTATS_ATTENDANCE_RETRY_ATTEMPTS")
+    committee_timeout = config_int("committee_membership_timeout", 20, "SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT")
+    committee_retry_attempts = config_int("committee_retry_attempts", 1, "SENSTATS_COMMITTEE_RETRY_ATTEMPTS")
+    committee_empty_abort_after = config_int("committee_empty_abort_after", 3, "SENSTATS_COMMITTEE_EMPTY_ABORT_AFTER")
     session_id = str(config_value("committee_session_id", "32", "SENSTATS_COMMITTEE_SESSION_ID"))
+    consecutive_empty_committees = 0
     for link in committee_links(http):
         code = link["code"]
         url = link["url"]
@@ -1283,8 +1285,13 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
             LOGGER.warning("Committee %s candidate %s from %s contained no member rows.", code, candidate_count, candidate_url)
             write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_empty")
         if parsed_committee is None:
+            consecutive_empty_committees += 1
             LOGGER.warning("Committee %s produced no member rows from %s live candidate(s); skipping empty committee document this run.", code, candidate_count)
+            if committee_empty_abort_after > 0 and consecutive_empty_committees >= committee_empty_abort_after:
+                LOGGER.warning("Stopping committee scrape after %s consecutive empty/timeout committees; set SENSTATS_COMMITTEE_EMPTY_ABORT_AFTER higher to keep probing during Senate outages.", consecutive_empty_committees)
+                break
             continue
+        consecutive_empty_committees = 0
         committees.append(parsed_committee)
     LOGGER.info("Parsed %s committee records", len(committees))
     return committees
