@@ -93,11 +93,6 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
   const attendanceByProvince = useMemo(() => aggregateAttendance(attendance, (row) => senatorsById.get(row.senatorId || '')?.province || 'Unknown'), [attendance, senatorsById]);
 
   return <section className="dashboards-view" aria-label="SenStats dashboards">
-    <div className="dashboard-overview-banner">
-      <span>Dashboards</span>
-      <strong>Group counts, expenses, retirement order, and attendance in one place</strong>
-      <small>Use the nested tabs below to switch between roster, expense, retirement, and attendance views.</small>
-    </div>
     <div className="senstats-tabs nested-tabs" role="tablist" aria-label="Dashboards">
       {(['groups', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
     </div>

@@ -5,6 +5,7 @@ import { SenStatsExpenseChart } from './SenStatsExpenseChart';
 
 type ExpensePivot = 'groups' | 'provinces' | 'individuals';
 type ExpenseRow = SenStatsExpenseDocument & { id: string };
+const CURRENT_YEAR = String(new Date().getFullYear());
 
 interface ExpenseAggregateRow {
   key: string;
@@ -59,37 +60,45 @@ function ExpensePivotSelector({ rows, activeKey, onSelect, label }: { rows: Expe
   </aside>;
 }
 
+function expenseYear(expense: ExpenseRow) {
+  const match = String(expense.quarter || '').match(/\b(20\d{2})\b/);
+  return match?.[1] || 'Unknown';
+}
+
 export function SenStatsExpensesDashboardView({ senators, expenses, selectedSenator, onSelectSenator, loading }: { senators: SenStatsSenatorDocument[]; expenses: ExpenseRow[]; selectedSenator?: SenStatsSenatorDocument; onSelectSenator: (id: string) => void; loading: boolean }) {
-  const [activePivot, setActivePivot] = useState<ExpensePivot>('groups');
+  const [activePivot, setActivePivot] = useState<ExpensePivot>('individuals');
   const [selectedGroup, setSelectedGroup] = useState('All');
   const [selectedProvince, setSelectedProvince] = useState('All');
+  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
   const senatorsById = useMemo(() => new Map(senators.map((senator) => [senator.id, senator])), [senators]);
-  const senatorExpenseRows = useMemo(() => aggregateExpenses(expenses, (expense) => {
+  const yearOptions = useMemo(() => ['All time', ...Array.from(new Set([CURRENT_YEAR, ...expenses.map(expenseYear).filter((year) => year !== 'Unknown')])).sort((a, b) => b.localeCompare(a))], [expenses]);
+  const yearFilteredExpenses = useMemo(() => selectedYear === 'All time' ? expenses : expenses.filter((expense) => expenseYear(expense) === selectedYear), [expenses, selectedYear]);
+  const senatorExpenseRows = useMemo(() => aggregateExpenses(yearFilteredExpenses, (expense) => {
     const senator = senatorsById.get(expense.senatorId || '');
     return { key: expense.senatorId || senator?.id || expense.senatorName || 'Unknown', label: senator?.name || expense.senatorName || 'Unknown senator', className: groupClassName(senator?.party || '') };
-  }), [expenses, senatorsById]);
-  const groupRows = useMemo(() => aggregateExpenses(expenses, (expense) => {
+  }), [yearFilteredExpenses, senatorsById]);
+  const groupRows = useMemo(() => aggregateExpenses(yearFilteredExpenses, (expense) => {
     const senator = senatorsById.get(expense.senatorId || '');
     const group = senator?.party || 'Unknown';
     return { key: group, label: groupLabel(group), className: groupClassName(group) };
-  }, 'perSenator'), [expenses, senatorsById]);
-  const provinceRows = useMemo(() => aggregateExpenses(expenses, (expense) => {
+  }, 'perSenator'), [yearFilteredExpenses, senatorsById]);
+  const provinceRows = useMemo(() => aggregateExpenses(yearFilteredExpenses, (expense) => {
     const senator = senatorsById.get(expense.senatorId || '');
     const province = senator?.province || 'Unknown';
     return { key: province, label: province };
-  }, 'perSenator'), [expenses, senatorsById]);
-  const filteredByGroup = useMemo(() => selectedGroup === 'All' ? expenses : expenses.filter((expense) => (senatorsById.get(expense.senatorId || '')?.party || 'Unknown') === selectedGroup), [expenses, selectedGroup, senatorsById]);
-  const filteredByProvince = useMemo(() => selectedProvince === 'All' ? expenses : expenses.filter((expense) => (senatorsById.get(expense.senatorId || '')?.province || 'Unknown') === selectedProvince), [expenses, selectedProvince, senatorsById]);
-  const selectedSenatorExpenses = useMemo(() => selectedSenator ? expenses.filter((expense) => expense.senatorId === selectedSenator.id) : [], [expenses, selectedSenator]);
+  }, 'perSenator'), [yearFilteredExpenses, senatorsById]);
+  const filteredByGroup = useMemo(() => selectedGroup === 'All' ? yearFilteredExpenses : yearFilteredExpenses.filter((expense) => (senatorsById.get(expense.senatorId || '')?.party || 'Unknown') === selectedGroup), [yearFilteredExpenses, selectedGroup, senatorsById]);
+  const filteredByProvince = useMemo(() => selectedProvince === 'All' ? yearFilteredExpenses : yearFilteredExpenses.filter((expense) => (senatorsById.get(expense.senatorId || '')?.province || 'Unknown') === selectedProvince), [yearFilteredExpenses, selectedProvince, senatorsById]);
+  const selectedSenatorExpenses = useMemo(() => selectedSenator ? yearFilteredExpenses.filter((expense) => expense.senatorId === selectedSenator.id) : [], [yearFilteredExpenses, selectedSenator]);
   const selectedQuarterRows = useMemo(() => quarterlyExpenseRows(selectedSenatorExpenses).slice(-8), [selectedSenatorExpenses]);
-  const totalExpenses = expenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
+  const totalExpenses = yearFilteredExpenses.reduce((sum, expense) => sum + (Number(expense.amount) || 0), 0);
 
   if (loading) return <div className="senstats-chart-empty"><div className="empty-graphic pulse" /><strong>Loading expense dashboard…</strong><span>Reading the shared expense dataset once for all pivots.</span></div>;
 
   return <section className="source-card source-wide expenses-dashboard" aria-label="Expense dashboards">
-    <div className="source-heading"><span>Expenses</span><strong>Reusable pivots over one shared expense dataset</strong><small>{expenses.length} records · {currency(totalExpenses)}</small></div>
+    <div className="source-heading expense-heading"><span>Expenses</span><strong>{selectedYear}</strong><small>{yearFilteredExpenses.length} records · {currency(totalExpenses)}</small><label>Year<select value={selectedYear} onChange={(event) => setSelectedYear(event.target.value)}>{yearOptions.map((year) => <option key={year} value={year}>{year}</option>)}</select></label></div>
     <div className="senstats-tabs nested-tabs expense-pivot-tabs" role="tablist" aria-label="Expense dashboard views">
-      {(['groups', 'provinces', 'individuals'] as ExpensePivot[]).map((tab) => <button key={tab} type="button" className={activePivot === tab ? 'active' : ''} onClick={() => setActivePivot(tab)}>{tab === 'groups' ? 'By group' : tab === 'provinces' ? 'By province' : 'By individual'}</button>)}
+      {(['individuals', 'groups', 'provinces'] as ExpensePivot[]).map((tab) => <button key={tab} type="button" className={activePivot === tab ? 'active' : ''} onClick={() => setActivePivot(tab)}>{tab === 'groups' ? 'By group' : tab === 'provinces' ? 'By province' : 'By individual'}</button>)}
     </div>
 
     {activePivot === 'groups' && <div className="expenses-dashboard-layout"><ExpensePivotSelector rows={groupRows} activeKey={selectedGroup} onSelect={setSelectedGroup} label="Group selector" /><div className="expense-pivot-content"><div className="source-heading"><span>Average per senator</span><strong>{selectedGroup === 'All' ? 'All parliamentary groups' : groupLabel(selectedGroup)}</strong><small>Groups are compared by average spending per senator; totals are shown as context.</small></div><ExpenseBarChart valueLabel={selectedGroup === 'All' ? 'Average per senator' : 'Total'} rows={selectedGroup === 'All' ? groupRows : aggregateExpenses(filteredByGroup, (expense) => { const senator = senatorsById.get(expense.senatorId || ''); return { key: senator?.name || expense.senatorName || 'Unknown', label: senator?.name || expense.senatorName || 'Unknown senator', className: groupClassName(senator?.party || '') }; })} /></div></div>}

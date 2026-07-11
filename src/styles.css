@@ -1100,6 +1100,9 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 
 /* Expense dashboard pivots */
 .expenses-dashboard { display: grid; gap: 14px; }
+.expense-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
+.expense-heading label { display: grid; gap: 5px; color: var(--sen-muted, #64748b); font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.expense-heading label select { min-width: 130px; border: 1px solid var(--sen-border, #dce4f2); border-radius: 12px; background: var(--sen-input-bg, #fff); color: var(--sen-text, #14213d); padding: 9px 10px; font: inherit; font-weight: 850; letter-spacing: 0; text-transform: none; }
 .expenses-dashboard-layout { display: grid; grid-template-columns: minmax(190px, .36fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .expense-pivot-selector { position: sticky; top: 12px; display: grid; gap: 8px; border: 1px solid var(--sen-border, #e8edf7); border-radius: 18px; background: var(--sen-surface, #fff); padding: 12px; max-height: 620px; overflow: auto; }
 .expense-pivot-selector > span { color: var(--sen-muted, #64748b); font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
