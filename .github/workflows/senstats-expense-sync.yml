@@ -1,15 +1,21 @@
-name: SenStats Daily Roster Data Sync
+name: SenStats Quarterly Expense Sync
 
 on:
+  # This path-scoped push trigger makes GitHub discover and list this new workflow
+  # as soon as the workflow file lands on the default branch. The quarterly
+  # schedule and manual workflow_dispatch remain the normal run paths.
+  push:
+    paths:
+      - '.github/workflows/senstats-expense-sync.yml'
   schedule:
-    - cron: '17 9 * * *'
+    - cron: '17 10 2 1,4,7,10 *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  sync-senstats:
+  sync-senstats-expenses:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,12 +31,15 @@ jobs:
       - name: Install ingestion dependencies
         run: pip install -r scripts/requirements-senstats.txt
 
-      - name: Run SenStats ingestion
+      - name: Run SenStats expense ingestion
         run: python scripts/senstats_ingest.py
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           SENSTATS_CONTACT_EMAIL: ${{ secrets.SENSTATS_CONTACT_EMAIL }}
-          SENSTATS_SYNC_EXPENSES: 'false'
+          SENSTATS_SYNC_SENATORS: 'false'
+          SENSTATS_SYNC_ATTENDANCE: 'false'
+          SENSTATS_SYNC_COMMITTEES: 'false'
+          SENSTATS_SYNC_EXPENSES: 'true'
           SENSTATS_PROACTIVE_XHR_URL: ${{ secrets.SENSTATS_PROACTIVE_XHR_URL || vars.SENSTATS_PROACTIVE_XHR_URL }}
           SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS: ${{ vars.SENSTATS_MAX_PROACTIVE_XHR_ATTEMPTS || '' }}
           SENSTATS_PROACTIVE_TIMEOUT: ${{ vars.SENSTATS_PROACTIVE_TIMEOUT || '' }}
@@ -38,27 +47,16 @@ jobs:
           SENSTATS_CHECK_STATIC_PROACTIVE_PAGES: ${{ vars.SENSTATS_CHECK_STATIC_PROACTIVE_PAGES || '' }}
           SENSTATS_STATIC_PROACTIVE_TIMEOUT: ${{ vars.SENSTATS_STATIC_PROACTIVE_TIMEOUT || '' }}
           SENSTATS_STATIC_PAGE_FAILURE_ABORT_AFTER: ${{ vars.SENSTATS_STATIC_PAGE_FAILURE_ABORT_AFTER || '' }}
-          SENSTATS_USE_COMMITTEE_FALLBACK: ${{ vars.SENSTATS_USE_COMMITTEE_FALLBACK || '' }}
-          SENSTATS_COMMITTEE_IDS: ${{ vars.SENSTATS_COMMITTEE_IDS || '' }}
-          SENSTATS_COMMITTEE_FOCUS_CODES: ''
-          SENSTATS_COMMITTEE_MEMBERSHIP_URLS: ${{ vars.SENSTATS_COMMITTEE_MEMBERSHIP_URLS || '' }}
-          SENSTATS_SKIP_COMMITTEE_DIRECTORY_PAGE: ${{ vars.SENSTATS_SKIP_COMMITTEE_DIRECTORY_PAGE || '' }}
-          SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK: ${{ vars.SENSTATS_SKIP_COMMITTEE_PAGE_FALLBACK || '' }}
-          SENSTATS_WRITE_COMMITTEE_DEBUG_HTML: ${{ vars.SENSTATS_WRITE_COMMITTEE_DEBUG_HTML || '' }}
-          SENSTATS_ATTENDANCE_TIMEOUT: ${{ vars.SENSTATS_ATTENDANCE_TIMEOUT || '' }}
-          SENSTATS_ATTENDANCE_RETRY_ATTEMPTS: ${{ vars.SENSTATS_ATTENDANCE_RETRY_ATTEMPTS || '' }}
           SENSTATS_REQUEST_TIMEOUT: ${{ vars.SENSTATS_REQUEST_TIMEOUT || '' }}
           SENSTATS_REQUEST_DELAY_SECONDS: ${{ vars.SENSTATS_REQUEST_DELAY_SECONDS || '' }}
           SENSTATS_REQUEST_DELAY_JITTER_SECONDS: ${{ vars.SENSTATS_REQUEST_DELAY_JITTER_SECONDS || '' }}
           SENSTATS_REQUEST_RETRY_ATTEMPTS: ${{ vars.SENSTATS_REQUEST_RETRY_ATTEMPTS || '' }}
           SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS: ${{ vars.SENSTATS_REQUEST_RETRY_BACKOFF_SECONDS || '' }}
 
-      - name: Upload ingestion debug artifacts
+      - name: Upload expense ingestion debug artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: senstats-ingestion-log
-          path: |
-            senstats_ingest_errors.log
-            senstats_committee_*_debug.html
+          name: senstats-expense-ingestion-log
+          path: senstats_ingest_errors.log
           if-no-files-found: ignore
