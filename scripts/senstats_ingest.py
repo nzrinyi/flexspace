@@ -1341,6 +1341,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     committee_timeout = config_int("committee_membership_timeout", 20, "SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT")
     committee_retry_attempts = config_int("committee_retry_attempts", 1, "SENSTATS_COMMITTEE_RETRY_ATTEMPTS")
     committee_empty_abort_after = config_int("committee_empty_abort_after", 3, "SENSTATS_COMMITTEE_EMPTY_ABORT_AFTER")
+    minimum_committee_members = config_int("committee_min_member_count", 10, "SENSTATS_COMMITTEE_MIN_MEMBER_COUNT")
     session_id = str(config_value("committee_session_id", "32", "SENSTATS_COMMITTEE_SESSION_ID"))
     consecutive_empty_committees = 0
     for link in committee_links(http):
@@ -1378,10 +1379,21 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
                 LOGGER.error("Committee parse failed for %s: %s", candidate_url, exc, exc_info=True)
                 write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_parse_error")
                 continue
-            if committee.members:
+            if len(committee.members) >= minimum_committee_members:
                 LOGGER.info("Parsed %s committee %s member rows from %s", len(committee.members), code, candidate_url)
                 parsed_committee = committee
                 break
+            if committee.members:
+                LOGGER.warning(
+                    "Committee %s candidate %s from %s returned only %s member row(s), below minimum %s; treating it as partial and continuing.",
+                    code,
+                    candidate_count,
+                    candidate_url,
+                    len(committee.members),
+                    minimum_committee_members,
+                )
+                write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_partial")
+                continue
             LOGGER.warning("Committee %s candidate %s from %s contained no member rows.", code, candidate_count, candidate_url)
             write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_empty")
         if parsed_committee is None:
