@@ -28,7 +28,7 @@ class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: 
 
   render() {
     if (this.state.error) {
-      return <section className="card blank-app"><p className="eyebrow">SenStats data issue</p><h2>Some political data could not be displayed.</h2><p className="muted">The dashboard is still available, but one section failed to render. Check the ingestion logs and Firestore documents.</p></section>;
+      return <section className="card blank-app"><p className="eyebrow">Quorum data issue</p><h2>Some political data could not be displayed.</h2><p className="muted">The dashboard is still available, but one section failed to render. Check the ingestion logs and Firestore documents.</p></section>;
     }
     return this.props.children;
   }
@@ -176,11 +176,11 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
   const selectedSenator = senators.find((senator) => senator.id === selectedSenatorId) ?? filteredSenators[0] ?? senators[0];
 
   if (loading) return <SenStatsLoadingSkeleton />;
-  if (error) return <section className="card blank-app"><p className="eyebrow">Realtime listener failed</p><h2>Unable to load SenStats data.</h2><p className="muted">{error}</p></section>;
+  if (error) return <section className="card blank-app"><p className="eyebrow">Realtime listener failed</p><h2>Unable to load Quorum data.</h2><p className="muted">{error}</p></section>;
 
   return (
     <section className={`card senstats-dashboard ${darkMode ? 'senstats-dark' : ''}`}>
-      <div className="senstats-tabs" role="tablist" aria-label="SenStats sections">
+      <div className="senstats-tabs" role="tablist" aria-label="Quorum sections">
         {(['senators', 'dashboards', 'committees', 'sources', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : 'Change log'}</button>)}
       </div>
 

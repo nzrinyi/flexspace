@@ -56,7 +56,7 @@ export function SenStatsDataSourcesView({ senatorCount, expenseCount, committeeC
   const lastUpdated = formatSyncDate(syncStatus?.finishedAt);
 
   return (
-    <section className="data-sources-view" aria-label="SenStats data sources">
+    <section className="data-sources-view" aria-label="Quorum data sources">
       <div className="source-page-heading">
         <div><span>Data sources</span><strong>Transparency and sync health</strong></div>
         <small>Last updated: {lastUpdated}</small>
@@ -71,7 +71,7 @@ export function SenStatsDataSourcesView({ senatorCount, expenseCount, committeeC
 
       <div className="source-card source-wide">
         <div className="source-heading"><span>Source and field provenance</span><strong>What each dataset means and where it comes from</strong></div>
-        <div className="source-table source-matrix" role="table" aria-label="SenStats source and field provenance">
+        <div className="source-table source-matrix" role="table" aria-label="Quorum source and field provenance">
           <div role="row" className="source-table-head"><span role="columnheader">Type</span><span role="columnheader">Data</span><span role="columnheader">Official source</span><span role="columnheader">Notes</span></div>
           {sourceMatrix.map((item) => (
             <a role="row" key={item.field} href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.source} in a new tab`}>

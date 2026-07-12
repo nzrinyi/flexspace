@@ -95,7 +95,7 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
         <i />
       </div>
       <strong>No committee data available yet</strong>
-      <span>The next SenStats sync will attempt to read current committee pages and membership from the Senate website.</span>
+      <span>The next Quorum sync will attempt to read current committee pages and membership from the Senate website.</span>
     </div>;
   }
 

@@ -197,7 +197,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     }).sort((a, b) => b.current - a.current);
   }, [forecastMonths, groupedSenators, retirementRows]);
 
-  return <section className="dashboards-view" aria-label="SenStats dashboards">
+  return <section className="dashboards-view" aria-label="Quorum dashboards">
     <div className="senstats-tabs nested-tabs" role="tablist" aria-label="Dashboards">
       {(['groups', 'caucus', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'caucus' ? 'Caucus Comparison' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
     </div>
