@@ -1351,3 +1351,36 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .attendance-name-cell { border-radius: 10px; background: color-mix(in srgb, var(--group-color, #64748b) 8%, transparent); padding: 6px 8px; }
 .senstats-dashboard.senstats-dark .attendance-rate-cell { background: var(--sen-surface-2); }
 .senstats-dashboard.senstats-dark .attendance-sort-button i { background: var(--sen-surface-2); color: var(--sen-link-text); }
+
+/* Caucus comparison and audit log polish */
+.caucus-comparison-table > div { grid-template-columns: minmax(190px,1fr) minmax(80px,.35fr) minmax(170px,.7fr) minmax(150px,.65fr) minmax(90px,.4fr); }
+.comparison-bar-cell { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
+.comparison-bar-cell b { color: var(--sen-text, #0f172a); }
+.comparison-bar-cell i { display: block; height: 9px; border-radius: 999px; background: var(--group-color, #64748b); min-width: 0; box-shadow: inset 0 0 0 1px rgba(15,23,42,.12); }
+.retirement-forecast-control { display: grid; gap: 14px; border: 1px solid var(--sen-border, #e8edf7); border-radius: 18px; background: var(--sen-surface-2, #f8fafc); padding: 14px; }
+.retirement-forecast-control label { display: grid; gap: 8px; color: var(--sen-muted, #475569); font-size: .82rem; font-weight: 950; text-transform: uppercase; letter-spacing: .06em; }
+.retirement-forecast-control input { width: 100%; accent-color: #2563eb; }
+.forecast-bars { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.forecast-bars > div { display: grid; gap: 5px; border-left: 5px solid var(--group-color, #64748b); border-radius: 14px; background: var(--sen-surface, #fff); padding: 10px; }
+.forecast-bars span { color: var(--group-text, #334155); font-size: .75rem; font-weight: 950; }
+.forecast-bars b { color: var(--sen-text, #0f172a); font-size: 1.25rem; }
+.forecast-bars i { display: block; height: 8px; border-radius: 999px; background: var(--group-color, #64748b); }
+.forecast-bars small { color: var(--sen-muted, #64748b); font-weight: 850; }
+.audit-log-list { gap: 16px; }
+.change-log-group { display: grid; gap: 10px; border: 1px solid var(--sen-border, #e8edf7); border-left: 8px solid #64748b; border-radius: 20px; background: var(--sen-surface, #fff); padding: 14px; box-shadow: 0 12px 26px rgba(15,23,42,.07); }
+.change-log-group.group_change { border-left-color: #2563eb; }
+.change-log-group.new_senator { border-left-color: #16a34a; }
+.change-log-group.retired_senator { border-left-color: #dc2626; }
+.change-log-group header { display: grid; gap: 3px; }
+.change-log-group header span { color: var(--sen-muted, #64748b); font-size: .72rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.change-log-group header strong { color: var(--sen-text, #0f172a); font-size: 1.05rem; }
+.change-log-group header small { color: var(--sen-muted, #64748b); font-weight: 850; }
+.change-log-group-body { display: grid; gap: 8px; }
+.audit-log-list .change-log-item { grid-template-columns: minmax(190px,.7fr) minmax(180px,1fr) auto; box-shadow: none; background: var(--sen-surface-2, #f8fafc); padding: 11px 12px; }
+.change-diff { display: inline-flex; align-items: center; gap: 8px; width: fit-content; border-radius: 999px; background: #eef2ff; color: #1e3a8a !important; padding: 7px 10px; }
+.change-diff i { color: #64748b; font-style: normal; font-weight: 950; }
+.senstats-dashboard.senstats-dark .change-diff { background: rgba(37, 99, 235, .16); color: #bfdbfe !important; }
+@media (max-width: 760px) {
+  .caucus-comparison-table > div, .audit-log-list .change-log-item { grid-template-columns: 1fr; }
+  .comparison-bar-cell { grid-template-columns: 1fr; }
+}

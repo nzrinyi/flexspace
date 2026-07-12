@@ -236,6 +236,8 @@ export interface SenStatsChangeLogDocument {
   previousProvince?: string;
   newProvince?: string;
   sourceUrl?: string;
+  action?: string;
+  actor?: string;
   detectedAt?: Timestamp;
   syncId?: string;
 }

@@ -1559,6 +1559,8 @@ def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterabl
         if previous is None:
             changes.append({
                 "type": "new_senator",
+                "action": "Senator Added",
+                "actor": "System/Scraper",
                 "senatorId": senator_id,
                 "senatorName": senator.name,
                 "newParty": senator.party,
@@ -1569,9 +1571,16 @@ def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterabl
             continue
         previous_party = party_label(str(previous.get("party") or ""))
         new_party = party_label(senator.party)
-        if previous_party and party_compare_key(previous_party) != party_compare_key(new_party):
+        previous_key = party_compare_key(previous_party)
+        new_key = party_compare_key(new_party)
+        # Only write affiliation audit records for meaningful normalized changes.
+        # This prevents log spam such as "GRO to GRO" when upstream text is
+        # re-fetched with different whitespace or equivalent labels.
+        if previous_key and new_key and previous_key != new_key:
             changes.append({
                 "type": "group_change",
+                "action": "Affiliation Updated",
+                "actor": "System/Scraper",
                 "senatorId": senator_id,
                 "senatorName": senator.name,
                 "previousParty": previous_party,
@@ -1585,6 +1594,8 @@ def detect_roster_changes(existing: dict[str, dict[str, Any]], senators: Iterabl
         if senator_id not in current:
             changes.append({
                 "type": "retired_senator",
+                "action": "Senator Removed",
+                "actor": "System/Scraper",
                 "senatorId": senator_id,
                 "senatorName": str(previous.get("name") or senator_id),
                 "previousParty": str(previous.get("party") or ""),
@@ -1600,6 +1611,12 @@ def write_change_log(db: Any, changes: Iterable[dict[str, Any]]) -> int:
     count = 0
     now = firestore.SERVER_TIMESTAMP
     for change in changes:
+        previous_party = party_label(str(change.get("previousParty") or ""))
+        new_party = party_label(str(change.get("newParty") or ""))
+        if change.get("type") == "group_change" and party_compare_key(previous_party) == party_compare_key(new_party):
+            LOGGER.info("Skipping no-op group change for %s (%s to %s)", change.get("senatorName"), previous_party, new_party)
+            continue
+        change = {**change, "previousParty": previous_party or change.get("previousParty"), "newParty": new_party or change.get("newParty"), "actor": change.get("actor") or "System/Scraper"}
         raw = f"{change.get('syncId')}|{change.get('type')}|{change.get('senatorId')}|{change.get('previousParty')}|{change.get('newParty')}"
         change_id = hashlib.sha1(raw.encode("utf-8")).hexdigest()
         ref = db.collection("senstats_change_log").document(change_id)
