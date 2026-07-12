@@ -1024,13 +1024,21 @@ def committee_page_headers(code: str) -> dict[str, str]:
 def committee_membership_request_options(code: str, membership_url: str, page_url: str, session_id: str) -> list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]]:
     """Return live committee membership sources in the order most likely to include rows.
 
-    Prefer the official human-readable committee page first because it exposes the
-    CommitteeId/SessionId needed by the membership endpoint, then probe the Umbraco
-    endpoint without the Lang parameter that has been timing out in GitHub Actions.
+    GitHub Actions has consistently timed out on the official Senate committee
+    static pages and direct Umbraco membership endpoint, while the reader mirror of
+    the same official response has been returning complete member rows. Keep those
+    slower official probes available behind config flags, but make the default path
+    concise: configured CommitteeId -> reader mirror -> parse.
     """
     headers = committee_request_headers(code)
     membership_page = page_url or urljoin(SENATE_COMMITTEES_URL, f"/en/committees/{code.lower()}/45-1")
-    candidates: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = [("GET", membership_page, committee_page_headers(code), None)]
+    use_reader = config_bool("use_reader_committee_fallback", True, "SENSTATS_USE_READER_COMMITTEE_FALLBACK")
+    prefer_reader = config_bool("prefer_reader_committee_membership", True, "SENSTATS_PREFER_READER_COMMITTEE_MEMBERSHIP")
+    probe_official = config_bool("probe_official_committee_membership", False, "SENSTATS_PROBE_OFFICIAL_COMMITTEE_MEMBERSHIP")
+    probe_static_page = config_bool("probe_committee_static_pages", False, "SENSTATS_PROBE_COMMITTEE_STATIC_PAGES")
+    candidates: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = []
+    if probe_static_page:
+        candidates.append(("GET", membership_page, committee_page_headers(code), None))
 
     def ajax_post_candidate(url: str) -> tuple[str, str, dict[str, str], dict[str, str]] | None:
         parsed = urlparse(url)
@@ -1050,31 +1058,44 @@ def committee_membership_request_options(code: str, membership_url: str, page_ur
         }
         return ("POST", f"{parsed.scheme}://{parsed.netloc}{parsed.path}", post_headers, data)
 
-    if membership_url:
-        membership_url = without_lang_query_param(membership_url)
-        candidates.append(("GET", with_cache_buster(membership_url), headers, None))
-        candidates.append(("GET", membership_url, headers, None))
-        if config_bool("use_reader_committee_fallback", True, "SENSTATS_USE_READER_COMMITTEE_FALLBACK"):
-            candidates.append(("GET", reader_url_for(membership_url), committee_reader_headers(), None))
-        post_candidate = ajax_post_candidate(membership_url)
+    def add_reader_candidate(url: str) -> None:
+        if use_reader:
+            candidates.append(("GET", reader_url_for(url), committee_reader_headers(), None))
+
+    def add_official_candidates(url: str) -> None:
+        if not probe_official:
+            return
+        candidates.append(("GET", with_cache_buster(url), headers, None))
+        candidates.append(("GET", url, headers, None))
+        post_candidate = ajax_post_candidate(url)
         if post_candidate:
             candidates.append(post_candidate)
+
+    if membership_url:
+        membership_url = without_lang_query_param(membership_url)
+        if prefer_reader:
+            add_reader_candidate(membership_url)
+        add_official_candidates(membership_url)
+        if use_reader and not prefer_reader:
+            add_reader_candidate(membership_url)
         if SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL in membership_url:
             corrected_url = membership_url.replace(SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL, SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL)
-            corrected_post_candidate = ajax_post_candidate(corrected_url)
-            if corrected_post_candidate:
-                candidates.append(corrected_post_candidate)
-            candidates.append(("GET", with_cache_buster(corrected_url), headers, None))
-    code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id}
-    code_candidate_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"
-    candidates.append(("GET", with_cache_buster(code_candidate_url), headers, None))
-    if config_bool("use_reader_committee_fallback", True, "SENSTATS_USE_READER_COMMITTEE_FALLBACK"):
-        candidates.append(("GET", reader_url_for(code_candidate_url), committee_reader_headers(), None))
-    code_post_candidate = ajax_post_candidate(code_candidate_url)
-    if code_post_candidate:
-        candidates.append(code_post_candidate)
-    # The human-readable committee page is already the first candidate. Do not append it
-    # again after the XHR probes; that previously caused duplicate/debug noise.
+            if prefer_reader:
+                add_reader_candidate(corrected_url)
+            add_official_candidates(corrected_url)
+            if use_reader and not prefer_reader:
+                add_reader_candidate(corrected_url)
+
+    # CommitteeCode-only probing is a last resort for unconfigured committees. The
+    # current configured-ID path should not spend time on it after a complete reader hit.
+    if not membership_url or probe_official:
+        code_candidate_params = {"CommitteeCode": code.upper(), "SessionId": session_id}
+        code_candidate_url = f"{SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL}?{urlencode(code_candidate_params)}"
+        if prefer_reader:
+            add_reader_candidate(code_candidate_url)
+        add_official_candidates(code_candidate_url)
+        if use_reader and not prefer_reader:
+            add_reader_candidate(code_candidate_url)
 
     deduped: list[tuple[str, str, dict[str, str] | None, dict[str, str] | None]] = []
     seen_requests: set[str] = set()

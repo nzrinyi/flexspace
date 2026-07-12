@@ -55,5 +55,8 @@
   "committee_min_member_count": 2,
   "committee_min_member_counts": {
     "AEFA": 10
-  }
+  },
+  "prefer_reader_committee_membership": true,
+  "probe_official_committee_membership": false,
+  "probe_committee_static_pages": false
 }
