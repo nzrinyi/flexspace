@@ -7,7 +7,7 @@ import { groupClassName, groupLabel } from './SenStatsHelpers';
 type DashboardTab = 'groups' | 'retirement' | 'attendance' | 'expenses';
 type AttendanceView = 'senators' | 'groups' | 'provinces';
 type RetirementSort = 'date' | 'served';
-type AttendanceSort = 'missed' | 'rate' | 'illness' | 'leave' | 'business';
+type AttendanceSort = 'missed' | 'rate' | 'present' | 'illness' | 'leave' | 'business';
 
 function yearFromValue(value: string) {
   const match = value.match(/\b(19|20)\d{2}\b/);
@@ -99,6 +99,22 @@ function aggregateAttendance<T extends string>(rows: Array<SenStatsAttendanceDoc
   return Array.from(totals.values()).map((item) => ({ ...item, rate: item.sittingDays ? Math.round((item.present / item.sittingDays) * 100) : 0 })).sort((a, b) => a.rate - b.rate || b.missed - a.missed);
 }
 
+function attendanceRateClass(rate: number) {
+  if (rate >= 80) return 'high';
+  if (rate >= 60) return 'medium';
+  return 'low';
+}
+
+function AttendanceRateCell({ rate }: { rate: number }) {
+  return <span className={`attendance-rate-cell ${attendanceRateClass(rate)}`}><i style={{ width: `${Math.max(rate, 4)}%` }} aria-hidden="true" /><b>{rate}%</b></span>;
+}
+
+function AttendanceSortButton({ sort, activeSort, onSort, children, title, average }: { sort: AttendanceSort; activeSort: AttendanceSort; onSort: (sort: AttendanceSort) => void; children: string; title?: string; average?: number }) {
+  return <button type="button" className={`attendance-sort-button ${activeSort === sort ? 'active' : ''}`} onClick={() => onSort(sort)} title={title}>
+    <span>{children}{title && <i aria-hidden="true">i</i>}</span>{average !== undefined && <small>Avg {average}%</small>}
+  </button>;
+}
+
 export function SenStatsDashboardsView({ senators, attendance, expenses, selectedSenator, onSelectSenator, expensesLoading, recentlyChangedSenatorIds, syncedAttendanceCount }: { senators: SenStatsSenatorDocument[]; attendance: Array<SenStatsAttendanceDocument & { id: string }>; expenses: Array<SenStatsExpenseDocument & { id: string }>; selectedSenator?: SenStatsSenatorDocument; onSelectSenator: (id: string) => void; expensesLoading: boolean; recentlyChangedSenatorIds: Set<string>; syncedAttendanceCount: number }) {
   const [activeDashboard, setActiveDashboard] = useState<DashboardTab>('groups');
   const [retirementSort, setRetirementSort] = useState<RetirementSort>('date');
@@ -138,11 +154,19 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     const aStats = attendanceStats(a);
     const bStats = attendanceStats(b);
     if (attendanceSort === 'rate') return aStats.rate - bStats.rate || bStats.missed - aStats.missed;
+    if (attendanceSort === 'present') return bStats.present - aStats.present;
     if (attendanceSort === 'illness') return bStats.illness - aStats.illness;
     if (attendanceSort === 'leave') return bStats.leave - aStats.leave;
     if (attendanceSort === 'business') return bStats.business - aStats.business;
     return bStats.missed - aStats.missed || aStats.rate - bStats.rate;
   }), [attendance, attendanceSort]);
+  const senateAttendanceAverage = useMemo(() => {
+    const totals = attendance.reduce((sum, row) => {
+      const stats = attendanceStats(row);
+      return { present: sum.present + stats.present, sittingDays: sum.sittingDays + stats.sittingDays };
+    }, { present: 0, sittingDays: 0 });
+    return totals.sittingDays ? Math.round((totals.present / totals.sittingDays) * 100) : 0;
+  }, [attendance]);
   const attendanceByGroup = useMemo(() => aggregateAttendance(attendance, (row) => row.party || 'Unknown'), [attendance]);
   const attendanceByProvince = useMemo(() => aggregateAttendance(attendance, (row) => senatorsById.get(row.senatorId || '')?.province || 'Unknown'), [attendance, senatorsById]);
 
@@ -163,11 +187,11 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
 
     {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure</strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="retirement-summary-grid" aria-label="Retirement summary"><article><span>Retiring this quarter</span><strong>{retirementSummary.thisQuarter}</strong><small>Within 92 days</small></article><article><span>Retiring this year</span><strong>{retirementSummary.thisYear}</strong><small>{new Date().getFullYear()}</small></article><article><span>Average tenure retiring</span><strong>{retirementSummary.averageTenure || '—'}</strong><small>Years served</small></article><article className="wide"><span>Next 5 caucus balance</span><strong>{retirementSummary.caucusBalance || 'Not enough data'}</strong><small>Based on soonest upcoming retirements</small></article></div><div className="dashboard-table retirement-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, appointedDate, age, yearsServed, daysUntilRetirement }) => <button type="button" role="row" key={senator.id} className={`dashboard-click-row ${groupClassName(senator.party)}`} onClick={() => onSelectSenator(senator.id)} title={appointedDate ? `Appointed ${appointedDate}` : 'Appointment date not synced'}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span className={`retirement-date-cell ${urgencyClass(daysUntilRetirement)}`}><b>{retirementDate || 'Not synced'}</b>{retirementDate && <small>{timeToEventLabel(daysUntilRetirement)}</small>}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></button>)}</div></div>}
 
-    {activeDashboard === 'attendance' && <div className="source-card source-wide"><div className="source-heading"><span>Attendance</span><strong>Senators' Attendance and Activities on Sitting Days</strong><select value={attendanceSort} onChange={(event) => setAttendanceSort(event.target.value as AttendanceSort)}><option value="missed">Most days missed</option><option value="rate">Lowest attendance rate</option><option value="illness">Most illness days</option><option value="leave">Most leave days</option><option value="business">Most public business</option></select><a href="https://sencanada.ca/en/attendance/" target="_blank" rel="noreferrer">Open source</a></div>{attendanceRows.length === 0 ? <p className="muted">{syncedAttendanceCount > 0 ? `${syncedAttendanceCount} attendance rows were reported by the latest sync, but the realtime listener did not return row documents. Check deployed Firestore rules for senstats_attendance reads.` : 'No attendance rows synced yet. The ingestion script reads the public attendance register and stores summary rows after the next sync.'}</p> : <>
+    {activeDashboard === 'attendance' && <div className="source-card source-wide"><div className="source-heading"><span>Attendance</span><strong>Senators' Attendance and Activities on Sitting Days</strong><select value={attendanceSort} onChange={(event) => setAttendanceSort(event.target.value as AttendanceSort)}><option value="missed">Most days missed</option><option value="rate">Lowest attendance rate</option><option value="present">Most present days</option><option value="illness">Most illness days</option><option value="leave">Most leave days</option><option value="business">Most public business</option></select><a href="https://sencanada.ca/en/attendance/" target="_blank" rel="noreferrer">Open source</a></div>{attendanceRows.length === 0 ? <p className="muted">{syncedAttendanceCount > 0 ? `${syncedAttendanceCount} attendance rows were reported by the latest sync, but the realtime listener did not return row documents. Check deployed Firestore rules for senstats_attendance reads.` : 'No attendance rows synced yet. The ingestion script reads the public attendance register and stores summary rows after the next sync.'}</p> : <>
       <div className="senstats-tabs nested-tabs attendance-view-tabs" role="tablist" aria-label="Attendance dashboard views">
         {(['senators', 'groups', 'provinces'] as AttendanceView[]).map((view) => <button key={view} type="button" className={attendanceView === view ? 'active' : ''} onClick={() => setAttendanceView(view)}>{view === 'senators' ? 'By senator' : view === 'groups' ? 'By group' : 'By province'}</button>)}
       </div>
-      {attendanceView === 'senators' && <div className="dashboard-table attendance-table expanded" role="table" aria-label="Senator attendance dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Province</span><span>Rate</span><span>Present</span><span>Public business</span><span>Illness</span><span>Leave</span><span>Missed</span></div>{attendanceRows.map((row) => { const stats = attendanceStats(row); const senator = senatorsById.get(row.senatorId || ''); return <button type="button" role="row" key={row.id} className={`dashboard-click-row ${groupClassName(row.party || '')}`} onClick={() => { if (senator) onSelectSenator(senator.id); }}><strong>{row.senatorName}</strong><em>{groupLabel(row.party || 'Unknown')}</em><span>{senator?.province || '—'}</span><span>{stats.rate}%</span><span>{stats.present}/{stats.sittingDays}</span><span>{stats.business}</span><span>{stats.illness}</span><span>{stats.leave}</span><span>{stats.missed}</span></button>; })}</div>}
+      {attendanceView === 'senators' && <div className="dashboard-table attendance-table expanded" role="table" aria-label="Senator attendance dashboard"><div role="row" className="source-table-head attendance-head"><span>Name</span><span>Group</span><span>Province</span><AttendanceSortButton sort="rate" activeSort={attendanceSort} onSort={setAttendanceSort} average={senateAttendanceAverage}>Rate</AttendanceSortButton><AttendanceSortButton sort="present" activeSort={attendanceSort} onSort={setAttendanceSort}>Present</AttendanceSortButton><AttendanceSortButton sort="business" activeSort={attendanceSort} onSort={setAttendanceSort} title="Excused/Other: days spent on other public parliamentary business.">Public business</AttendanceSortButton><AttendanceSortButton sort="illness" activeSort={attendanceSort} onSort={setAttendanceSort} title="Excused/Other: sitting days recorded as illness.">Illness</AttendanceSortButton><AttendanceSortButton sort="leave" activeSort={attendanceSort} onSort={setAttendanceSort} title="Excused/Other: sitting days recorded as leave.">Leave</AttendanceSortButton><AttendanceSortButton sort="missed" activeSort={attendanceSort} onSort={setAttendanceSort} title="Unexcused/uncategorized days not counted as present or public business.">Missed</AttendanceSortButton></div>{attendanceRows.map((row) => { const stats = attendanceStats(row); const senator = senatorsById.get(row.senatorId || ''); return <button type="button" role="row" key={row.id} className={`dashboard-click-row ${groupClassName(row.party || '')}`} onClick={() => { if (senator) onSelectSenator(senator.id); }}><strong className="attendance-name-cell">{row.senatorName}</strong><em>{groupLabel(row.party || 'Unknown')}</em><span>{senator?.province || '—'}</span><AttendanceRateCell rate={stats.rate} /><span>{stats.present}/{stats.sittingDays}</span><span>{stats.business}</span><span>{stats.illness}</span><span>{stats.leave}</span><span>{stats.missed}</span></button>; })}</div>}
       {attendanceView === 'groups' && <div className="dashboard-table attendance-table aggregate" role="table" aria-label="Attendance by group"><div role="row" className="source-table-head"><span>Group</span><span>Rate</span><span>Senators</span><span>Present</span><span>Public business</span><span>Illness</span><span>Leave</span><span>Missed</span></div>{attendanceByGroup.map((item) => <div role="row" key={item.key} className={groupClassName(item.key)}><strong>{groupLabel(item.key)}</strong><span>{item.rate}%</span><span>{item.count}</span><span>{item.present}/{item.sittingDays}</span><span>{item.business}</span><span>{item.illness}</span><span>{item.leave}</span><span>{item.missed}</span></div>)}</div>}
       {attendanceView === 'provinces' && <div className="dashboard-table attendance-table aggregate" role="table" aria-label="Attendance by province"><div role="row" className="source-table-head"><span>Province</span><span>Rate</span><span>Senators</span><span>Present</span><span>Public business</span><span>Illness</span><span>Leave</span><span>Missed</span></div>{attendanceByProvince.map((item) => <div role="row" key={item.key}><strong>{item.key}</strong><span>{item.rate}%</span><span>{item.count}</span><span>{item.present}/{item.sittingDays}</span><span>{item.business}</span><span>{item.illness}</span><span>{item.leave}</span><span>{item.missed}</span></div>)}</div>}
     </>}</div>}

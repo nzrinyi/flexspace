@@ -1333,3 +1333,21 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-dashboard.senstats-dark .retirement-date-cell.later { background: color-mix(in srgb, #16a34a 18%, var(--sen-surface)); color: #bbf7d0; }
 @media (max-width: 900px) { .retirement-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .retirement-summary-grid { grid-template-columns: 1fr; } }
+.attendance-sort-button { display: grid; gap: 2px; width: fit-content; min-height: 0; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.attendance-sort-button > span { display: inline-flex; align-items: center; gap: 5px; }
+.attendance-sort-button i { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 999px; background: #e0e7ff; color: #3730a3; font-size: .62rem; font-style: normal; letter-spacing: 0; text-transform: none; }
+.attendance-sort-button small { color: #64748b; font-size: .64rem; letter-spacing: 0; text-transform: none; }
+.attendance-sort-button.active { color: #2563eb; }
+.attendance-rate-cell { position: relative; display: grid; min-width: 76px; overflow: hidden; border-radius: 999px; background: #fee2e2; padding: 5px 8px; }
+.attendance-rate-cell i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: #ef4444; opacity: .24; }
+.attendance-rate-cell b { position: relative; color: #7f1d1d; font-size: .82rem; }
+.attendance-rate-cell.medium { background: #fef3c7; }
+.attendance-rate-cell.medium i { background: #f59e0b; }
+.attendance-rate-cell.medium b { color: #92400e; }
+.attendance-rate-cell.high { background: #dcfce7; }
+.attendance-rate-cell.high i { background: #16a34a; }
+.attendance-rate-cell.high b { color: #166534; }
+.dashboard-table.attendance-table.expanded > .dashboard-click-row:nth-child(odd) { background: color-mix(in srgb, var(--group-color, #64748b) 4%, var(--sen-surface, #fff)); }
+.attendance-name-cell { border-radius: 10px; background: color-mix(in srgb, var(--group-color, #64748b) 8%, transparent); padding: 6px 8px; }
+.senstats-dashboard.senstats-dark .attendance-rate-cell { background: var(--sen-surface-2); }
+.senstats-dashboard.senstats-dark .attendance-sort-button i { background: var(--sen-surface-2); color: var(--sen-link-text); }
