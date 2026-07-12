@@ -51,7 +51,7 @@ SENATE_COMMITTEE_MEMBERSHIP_AJAX_URL = "https://sencanada.ca/umbraco/surface/Com
 SENATE_COMMITTEE_MEMBERSHIP_LEGACY_AJAX_URL = "https://sencanada.ca/umbraco/surface/CommitteeAjax/GetCommitteeMembership"
 JINA_READER_BASE_URL = "https://r.jina.ai/"
 
-KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "CONF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
+KNOWN_COMMITTEE_CODES = ["AEFA", "AGFO", "AOVS", "APPA", "BANC", "CIBA", "COMF", "ENEV", "LCJC", "NFFN", "OLLO", "POFO", "RIDR", "RPRD", "SECD", "SELE", "SOCI", "TRCM"]
 KNOWN_COMMITTEE_IDS = {"AEFA": "1008"}
 KNOWN_COMMITTEE_NAMES = {
     "AEFA": "Foreign Affairs and International Trade",
@@ -60,7 +60,7 @@ KNOWN_COMMITTEE_NAMES = {
     "APPA": "Indigenous Peoples",
     "BANC": "Banking, Commerce and the Economy",
     "CIBA": "Internal Economy, Budgets and Administration",
-    "CONF": "Ethics and Conflict of Interest for Senators",
+    "COMF": "Ethics and Conflict of Interest for Senators",
     "ENEV": "Energy, the Environment and Natural Resources",
     "LCJC": "Legal and Constitutional Affairs",
     "NFFN": "National Finance",
