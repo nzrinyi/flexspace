@@ -8,6 +8,12 @@ function senatorPhotoUrl(senator?: SenStatsSenatorDocument) {
   return senator?.photoUrl || (typeof profilePhoto === 'string' ? profilePhoto : undefined);
 }
 
+
+function expenseYear(expense: SenStatsExpenseDocument) {
+  const match = String(expense.quarter || '').match(/(19|20)\d{2}/);
+  return match ? Number(match[0]) : 0;
+}
+
 function detailValue(senator: SenStatsSenatorDocument | undefined, keys: string[]) {
   if (!senator) return '';
   const sources = [senator.extraDetails, senator.profileDetails, ...(senator.officeDetails ?? [])];
@@ -27,8 +33,10 @@ export function SenatorProfileDrawer({ senators, committees, expenses }: { senat
   const senator = senators.find((item) => item.id === selectedSenatorId);
   const photoUrl = senatorPhotoUrl(senator);
   const senatorExpenses = useMemo(() => senator ? expenses.filter((expense) => expense.senatorId === senator.id) : [], [expenses, senator]);
-  const quarterRows = useMemo(() => quarterlyExpenseRows(senatorExpenses).slice(-4), [senatorExpenses]);
-  const totalExpenses = senatorExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+  const latestExpenseYear = senatorExpenses.reduce((latest, expense) => Math.max(latest, expenseYear(expense)), 0);
+  const ytdExpenses = useMemo(() => latestExpenseYear ? senatorExpenses.filter((expense) => expenseYear(expense) === latestExpenseYear) : senatorExpenses, [latestExpenseYear, senatorExpenses]);
+  const quarterRows = useMemo(() => quarterlyExpenseRows(ytdExpenses), [ytdExpenses]);
+  const totalExpenses = ytdExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
   const memberships = senator ? committees.filter((committee) => (committee.members || []).some((member) => member.senatorId === senator.id || member.name === senator.name)) : [];
   const profileUrl = typeof senator?.profileDetails?.profileUrl === 'string' ? senator.profileDetails.profileUrl : senator?.sourceUrl;
   const appointedDate = detailValue(senator, ['nominatedDate', 'appointed-date', 'appointedDate', 'summoned-to-the-senate', 'date-of-appointment']);
@@ -62,13 +70,13 @@ export function SenatorProfileDrawer({ senators, committees, expenses }: { senat
         </div>
       </section>
       <div className="drawer-stat-grid">
-        <p><span>Expenses</span><strong>{currency(totalExpenses)}</strong><small>{senatorExpenses.length} records</small></p>
+        <p><span>{latestExpenseYear ? `${latestExpenseYear} YTD expenses` : 'Latest YTD expenses'}</span><strong>{currency(totalExpenses)}</strong><small>{ytdExpenses.length} records</small></p>
         <p><span>Committees</span><strong>{memberships.length}</strong><small>current memberships</small></p>
         <p><span>Appointed</span><strong>{appointedDate || 'Not synced'}</strong></p>
         <p><span>Retirement</span><strong>{retirementDate || 'Not synced'}</strong></p>
       </div>
       <section className="drawer-section">
-        <strong>Recent expense quarters</strong>
+        <strong>{latestExpenseYear ? `${latestExpenseYear} YTD expense quarters` : 'Latest YTD expense quarters'}</strong>
         {quarterRows.length === 0 ? <p className="muted">No expense records available for this senator.</p> : quarterRows.map((row) => {
           const total = Object.entries(row).filter(([key]) => key !== 'quarter').reduce((sum, [, value]) => sum + Number(value || 0), 0);
           return <p key={String(row.quarter)}><span>{String(row.quarter)}</span><b>{currency(total)}</b></p>;

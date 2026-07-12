@@ -13,6 +13,14 @@ function isLeadershipRole(role = '') {
   return normalized.includes('chair');
 }
 
+function leadershipLabel(role = '') {
+  const normalized = role.toLowerCase();
+  if (normalized.includes('vice')) return 'Vice Chair';
+  if (normalized.includes('deputy')) return 'Deputy Chair';
+  if (normalized.includes('chair')) return 'Chair';
+  return role || 'Member';
+}
+
 function committeeMemberKey(committeeId: string, member: SenStatsCommitteeMember) {
   return `${committeeId}-${member.senatorId || member.name}-${member.role || 'member'}`;
 }
@@ -30,7 +38,7 @@ function CommitteeMemberRow({ member, committeeId, senator }: { member: SenStats
     <div>
       <strong>{member.name}</strong>
       <small className="member-meta-badges">
-        <span className={`member-role-badge ${isLeadershipRole(member.role) ? 'leadership' : ''}`}>{roleIcon(member.role)} {member.role || 'Member'}</span>
+        <span className={`member-role-badge ${isLeadershipRole(member.role) ? 'leadership' : ''}`}>{roleIcon(member.role)} {leadershipLabel(member.role)}</span>
         {member.party && <span>{groupLabel(member.party)}</span>}
         {member.province && <span>{member.province}</span>}
       </small>
@@ -145,17 +153,20 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
         }, {})).sort(([, a], [, b]) => b - a);
         const nextMeeting = selectedCommittee.nextMeetingDate || selectedCommittee.nextMeeting || '';
         return <article className="committee-card committee-detail-panel" aria-live="polite">
-          <header className="committee-card-header committee-detail-header">
-            <div>
-              <span>{selectedCommittee.code} · {selectedCommittee.type || 'Committee'}</span>
-              <strong>{selectedCommittee.name}</strong>
-              <div className="committee-quick-stats" aria-label={`${selectedCommittee.name} caucus breakdown`}>
-                <span>{dedupedMembers.length} total</span>
-                {caucusStats.map(([label, count]) => <span key={label}>{count} {label}</span>)}
+          <header className="committee-detail-hero">
+            <div className="committee-title-block">
+              <span className="committee-code-pill">{selectedCommittee.code}</span>
+              <div>
+                <small>{selectedCommittee.type || 'Committee'} · {selectedCommittee.session || 'Current session'}</small>
+                <strong>{selectedCommittee.name}</strong>
               </div>
-              <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
             </div>
-            <small>{selectedCommittee.session || 'Current session'}</small>
+            <div className="committee-quick-stats" aria-label={`${selectedCommittee.name} caucus breakdown`}>
+              <span>{dedupedMembers.length} total</span>
+              {leadership.length > 0 && <span>{leadership.length} leadership</span>}
+              {caucusStats.map(([label, count]) => <span key={label}>{count} {label}</span>)}
+            </div>
+            <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'No meeting posted'}</em>
           </header>
           {selectedCommittee.sourceUrl && <a className="committee-official-link" href={selectedCommittee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span className="external-link-icon" aria-hidden="true">↗</span></a>}
           {visibleMembers.length === 0 ? <div className="senstats-chart-empty committee-member-empty"><strong>No matching members</strong><span>Try a different senator, role, caucus, or province.</span></div> : <>

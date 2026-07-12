@@ -1217,7 +1217,14 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         senator = senator or senators_by_name.get(normalized_name)
         key = senator.senator_id if senator else stable_id(normalized_name or profile_url)
         name_key = stable_id(normalized_name)
-        if not key or key in seen or (name_key and name_key in seen_names):
+        if not key:
+            return
+        if key in seen or (name_key and name_key in seen_names):
+            if role and any(token in role.lower() for token in ["chair", "vice"]):
+                for member in members:
+                    if member.get("senatorId") == key or (name_key and stable_id(str(member.get("name") or "")) == name_key):
+                        member["role"] = role
+                        break
             return
         seen.add(key)
         if name_key:
@@ -1269,7 +1276,7 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         )
 
     text_lines = [cleaned for line in raw_text.splitlines() if (cleaned := clean_committee_text_line(line))]
-    role_tokens = {"chair", "deputy chair", "member", "ex officio"}
+    role_tokens = {"chair", "deputy chair", "vice chair", "deputy-chair", "vice-chair", "member", "ex officio"}
     affiliation_pattern = re.compile(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", re.IGNORECASE)
     for index, line in enumerate(text_lines):
         normalized_role = " ".join(line.split()).lower()

@@ -5,7 +5,7 @@ export function currency(amount: number) {
 }
 
 export function groupClassName(group: string) {
-  const normalized = group.toLowerCase();
+  const normalized = group.trim().toLowerCase();
   if (normalized.includes('non-affiliated') || normalized.includes('non affiliated')) return 'group-na';
   if (normalized.includes('independent') || normalized === 'isg') return 'group-isg';
   if (normalized.includes('conservative') || normalized === 'cpc' || normalized === 'c') return 'group-conservative';
@@ -16,19 +16,19 @@ export function groupClassName(group: string) {
 }
 
 export function groupLabel(group: string) {
-  const normalized = group.toLowerCase();
+  const normalized = group.trim().toLowerCase();
   if (normalized.includes('independent senators') || normalized === 'isg') return 'ISG';
   if (normalized.includes('progressive') || normalized === 'psg') return 'PSG';
   if (normalized.includes('canadian senators') || normalized === 'csg') return 'CSG';
   if (normalized.includes('government') || normalized === 'gro') return 'GRO';
   if (normalized.includes('conservative') || normalized === 'cpc' || normalized === 'c') return 'CPC';
   if (normalized.includes('non-affiliated') || normalized.includes('non affiliated')) return 'Non-affiliated';
-  return group;
+  return group.trim();
 }
 
 
 export function groupFullName(group: string) {
-  const normalized = group.toLowerCase();
+  const normalized = group.trim().toLowerCase();
   if (normalized.includes('independent senators') || normalized === 'isg') return 'Independent Senators Group';
   if (normalized.includes('progressive') || normalized === 'psg') return 'Progressive Senate Group';
   if (normalized.includes('canadian senators') || normalized === 'csg') return 'Canadian Senators Group';

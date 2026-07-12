@@ -8,24 +8,14 @@ interface SenStatsDataSourcesViewProps {
   syncStatus: SenStatsSyncStatusDocument | null;
 }
 
-const officialSources = [
-  { category: 'Roster', label: 'Current senators roster', url: 'https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist' },
-  { category: 'Expenses', label: 'Proactive disclosure summary', url: 'https://sencanada.ca/en/proactive/summary/#?Year=2026&Quarter=1&Member=Senators' },
-  { category: 'Expenses', label: 'Proactive disclosure by senator', url: 'https://sencanada.ca/en/ProActive/Summary/Senators' },
-  { category: 'Expenses', label: 'Proactive disclosure details', url: 'https://sencanada.ca/en/ProActive/Summary/Details' },
-  { category: 'Committees', label: 'Senate committees directory', url: 'https://sencanada.ca/en/committees/' },
-  { category: 'Attendance', label: 'Senators attendance register', url: 'https://sencanada.ca/en/attendance/' },
-  { category: 'Reference', label: 'Open North Represent reference', url: 'https://represent.opennorth.ca/' },
-];
-
-const fieldSources = [
-  { icon: '👤', field: 'Name, province, and group', source: 'Official Senate current-senators roster.' },
-  { icon: '📅', field: 'Appointment and retirement details', source: 'Official Senate roster columns such as nominated date, retirement date, and appointed-on-advice-of details.' },
-  { icon: '🖼️', field: 'Photos / thumbnails', source: 'Image URLs exposed in the public Senate roster response when available. If the public response omits or blocks images, mirror official profile images into a controlled image store during sync.' },
-  { icon: '💳', field: 'Quarterly expenses', source: 'Senate ProActive expense summary pages, including the Senators filter view.' },
-  { icon: '🏛️', field: 'Committee membership', source: 'Public Senate committee directory and committee member pages.' },
-  { icon: '✅', field: 'Attendance', source: "Senators' Attendance and Activities on Sitting Days register." },
-  { icon: '🔁', field: 'Affiliation changes', source: 'Differences observed between consecutive public roster syncs.' },
+const sourceMatrix = [
+  { icon: '👤', category: 'Roster', field: 'Name, province, and group', source: 'Current senators roster', detail: 'Official Senate roster response.', url: 'https://sencanada.ca/umbraco/surface/SenatorsAjax/GetSenators?Lang=en&displayFor=senatorslist' },
+  { icon: '📅', category: 'Roster', field: 'Appointment and retirement details', source: 'Roster profile columns', detail: 'Nominated date, mandatory retirement date, and appointment metadata from official Senate fields.', url: 'https://sencanada.ca/en/senators/' },
+  { icon: '🖼️', category: 'Roster', field: 'Photos / thumbnails', source: 'Official Senate portraits', detail: 'Public image URLs exposed by roster/profile responses when available.', url: 'https://sencanada.ca/en/senators/' },
+  { icon: '💳', category: 'Expenses', field: 'Quarterly expenses', source: 'Proactive disclosure summary', detail: 'Separate monthly/quarterly scrape; not expected to refresh on every daily roster run.', url: 'https://sencanada.ca/en/proactive/summary/#?Year=2026&Quarter=1&Member=Senators' },
+  { icon: '🏛️', category: 'Committees', field: 'Committee membership and roles', source: 'Committee membership endpoint', detail: 'Public committee member responses, including Chair, Deputy Chair, Vice Chair, and member rows when present.', url: 'https://sencanada.ca/en/committees/' },
+  { icon: '✅', category: 'Attendance', field: 'Attendance', source: 'Attendance register', detail: "Senators' Attendance and Activities on Sitting Days register.", url: 'https://sencanada.ca/en/attendance/' },
+  { icon: '🔁', category: 'Audit', field: 'Affiliation changes', source: 'Consecutive roster snapshots', detail: 'Meaningful normalized differences between stored and newly synced roster data.', url: 'https://sencanada.ca/en/senators/' },
 ];
 
 function formatSyncDate(value: SenStatsSyncStatusDocument['finishedAt']) {
@@ -34,28 +24,30 @@ function formatSyncDate(value: SenStatsSyncStatusDocument['finishedAt']) {
   return String(value);
 }
 
-function sourceStatus(syncStatus: SenStatsSyncStatusDocument | null, count: number) {
+function sourceStatus(syncStatus: SenStatsSyncStatusDocument | null, count: number, monthly = false) {
   if (!syncStatus) return 'No sync status has been written yet.';
   const date = formatSyncDate(syncStatus.finishedAt);
   const errors = syncStatus.errors ?? [];
-  if (count > 0) return `Last completed ${date}.`;
+  if (count > 0) return monthly ? `Latest stored expense records are available; expense scrape runs separately. Last roster sync ${date}.` : `Last completed ${date}.`;
+  if (monthly && !errors.length) return `No records in this view yet. Expense sync runs separately from the daily roster sync, so this is not a daily-run warning.`;
   return errors.length ? `Last attempted ${date}; errors: ${errors.join(' ')}` : `Last attempted ${date}; no records were written.`;
 }
 
-function healthClass(syncStatus: SenStatsSyncStatusDocument | null, count: number) {
-  if (!syncStatus) return 'warning';
+function healthClass(syncStatus: SenStatsSyncStatusDocument | null, count: number, monthly = false) {
+  if (!syncStatus) return monthly ? 'neutral' : 'warning';
   if ((syncStatus.errorCount ?? 0) > 0 || (syncStatus.errors ?? []).length > 0) return 'danger';
+  if (monthly) return count > 0 ? 'success' : 'neutral';
   return count > 0 ? 'success' : 'warning';
 }
 
-function SourceMetric({ label, count, syncStatus, primary = false }: { label: string; count: number; syncStatus: SenStatsSyncStatusDocument | null; primary?: boolean }) {
-  const health = healthClass(syncStatus, count);
+function SourceMetric({ label, count, syncStatus, primary = false, monthly = false }: { label: string; count: number; syncStatus: SenStatsSyncStatusDocument | null; primary?: boolean; monthly?: boolean }) {
+  const health = healthClass(syncStatus, count, monthly);
 
   return (
     <article className={`source-card source-metric ${primary ? 'primary' : ''} ${health}`}>
       <div className="source-metric-label"><i aria-hidden="true" /><span>{label}</span></div>
       <strong>{count}</strong>
-      <small>{sourceStatus(syncStatus, count)}</small>
+      <small>{sourceStatus(syncStatus, count, monthly)}</small>
     </article>
   );
 }
@@ -72,34 +64,22 @@ export function SenStatsDataSourcesView({ senatorCount, expenseCount, committeeC
 
       <div className="source-overview-grid">
         <SourceMetric label="Senators loaded" count={senatorCount} syncStatus={syncStatus} primary />
-        <SourceMetric label="Expense records" count={expenseCount} syncStatus={syncStatus} />
+        <SourceMetric label="Expense records" count={expenseCount} syncStatus={syncStatus} monthly />
         <SourceMetric label="Committees" count={committeeCount} syncStatus={syncStatus} />
         <SourceMetric label="Attendance rows" count={attendanceCount} syncStatus={syncStatus} />
       </div>
 
       <div className="source-card source-wide">
-        <div className="source-heading"><span>Official public sources</span><strong>External websites used by SenStats, including expenses and attendance</strong></div>
-        <div className="source-link-table" aria-label="Official public source links">
-          {officialSources.map((source) => (
-            <a key={source.url} href={source.url} target="_blank" rel="noreferrer" aria-label={`Open ${source.label} in a new tab`}>
-              <span>{source.category}</span>
-              <strong>{source.label}</strong>
-              <small aria-hidden="true">↗</small>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      <div className="source-card source-wide">
-        <div className="source-heading"><span>Field-level provenance</span><strong>Where each piece of data comes from</strong></div>
-        <div className="source-table external-only" role="table" aria-label="Field-level SenStats data provenance">
-          <div role="row" className="source-table-head"><span role="columnheader">Type</span><span role="columnheader">Data</span><span role="columnheader">External source</span></div>
-          {fieldSources.map((item) => (
-            <div role="row" key={item.field}>
+        <div className="source-heading"><span>Source and field provenance</span><strong>What each dataset means and where it comes from</strong></div>
+        <div className="source-table source-matrix" role="table" aria-label="SenStats source and field provenance">
+          <div role="row" className="source-table-head"><span role="columnheader">Type</span><span role="columnheader">Data</span><span role="columnheader">Official source</span><span role="columnheader">Notes</span></div>
+          {sourceMatrix.map((item) => (
+            <a role="row" key={item.field} href={item.url} target="_blank" rel="noreferrer" aria-label={`Open ${item.source} in a new tab`}>
               <span className="source-field-icon" role="cell" aria-hidden="true">{item.icon}</span>
-              <strong role="cell">{item.field}</strong>
-              <span role="cell">{item.source}</span>
-            </div>
+              <strong role="cell"><small>{item.category}</small>{item.field}</strong>
+              <span role="cell">{item.source} ↗</span>
+              <p role="cell">{item.detail}</p>
+            </a>
           ))}
         </div>
       </div>
