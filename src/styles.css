@@ -1313,3 +1313,23 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-group-key span:hover, .senstats-group-key span:focus-visible { transform: translateY(-1px); box-shadow: 0 10px 18px color-mix(in srgb, var(--group-color, #64748b) 18%, transparent); outline: none; }
 .senstats-dashboard.senstats-dark .clear-filters-button { background: var(--sen-surface-2); border-color: var(--sen-border); color: var(--sen-link-text); }
 @media (max-width: 900px) { .senstats-filter-bar .senstats-filters.with-clear { grid-template-columns: 1fr; } .clear-filters-button { justify-self: start; } }
+.retirement-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.retirement-summary-grid article { display: grid; gap: 4px; border: 1px solid var(--sen-border, #e8edf7); border-radius: 16px; background: var(--sen-surface, #fff); padding: 12px; }
+.retirement-summary-grid span { color: var(--sen-muted, #64748b); font-size: .7rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.retirement-summary-grid strong { color: var(--sen-text, #0f172a); font-size: clamp(1.15rem, 2vw, 1.55rem); line-height: 1.1; }
+.retirement-summary-grid small { color: var(--sen-text-2, #64748b); font-weight: 850; }
+.retirement-summary-grid .wide strong { font-size: 1rem; line-height: 1.3; }
+.retirement-date-cell { display: grid; gap: 2px; width: fit-content; min-width: 118px; border-radius: 12px; padding: 7px 9px; background: #f8fafc; color: #334155; }
+.retirement-date-cell b { color: inherit; font-size: .9rem; }
+.retirement-date-cell small { color: inherit; font-size: .7rem; font-weight: 950; opacity: .78; }
+.retirement-date-cell.critical { background: #fee2e2; color: #991b1b; }
+.retirement-date-cell.soon { background: #ffedd5; color: #9a3412; }
+.retirement-date-cell.year { background: #fef3c7; color: #92400e; }
+.retirement-date-cell.later { background: #ecfdf5; color: #166534; }
+.senstats-dashboard.senstats-dark .retirement-date-cell { background: var(--sen-surface-2); color: var(--sen-text); }
+.senstats-dashboard.senstats-dark .retirement-date-cell.critical { background: color-mix(in srgb, #dc2626 22%, var(--sen-surface)); color: #fecaca; }
+.senstats-dashboard.senstats-dark .retirement-date-cell.soon { background: color-mix(in srgb, #f97316 22%, var(--sen-surface)); color: #fed7aa; }
+.senstats-dashboard.senstats-dark .retirement-date-cell.year { background: color-mix(in srgb, #f59e0b 18%, var(--sen-surface)); color: #fde68a; }
+.senstats-dashboard.senstats-dark .retirement-date-cell.later { background: color-mix(in srgb, #16a34a 18%, var(--sen-surface)); color: #bbf7d0; }
+@media (max-width: 900px) { .retirement-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .retirement-summary-grid { grid-template-columns: 1fr; } }

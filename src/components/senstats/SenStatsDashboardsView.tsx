@@ -14,6 +14,40 @@ function yearFromValue(value: string) {
   return match ? Number(match[0]) : 0;
 }
 
+function dateFromValue(value: string) {
+  if (!value) return null;
+  const direct = new Date(value);
+  if (!Number.isNaN(direct.getTime())) return direct;
+  const year = yearFromValue(value);
+  return year ? new Date(year, 0, 1) : null;
+}
+
+function daysUntilDate(date: Date | null) {
+  if (!date) return undefined;
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  return Math.ceil((date.getTime() - startOfToday) / 86_400_000);
+}
+
+function timeToEventLabel(days?: number) {
+  if (days === undefined) return '';
+  if (days < 0) return `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`;
+  if (days === 0) return 'today';
+  if (days < 60) return `in ${days} day${days === 1 ? '' : 's'}`;
+  const months = Math.round(days / 30);
+  if (months < 24) return `in ${months} month${months === 1 ? '' : 's'}`;
+  const years = Math.round(months / 12);
+  return `in ${years} year${years === 1 ? '' : 's'}`;
+}
+
+function urgencyClass(days?: number) {
+  if (days === undefined) return 'unknown';
+  if (days <= 30) return 'critical';
+  if (days <= 183) return 'soon';
+  if (days <= 365) return 'year';
+  return 'later';
+}
+
 function detailValue(senator: SenStatsSenatorDocument, keys: string[]) {
   const sources = [senator.extraDetails, senator.profileDetails, ...(senator.officeDetails ?? [])];
   for (const source of sources) {
@@ -77,8 +111,28 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     const appointedDate = detailValue(senator, ['nominatedDate', 'appointed-date', 'appointedDate', 'summoned-to-the-senate', 'date-of-appointment']);
     const retirementYear = yearFromValue(retirementDate);
     const appointedYear = yearFromValue(appointedDate);
-    return { senator, retirementDate, appointedDate, age: senatorAge(retirementDate), yearsServed: appointedYear ? Math.max(new Date().getFullYear() - appointedYear, 0) : 0, retirementYear: retirementYear || 9999 };
-  }).sort((a, b) => retirementSort === 'served' ? b.yearsServed - a.yearsServed : a.retirementYear - b.retirementYear), [retirementSort, senators]);
+    const parsedRetirementDate = dateFromValue(retirementDate);
+    const daysUntilRetirement = daysUntilDate(parsedRetirementDate);
+    return { senator, retirementDate, appointedDate, age: senatorAge(retirementDate), yearsServed: appointedYear ? Math.max(new Date().getFullYear() - appointedYear, 0) : 0, retirementYear: retirementYear || 9999, retirementTimestamp: parsedRetirementDate?.getTime() ?? Number.MAX_SAFE_INTEGER, daysUntilRetirement };
+  }).sort((a, b) => retirementSort === 'served' ? b.yearsServed - a.yearsServed : a.retirementTimestamp - b.retirementTimestamp), [retirementSort, senators]);
+  const retirementSummary = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const upcomingRows = retirementRows.filter((row) => row.daysUntilRetirement === undefined || row.daysUntilRetirement >= 0);
+    const nextFive = upcomingRows.slice(0, 5);
+    const caucusBalance = Array.from(nextFive.reduce((counts, row) => {
+      const label = groupLabel(row.senator.party || 'Unknown');
+      counts.set(label, (counts.get(label) || 0) + 1);
+      return counts;
+    }, new Map<string, number>())).map(([label, count]) => `${count} ${label}`).join(', ');
+    const tenureRows = upcomingRows.filter((row) => row.yearsServed > 0);
+    const averageTenure = tenureRows.length ? Math.round((tenureRows.reduce((sum, row) => sum + row.yearsServed, 0) / tenureRows.length) * 10) / 10 : 0;
+    return {
+      thisQuarter: upcomingRows.filter((row) => row.daysUntilRetirement !== undefined && row.daysUntilRetirement <= 92).length,
+      thisYear: upcomingRows.filter((row) => row.retirementYear === currentYear).length,
+      averageTenure,
+      caucusBalance,
+    };
+  }, [retirementRows]);
   const senatorsById = useMemo(() => new Map(senators.map((senator) => [senator.id, senator])), [senators]);
   const attendanceRows = useMemo(() => [...attendance].sort((a, b) => {
     const aStats = attendanceStats(a);
@@ -107,7 +161,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
 
     {activeDashboard === 'expenses' && <SenStatsExpensesDashboardView senators={senators} expenses={expenses} selectedSenator={selectedSenator} onSelectSenator={onSelectSenator} loading={expensesLoading} />}
 
-    {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure</strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="dashboard-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, age, yearsServed }) => <button type="button" role="row" key={senator.id} className={`dashboard-click-row ${groupClassName(senator.party)}`} onClick={() => onSelectSenator(senator.id)}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span>{retirementDate || 'Not synced'}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></button>)}</div></div>}
+    {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure</strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="retirement-summary-grid" aria-label="Retirement summary"><article><span>Retiring this quarter</span><strong>{retirementSummary.thisQuarter}</strong><small>Within 92 days</small></article><article><span>Retiring this year</span><strong>{retirementSummary.thisYear}</strong><small>{new Date().getFullYear()}</small></article><article><span>Average tenure retiring</span><strong>{retirementSummary.averageTenure || '—'}</strong><small>Years served</small></article><article className="wide"><span>Next 5 caucus balance</span><strong>{retirementSummary.caucusBalance || 'Not enough data'}</strong><small>Based on soonest upcoming retirements</small></article></div><div className="dashboard-table retirement-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, appointedDate, age, yearsServed, daysUntilRetirement }) => <button type="button" role="row" key={senator.id} className={`dashboard-click-row ${groupClassName(senator.party)}`} onClick={() => onSelectSenator(senator.id)} title={appointedDate ? `Appointed ${appointedDate}` : 'Appointment date not synced'}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span className={`retirement-date-cell ${urgencyClass(daysUntilRetirement)}`}><b>{retirementDate || 'Not synced'}</b>{retirementDate && <small>{timeToEventLabel(daysUntilRetirement)}</small>}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></button>)}</div></div>}
 
     {activeDashboard === 'attendance' && <div className="source-card source-wide"><div className="source-heading"><span>Attendance</span><strong>Senators' Attendance and Activities on Sitting Days</strong><select value={attendanceSort} onChange={(event) => setAttendanceSort(event.target.value as AttendanceSort)}><option value="missed">Most days missed</option><option value="rate">Lowest attendance rate</option><option value="illness">Most illness days</option><option value="leave">Most leave days</option><option value="business">Most public business</option></select><a href="https://sencanada.ca/en/attendance/" target="_blank" rel="noreferrer">Open source</a></div>{attendanceRows.length === 0 ? <p className="muted">{syncedAttendanceCount > 0 ? `${syncedAttendanceCount} attendance rows were reported by the latest sync, but the realtime listener did not return row documents. Check deployed Firestore rules for senstats_attendance reads.` : 'No attendance rows synced yet. The ingestion script reads the public attendance register and stores summary rows after the next sync.'}</p> : <>
       <div className="senstats-tabs nested-tabs attendance-view-tabs" role="tablist" aria-label="Attendance dashboard views">
