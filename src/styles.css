@@ -439,6 +439,17 @@ a { color: var(--accent); font-weight: 700; }
 .committee-toolbar small { color: #64748b; font-weight: 850; }
 .committee-toolbar label { display: grid; gap: 6px; }
 .committee-toolbar input { width: 100%; border: 1px solid #dce4f2; border-radius: 14px; background: #fff; color: #14213d; padding: 11px 12px; font: inherit; font-weight: 800; text-transform: none; letter-spacing: 0; }
+
+.committee-button-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: stretch; }
+.committee-picker-button { display: grid; gap: 4px; align-content: start; min-height: 94px; border: 1px solid var(--sen-border, #e8edf7); border-left: 5px solid var(--group-color, #94a3b8); border-radius: 16px; background: var(--sen-surface, #fff); color: var(--sen-text-2, #25324a); padding: 12px; text-align: left; box-shadow: var(--sen-shadow, 0 10px 24px rgba(15,23,42,.06)); transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease; }
+.committee-picker-button:hover, .committee-picker-button:focus-visible { transform: translateY(-1px); border-color: color-mix(in srgb, var(--group-color, #94a3b8) 38%, var(--sen-border, #e8edf7)); background: color-mix(in srgb, var(--group-color, #94a3b8) 6%, var(--sen-surface, #fff)); box-shadow: 0 14px 30px rgba(15,23,42,.1); outline: none; }
+.committee-picker-button.active { border-color: #2563eb; border-left-color: #2563eb; background: color-mix(in srgb, #2563eb 9%, var(--sen-surface, #fff)); box-shadow: 0 16px 34px rgba(37,99,235,.16); }
+.committee-picker-button strong { color: var(--sen-text, #0f172a); font-size: .95rem; letter-spacing: .04em; }
+.committee-picker-button span { color: var(--sen-text-2, #475569); font-size: .82rem; line-height: 1.25; }
+.committee-picker-button small { color: var(--sen-muted, #64748b); font-size: .72rem; font-weight: 900; }
+.committee-detail-panel { overflow: hidden; padding: 0; border-left-width: 0; }
+.committee-detail-header { cursor: default; }
+.committee-detail-header::before { content: none; }
 .committee-card { gap: 0; padding: 0; overflow: hidden; border-left-width: 0; }
 .committee-card-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; border-bottom: 1px solid #e8edf7; background: linear-gradient(135deg,#f8fafc,#eef2ff); padding: 16px; cursor: pointer; list-style: none; }
 .committee-card-header::-webkit-details-marker { display: none; }
@@ -1049,6 +1060,14 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-dashboard.senstats-dark .senstats-empty-state { background: var(--sen-surface); border-color: var(--sen-border); color: var(--sen-text-2); }
 .senstats-dashboard.senstats-dark .source-table .source-table-head,
 .senstats-dashboard.senstats-dark .dashboard-table .source-table-head { background: var(--sen-surface-2); color: var(--sen-muted); }
+
+.senstats-dashboard.senstats-dark .committee-picker-button { background: var(--sen-surface); border-color: var(--sen-border); color: var(--sen-text-2); box-shadow: none; }
+.senstats-dashboard.senstats-dark .committee-picker-button:hover,
+.senstats-dashboard.senstats-dark .committee-picker-button:focus-visible { background: color-mix(in srgb, #2563eb 10%, var(--sen-surface)); }
+.senstats-dashboard.senstats-dark .committee-picker-button.active { background: color-mix(in srgb, #2563eb 18%, var(--sen-surface)); border-color: #60a5fa; border-left-color: #60a5fa; box-shadow: none; }
+.senstats-dashboard.senstats-dark .committee-picker-button strong { color: var(--sen-text); }
+.senstats-dashboard.senstats-dark .committee-picker-button span { color: var(--sen-text-2); }
+.senstats-dashboard.senstats-dark .committee-picker-button small { color: var(--sen-muted); }
 .senstats-dashboard.senstats-dark .committee-member-row { background: color-mix(in srgb, var(--group-color, #64748b) 7%, var(--sen-surface)); border-color: var(--sen-border); }
 .senstats-dashboard.senstats-dark .committee-member-row:hover,
 .senstats-dashboard.senstats-dark .committee-member-row:focus-within { background: color-mix(in srgb, var(--group-color, #64748b) 14%, var(--sen-surface)); }
@@ -1124,6 +1143,8 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
   .expense-chart-stack { height: auto; min-height: 28px; }
   .groups-grid,
   .committees-grid { grid-template-columns: minmax(0, 1fr); }
+  .committee-button-grid { display: flex; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; }
+  .committee-picker-button { flex: 0 0 min(210px, 78vw); min-height: 88px; scroll-snap-align: start; }
   .committee-card,
   .group-card,
   .dashboard-metric-card,

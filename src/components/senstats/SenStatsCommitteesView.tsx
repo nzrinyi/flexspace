@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { SenStatsCommitteeDocument, SenStatsCommitteeMember, SenStatsSenatorDocument } from '../../types';
 import { groupClassName, groupLabel } from './SenStatsHelpers';
 import { useSenatorSelect } from './SenatorSelectionContext';
@@ -45,6 +45,7 @@ function uniqueMembers(members: SenStatsCommitteeMember[]) {
 
 export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitteesViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCommitteeId, setSelectedCommitteeId] = useState('');
   const senatorsById = useMemo(() => new Map(senators.map((senator) => [senator.id, senator])), [senators]);
   const senatorsByName = useMemo(() => new Map(senators.map((senator) => [senator.name.toLowerCase(), senator])), [senators]);
   const committeesWithMembers = useMemo(() => committees.filter((committee) => (committee.members || []).length > 0), [committees]);
@@ -60,6 +61,14 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
       ...(committee.members || []).map((member) => member.name),
     ].filter(Boolean).join(' ').toLowerCase().includes(normalizedSearch));
   }, [committeesWithMembers, searchTerm]);
+  const selectedCommittee = filteredCommittees.find((committee) => committee.id === selectedCommitteeId) || filteredCommittees[0];
+
+  useEffect(() => {
+    if (!filteredCommittees.length) return;
+    if (!selectedCommitteeId || !filteredCommittees.some((committee) => committee.id === selectedCommitteeId)) {
+      setSelectedCommitteeId(filteredCommittees[0].id);
+    }
+  }, [filteredCommittees, selectedCommitteeId]);
 
   if (committees.length === 0) {
     return <div className="committee-empty-panel senstats-chart-empty">
@@ -91,29 +100,48 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
       {committeesWithMembers.length === 0 ? <div className="committee-skeleton-stack" aria-hidden="true"><i /><i /><i /></div> : <div className="empty-graphic" aria-hidden="true">⌕</div>}
       <strong>{committeesWithMembers.length === 0 ? 'No committee member rows yet' : 'No results found'}</strong>
       <span>{committeesWithMembers.length === 0 ? 'Committee cards stay hidden until at least one member row is available, so blank cards do not look broken.' : 'Try a different committee code, name, or senator.'}</span>
-    </div> : <div className="committees-grid">{filteredCommittees.map((committee) => {
-      const members = committee.members || [];
-      const dedupedMembers = uniqueMembers(members);
-      const leadership = dedupedMembers.filter((member) => isLeadershipRole(member.role));
-      const regularMembers = dedupedMembers.filter((member) => !isLeadershipRole(member.role));
-      const nextMeeting = committee.nextMeetingDate || committee.nextMeeting || '';
-      return <details key={committee.id} className="committee-card" open>
-        <summary className="committee-card-header">
-          <div>
-            <span>{committee.code} · {committee.type || 'Committee'}</span>
-            <strong>{committee.name}</strong>
-            <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
-          </div>
-          <small>{committee.session || 'Current session'}</small>
-        </summary>
-        {committee.sourceUrl && <a className="committee-official-link" href={committee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span aria-hidden="true">↗</span></a>}
-        {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${committee.name} leadership`}>
-          {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
-        </ul>}
-        <ul className="committee-member-list" aria-label={`${committee.name} members`}>
-          {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
-        </ul>
-      </details>;
-    })}</div>}
+    </div> : <>
+      <div className="committee-button-grid" role="tablist" aria-label="Committees">
+        {filteredCommittees.map((committee) => {
+          const isSelected = selectedCommittee?.id === committee.id;
+          return <button
+            key={committee.id}
+            type="button"
+            role="tab"
+            aria-selected={isSelected}
+            className={`committee-picker-button ${isSelected ? 'active' : ''}`}
+            onClick={() => setSelectedCommitteeId(committee.id)}
+          >
+            <strong>{committee.code}</strong>
+            <span>{committee.name}</span>
+            <small>{(committee.members || []).length} member{(committee.members || []).length === 1 ? '' : 's'}</small>
+          </button>;
+        })}
+      </div>
+      {selectedCommittee && (() => {
+        const members = selectedCommittee.members || [];
+        const dedupedMembers = uniqueMembers(members);
+        const leadership = dedupedMembers.filter((member) => isLeadershipRole(member.role));
+        const regularMembers = dedupedMembers.filter((member) => !isLeadershipRole(member.role));
+        const nextMeeting = selectedCommittee.nextMeetingDate || selectedCommittee.nextMeeting || '';
+        return <article className="committee-card committee-detail-panel" aria-live="polite">
+          <header className="committee-card-header committee-detail-header">
+            <div>
+              <span>{selectedCommittee.code} · {selectedCommittee.type || 'Committee'}</span>
+              <strong>{selectedCommittee.name}</strong>
+              <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
+            </div>
+            <small>{selectedCommittee.session || 'Current session'}</small>
+          </header>
+          {selectedCommittee.sourceUrl && <a className="committee-official-link" href={selectedCommittee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span aria-hidden="true">↗</span></a>}
+          {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${selectedCommittee.name} leadership`}>
+            {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
+          </ul>}
+          <ul className="committee-member-list" aria-label={`${selectedCommittee.name} members`}>
+            {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
+          </ul>
+        </article>;
+      })()}
+    </>}
   </section>;
 }
