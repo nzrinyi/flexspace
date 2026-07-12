@@ -1005,8 +1005,10 @@ input, select, textarea { max-width: 100%; }
 .senstats-empty-state { border: 1px dashed var(--sen-border, #cbd5e1) !important; border-radius: 14px; background: color-mix(in srgb, var(--group-color, #64748b) 5%, var(--sen-surface, #fff)); padding: 10px !important; }
 .senstats-empty-state span { color: var(--sen-muted, #64748b); font-size: .68rem; letter-spacing: .08em; text-transform: uppercase; }
 .senstats-empty-state small { color: var(--sen-text-2, #475569); }
-.senstats-group-key span, .senator-table em, .dashboard-table em { cursor: help; transition: transform .16s ease, box-shadow .16s ease; }
-.senstats-group-key span:hover, .senator-table em:hover, .dashboard-table em:hover { transform: translateY(-1px); box-shadow: 0 8px 16px color-mix(in srgb, var(--group-color, #64748b) 18%, transparent); }
+.senstats-group-key span { cursor: default; user-select: none; transition: box-shadow .16s ease; }
+.senstats-group-key span:hover { box-shadow: 0 8px 16px color-mix(in srgb, var(--group-color, #64748b) 16%, transparent); }
+.senator-table em, .dashboard-table em { cursor: default; transition: transform .16s ease, box-shadow .16s ease; }
+.senator-table em:hover, .dashboard-table em:hover { transform: translateY(-1px); box-shadow: 0 8px 16px color-mix(in srgb, var(--group-color, #64748b) 18%, transparent); }
 
 /* SenStats shell-level dark mode: cover the real page background, not only cards */
 body.senstats-body-dark { background: #020617; color: #e2e8f0; }
@@ -1028,6 +1030,25 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-dashboard.senstats-dark .dashboard-overview-banner strong { color: var(--sen-text); }
 .senstats-dashboard.senstats-dark .dashboard-overview-banner span,
 .senstats-dashboard.senstats-dark .dashboard-overview-banner small { color: var(--sen-muted); }
+.senstats-dashboard.senstats-dark .senstats-group-key span { background: color-mix(in srgb, var(--group-color, #64748b) 14%, var(--sen-surface)); color: var(--sen-text); border-color: color-mix(in srgb, var(--group-color, #64748b) 42%, var(--sen-border)); }
+.senstats-dashboard.senstats-dark .group-gro { --group-pill-bg: #1e293b; --group-text: #f8fafc; --group-border: #64748b; }
+.senstats-dashboard.senstats-dark .source-table > div,
+.senstats-dashboard.senstats-dark .dashboard-table > div,
+.senstats-dashboard.senstats-dark .dashboard-click-row,
+.senstats-dashboard.senstats-dark .group-card,
+.senstats-dashboard.senstats-dark .committee-card,
+.senstats-dashboard.senstats-dark .expense-pivot-selector,
+.senstats-dashboard.senstats-dark .expense-pivot-row,
+.senstats-dashboard.senstats-dark .expense-summary-card,
+.senstats-dashboard.senstats-dark .change-log-item,
+.senstats-dashboard.senstats-dark .sync-card,
+.senstats-dashboard.senstats-dark .senstats-empty-state { background: var(--sen-surface); border-color: var(--sen-border); color: var(--sen-text-2); }
+.senstats-dashboard.senstats-dark .source-table .source-table-head,
+.senstats-dashboard.senstats-dark .dashboard-table .source-table-head { background: var(--sen-surface-2); color: var(--sen-muted); }
+.senstats-dashboard.senstats-dark a,
+.senstats-dashboard.senstats-dark .change-log-senator { color: var(--sen-link-text); }
+.senstats-dashboard.senstats-dark ::placeholder { color: #94a3b8; }
+
 .attendance-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .dashboard-table.attendance-table.expanded > div { grid-template-columns: minmax(170px, 1.2fr) minmax(86px, .5fr) minmax(88px, .55fr) repeat(6, minmax(76px, .42fr)); }
 .dashboard-table.attendance-table.aggregate > div { grid-template-columns: minmax(170px, 1.2fr) minmax(84px, .5fr) minmax(86px, .5fr) repeat(5, minmax(76px, .42fr)); }
@@ -1091,6 +1112,15 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
   .source-table .source-table-head { display: none; }
   .expense-chart-row { grid-template-columns: 1fr; gap: 6px; }
   .expense-chart-stack { height: auto; min-height: 28px; }
+  .groups-grid,
+  .committees-grid { grid-template-columns: minmax(0, 1fr); }
+  .committee-card,
+  .group-card,
+  .dashboard-metric-card,
+  .expense-summary-card { min-width: 0; }
+  .committee-card-header,
+  .expense-heading { grid-template-columns: 1fr; gap: 8px; align-items: start; }
+  .senstats-group-key { max-width: 100%; }
 }
 @media (max-width: 420px) {
   .shell { width: 100%; padding: 10px 0; }

@@ -877,6 +877,20 @@ def filter_committee_links_for_focus(links: list[dict[str, str]]) -> list[dict[s
     focus = set(focus_codes)
     return [link for link in links if link.get("code") in focus]
 
+
+def minimum_committee_member_count(code: str) -> int:
+    default_minimum = config_int("committee_min_member_count", 2, "SENSTATS_COMMITTEE_MIN_MEMBER_COUNT")
+    configured = config_value("committee_min_member_counts", {}, None)
+    if isinstance(configured, dict):
+        value = configured.get(code.upper()) or configured.get(code.lower())
+        if value is not None:
+            try:
+                return max(1, int(value))
+            except (TypeError, ValueError):
+                LOGGER.warning("Ignoring invalid committee_min_member_counts value for %s: %r", code, value)
+    return max(1, default_minimum)
+
+
 def configured_committee_ids() -> dict[str, str]:
     ids = dict(KNOWN_COMMITTEE_IDS)
     configured = config_value("committee_ids", None, None)
@@ -1358,7 +1372,6 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
     committee_timeout = config_int("committee_membership_timeout", 20, "SENSTATS_COMMITTEE_MEMBERSHIP_TIMEOUT")
     committee_retry_attempts = config_int("committee_retry_attempts", 1, "SENSTATS_COMMITTEE_RETRY_ATTEMPTS")
     committee_empty_abort_after = config_int("committee_empty_abort_after", 3, "SENSTATS_COMMITTEE_EMPTY_ABORT_AFTER")
-    minimum_committee_members = config_int("committee_min_member_count", 10, "SENSTATS_COMMITTEE_MIN_MEMBER_COUNT")
     session_id = str(config_value("committee_session_id", "32", "SENSTATS_COMMITTEE_SESSION_ID"))
     consecutive_empty_committees = 0
     for link in committee_links(http):
@@ -1396,6 +1409,7 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
                 LOGGER.error("Committee parse failed for %s: %s", candidate_url, exc, exc_info=True)
                 write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_parse_error")
                 continue
+            minimum_committee_members = minimum_committee_member_count(code)
             if len(committee.members) >= minimum_committee_members:
                 LOGGER.info("Parsed %s committee %s member rows from %s", len(committee.members), code, candidate_url)
                 parsed_committee = committee
