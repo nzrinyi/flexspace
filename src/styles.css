@@ -1290,3 +1290,7 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
   .source-field-icon { width: 34px; height: 34px; }
 }
 .source-field-icon { letter-spacing: 0; text-transform: none; font-weight: 900; }
+
+/* Keep the selected committee details in the normal page flow so long member lists are never clipped. */
+.committee-card.committee-detail-panel { max-height: none; overflow: visible; padding-bottom: 4px; }
+.committees-view { padding-bottom: 18px; }
