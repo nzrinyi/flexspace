@@ -5,13 +5,14 @@ import { groupClassName, groupLabel } from './SenStatsHelpers';
 interface SenStatsGroupsViewProps {
   groups: Array<{ group: string; senators: SenStatsSenatorDocument[] }>;
   recentlyChangedSenatorIds: Set<string>;
+  onSelectSenator: (id: string) => void;
 }
 
 function provinceBadge(province: string) {
   return province.split(/\s+/).map((word) => word[0]).join('').slice(0, 3).toUpperCase() || 'CA';
 }
 
-export function SenStatsGroupsView({ groups, recentlyChangedSenatorIds }: SenStatsGroupsViewProps) {
+export function SenStatsGroupsView({ groups, recentlyChangedSenatorIds, onSelectSenator }: SenStatsGroupsViewProps) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => new Set(groups.slice(0, 1).map((item) => item.group)));
   const [groupSearch, setGroupSearch] = useState<Record<string, string>>({});
   const toggleGroup = (group: string) => setExpandedGroups((current) => {
@@ -48,7 +49,7 @@ export function SenStatsGroupsView({ groups, recentlyChangedSenatorIds }: SenSta
                   <div className="group-senator-list">
                     {visibleSenators.length === 0 && <p className="muted">No senators match this group search.</p>}
                     {visibleSenators.map((senator) => (
-                      <button type="button" className="group-senator-row" key={senator.id}>
+                      <button type="button" className="group-senator-row" key={senator.id} onClick={() => onSelectSenator(senator.id)}>
                         <span>{senator.name}{recentlyChangedSenatorIds.has(senator.id) && <em className="history-badge" title="Recent affiliation change">↻</em>}</span>
                         <small><i aria-hidden="true">⚑</i>{provinceBadge(senator.province)}</small>
                       </button>
