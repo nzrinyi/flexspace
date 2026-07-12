@@ -75,6 +75,31 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /senstats_sync/{document=**} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /senstats_change_log/{changeId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /senstats_attendance/{attendanceId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /senstats_expenses/{expenseId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
+    match /{path=**}/expenses/{expenseId} {
+      allow read: if signedIn();
+      allow write: if false;
+    }
+
 
     match /senstats_senators/{senatorId} {
       allow read: if signedIn();
