@@ -41,7 +41,7 @@
   "committee_list_timeout": 20,
   "committee_membership_timeout": 20,
   "committee_retry_attempts": 1,
-  "committee_empty_abort_after": 3,
+  "committee_empty_abort_after": 0,
   "skip_committee_directory_page": true,
   "use_committee_fallback": true,
   "skip_committee_page_fallback": true,

@@ -78,6 +78,7 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
       <div>
         <span>Committees</span>
         <strong>{committeesWithMembers.length} with member data</strong>
+        <small aria-live="polite">Showing {filteredCommittees.length} of {committeesWithMembers.length} committees{searchTerm.trim() ? ' matching your search' : ''}.</small>
         {hiddenCommitteeCount > 0 && <small>{hiddenCommitteeCount} empty committee{hiddenCommitteeCount === 1 ? '' : 's'} hidden until data is available.</small>}
       </div>
       <label>
@@ -88,7 +89,7 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
 
     {filteredCommittees.length === 0 ? <div className="senstats-chart-empty">
       {committeesWithMembers.length === 0 ? <div className="committee-skeleton-stack" aria-hidden="true"><i /><i /><i /></div> : <div className="empty-graphic" aria-hidden="true">⌕</div>}
-      <strong>{committeesWithMembers.length === 0 ? 'No committee member rows yet' : 'No matching committee records'}</strong>
+      <strong>{committeesWithMembers.length === 0 ? 'No committee member rows yet' : 'No results found'}</strong>
       <span>{committeesWithMembers.length === 0 ? 'Committee cards stay hidden until at least one member row is available, so blank cards do not look broken.' : 'Try a different committee code, name, or senator.'}</span>
     </div> : <div className="committees-grid">{filteredCommittees.map((committee) => {
       const members = committee.members || [];
@@ -101,11 +102,11 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
           <div>
             <span>{committee.code} · {committee.type || 'Committee'}</span>
             <strong>{committee.name}</strong>
-            <em>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
+            <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
           </div>
           <small>{committee.session || 'Current session'}</small>
         </summary>
-        {committee.sourceUrl && <a className="committee-official-link" href={committee.sourceUrl} target="_blank" rel="noreferrer">Official committee page</a>}
+        {committee.sourceUrl && <a className="committee-official-link" href={committee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span aria-hidden="true">↗</span></a>}
         {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${committee.name} leadership`}>
           {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(committee.id, member)} committeeId={committee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
         </ul>}
