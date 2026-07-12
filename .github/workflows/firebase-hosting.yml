@@ -3,12 +3,17 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches:
-      - '**'
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
   checks: write
   pull-requests: write
+
+concurrency:
+  group: firebase-hosting-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -35,6 +40,9 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: '544136326567'
           VITE_FIREBASE_APP_ID: '1:544136326567:web:eeab9a468ce0f82299da82'
           VITE_FIREBASE_MEASUREMENT_ID: G-LVT5RRD31W
+          VITE_DEPLOY_BRANCH: ${{ github.ref_name }}
+          VITE_DEPLOY_SHA: ${{ github.sha }}
+          VITE_DEPLOY_RUN_NUMBER: ${{ github.run_number }}
 
 
       - name: Deploy to Firebase Hosting
