@@ -1407,3 +1407,8 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .committee-title-block strong { display: block; color: var(--sen-text, #0f172a); font-size: 1.25rem; line-height: 1.15; }
 .senstats-dashboard.senstats-dark .info-tooltip { background: rgba(96,165,250,.18); color: #bfdbfe; }
 @media (max-width: 760px) { .source-matrix > a, .source-matrix > div { grid-template-columns: 1fr; } .committee-title-block { align-items: flex-start; flex-direction: column; } }
+
+/* Compact senator result count */
+.filter-rail-heading.compact-results { align-content: center; gap: 4px; }
+.filter-rail-heading.compact-results strong { display: none; }
+.filter-rail-heading.compact-results small { color: var(--sen-muted, #64748b); font-size: .86rem; font-weight: 850; text-transform: none; letter-spacing: 0; }

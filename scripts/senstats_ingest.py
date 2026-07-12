@@ -1211,7 +1211,22 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
     seen: set[str] = set()
     seen_names: set[str] = set()
 
+
+    def normalized_member_role(text: str, fallback: str = "Member") -> str:
+        normalized = " ".join(str(text or "").replace("\xa0", " ").split())
+        lowered = normalized.lower()
+        if re.search(r"\b(deputy|vice)[ -]?chair\b", lowered):
+            return "Vice Chair" if "vice" in lowered else "Deputy Chair"
+        if re.search(r"\bchair\b", lowered):
+            return "Chair"
+        if re.search(r"\bex officio\b", lowered):
+            return "Ex officio"
+        if re.search(r"\bmember\b", lowered):
+            return "Member"
+        return fallback or "Member"
+
     def append_member(name_text: str, role: str, party: str = "", province: str = "", profile_url: str = "") -> None:
+        role = normalized_member_role(role)
         normalized_name = clean_display_name(name_text)
         senator = senators_by_profile.get(profile_url_key(profile_url)) if profile_url else None
         senator = senator or senators_by_name.get(normalized_name)
@@ -1246,13 +1261,18 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         profile_anchor = anchor or (anchors[0] if anchors else None)
         role_heading = row.find(["h3", "h4"])
         detail_text = row.get_text(" ", strip=True)
+        role_text = " ".join([
+            role_heading.get_text(" ", strip=True) if role_heading else "",
+            " ".join(item.get_text(" ", strip=True) for item in row.find_all(class_=re.compile(r"role|position|title|chair", re.I))),
+            detail_text,
+        ])
         party = ""
         province = ""
         affiliation_match = re.search(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", detail_text)
         if affiliation_match:
             party = affiliation_match.group(1)
             province = affiliation_match.group(2)
-        append_member(anchor.get_text(" ", strip=True) if anchor else "", role_heading.get_text(" ", strip=True) if role_heading else "Member", party, province, str(profile_anchor["href"]) if profile_anchor else "")
+        append_member(anchor.get_text(" ", strip=True) if anchor else "", normalized_member_role(role_text), party, province, str(profile_anchor["href"]) if profile_anchor else "")
 
     def clean_committee_text_line(line: str) -> str:
         line = re.sub(r"^#+\s*", "", line.strip())
@@ -1303,8 +1323,8 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
             continue
         role = ""
         for line in raw_text.splitlines():
-            if senator_name in line and any(token in line.lower() for token in ["chair", "deputy", "member", "ex officio"]):
-                role = line.replace(senator_name, "").strip(" -·,;:")[:80]
+            if senator_name in line and any(token in line.lower() for token in ["chair", "deputy", "vice", "member", "ex officio"]):
+                role = normalized_member_role(line.replace(senator_name, "").strip(" -·,;:")[:80])
                 break
         append_member(senator.name, role or "Member", senator.party, senator.province, "")
     return CommitteeRecord(stable_id(code), code, name, committee_type, session, source_url, members)

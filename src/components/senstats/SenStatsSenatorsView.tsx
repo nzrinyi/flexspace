@@ -60,7 +60,7 @@ export function SenStatsSenatorsView({ senators, selectedSenator, filteredSenato
       {groupOptions.filter((group) => group !== 'All').map((group) => <span key={group} className={groupClassName(group)} title={groupFullName(group)} onMouseEnter={() => setHoveredGroup(group)} onMouseLeave={() => setHoveredGroup('')} onFocus={() => setHoveredGroup(group)} onBlur={() => setHoveredGroup('')} tabIndex={0}><i />{groupLabel(group)}</span>)}
     </div>
     <section className="senstats-filter-bar" aria-label="Senator filters">
-      <div className="filter-rail-heading"><span>Refine senators</span><strong>{filteredSenators.length}</strong><small>of {senators.length}</small></div>
+      <div className="filter-rail-heading compact-results"><span>Refine senators</span><small>{filteredSenators.length} result{filteredSenators.length === 1 ? '' : 's'}{filteredSenators.length !== senators.length ? ` of ${senators.length}` : ''}</small></div>
       <div className="senstats-filters compact with-clear">
         <label><span>Search</span><input value={searchTerm} onChange={(event) => onSearchTermChange(event.target.value)} placeholder="Name, province, group…" /></label>
         <label><span>Group</span><select value={groupFilter} onChange={(event) => onGroupFilterChange(event.target.value)}>{groupOptions.map((group) => <option key={group}>{group}</option>)}</select></label>
