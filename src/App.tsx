@@ -133,11 +133,38 @@ function App() {
 
 
 function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) => void }) {
-  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open existing app</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Blank workspace ready for the next app build-out.</span><small>Open blank app</small></button></div></section></main>;
+  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">FlexSpace launcher</p><h2>Choose a workspace app</h2></div><span>Double-click an app name in either app header to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, shared notes, quotes, test-drive planning, and decision support.</span><small>Open CarMatch</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Canadian Senate dashboard with senators, groups, committees, expenses, public sources, sync status, and change history.</span><small>Open SenStats</small></button></div></section></main>;
 }
 
+type SenStatsThemeMode = 'light' | 'dark' | 'auto';
+
+const deployBranch = import.meta.env.VITE_DEPLOY_BRANCH || 'local';
+const deploySha = String(import.meta.env.VITE_DEPLOY_SHA || 'dev').slice(0, 7);
+const deployRunNumber = import.meta.env.VITE_DEPLOY_RUN_NUMBER || 'local';
+const deployVersionLabel = `Deploy #${deployRunNumber} · ${deployBranch} · ${deploySha}`;
+
 function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
-  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button></div></section><SenStatsDashboard /></main>;
+  const [themeMode, setThemeMode] = useState<SenStatsThemeMode>(() => (localStorage.getItem('senstats.themeMode') as SenStatsThemeMode | null) || (localStorage.getItem('senstats.darkMode') === 'true' ? 'dark' : 'auto'));
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const darkMode = themeMode === 'auto' ? systemPrefersDark : themeMode === 'dark';
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(prefers-color-scheme: dark)');
+    if (!media) return undefined;
+    const onChange = (event: MediaQueryListEvent) => setSystemPrefersDark(event.matches);
+    media.addEventListener('change', onChange);
+    return () => media.removeEventListener('change', onChange);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('senstats.themeMode', themeMode);
+    localStorage.setItem('senstats.darkMode', String(darkMode));
+    document.body.classList.toggle('senstats-body-dark', darkMode);
+    return () => document.body.classList.remove('senstats-body-dark');
+  }, [darkMode, themeMode]);
+
+  return <main className={`shell senstats-shell ${darkMode ? 'senstats-shell-dark' : ''}`}><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><span className="deploy-version-badge" title={`Deploy run ${deployRunNumber} from ${deployBranch} at ${deploySha}`}>{deployVersionLabel}</span><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-haspopup="dialog">Settings</button></div></section><SenStatsDashboard darkMode={darkMode} />{settingsOpen && <div className="settings-modal-layer" role="presentation"><button type="button" className="settings-modal-backdrop" aria-label="Close settings" onClick={() => setSettingsOpen(false)} /><section className="settings-modal" role="dialog" aria-modal="true" aria-labelledby="senstats-settings-title"><header><div><span>SenStats settings</span><strong id="senstats-settings-title">Display preferences</strong></div><button type="button" aria-label="Close settings" onClick={() => setSettingsOpen(false)}>×</button></header><div className="settings-section"><span>Theme</span><div className="theme-mode-options" role="radiogroup" aria-label="Theme mode">{(['light', 'dark', 'auto'] as SenStatsThemeMode[]).map((mode) => <button key={mode} type="button" role="radio" aria-checked={themeMode === mode} className={themeMode === mode ? 'active' : ''} onClick={() => setThemeMode(mode)}><strong>{mode === 'light' ? 'Light' : mode === 'dark' ? 'Dark' : 'Auto'}</strong><small>{mode === 'auto' ? 'Match system' : `${mode} mode`}</small></button>)}</div></div><div className="settings-section placeholder"><span>More settings coming soon</span><p className="muted">This panel is ready for future defaults, sync display preferences, and accessibility controls.</p></div></section></div>}</main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {

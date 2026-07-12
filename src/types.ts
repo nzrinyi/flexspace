@@ -170,6 +170,8 @@ export interface SenStatsSenatorDocument {
 
 export interface SenStatsExpenseDocument {
   id?: string;
+  senatorId?: string;
+  senatorName?: string;
   quarter: string;
   amount: number;
   category: string;
@@ -193,6 +195,8 @@ export interface SenStatsCommitteeDocument {
   type?: string;
   session?: string;
   sourceUrl?: string;
+  nextMeeting?: string;
+  nextMeetingDate?: string;
   members: SenStatsCommitteeMember[];
   updatedAt?: Timestamp;
 }
@@ -203,4 +207,55 @@ export interface SenStatsAffiliationHistoryDocument {
   newParty: string;
   sourceUrl?: string;
   changedAt?: Timestamp;
+}
+
+export interface SenStatsSyncStatusDocument {
+  id?: string;
+  status: 'success' | 'partial' | 'failed' | string;
+  startedAt?: Timestamp;
+  finishedAt?: Timestamp;
+  senatorCount?: number;
+  expenseCount?: number;
+  committeeCount?: number;
+  attendanceCount?: number;
+  changeCount?: number;
+  errorCount?: number;
+  errors?: string[];
+  photoCount?: number;
+  missingPhotoCount?: number;
+  workaround?: string;
+}
+
+export interface SenStatsChangeLogDocument {
+  id?: string;
+  type: 'new_senator' | 'retired_senator' | 'group_change' | string;
+  senatorId: string;
+  senatorName: string;
+  previousParty?: string;
+  newParty?: string;
+  previousProvince?: string;
+  newProvince?: string;
+  sourceUrl?: string;
+  action?: string;
+  actor?: string;
+  detectedAt?: Timestamp;
+  syncId?: string;
+}
+
+
+export interface SenStatsAttendanceDocument {
+  id?: string;
+  senatorId?: string;
+  senatorName: string;
+  party?: string;
+  sittingDays?: number;
+  present?: number;
+  otherPublicBusiness?: number;
+  illness?: number;
+  leave?: number;
+  session?: string;
+  asOf?: string;
+  sourceUrl?: string;
+  raw?: Record<string, unknown>;
+  updatedAt?: Timestamp;
 }
