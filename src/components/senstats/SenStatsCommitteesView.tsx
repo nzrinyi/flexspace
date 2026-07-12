@@ -17,6 +17,10 @@ function committeeMemberKey(committeeId: string, member: SenStatsCommitteeMember
   return `${committeeId}-${member.senatorId || member.name}-${member.role || 'member'}`;
 }
 
+function roleIcon(role = '') {
+  return isLeadershipRole(role) ? '♛' : '';
+}
+
 function CommitteeMemberRow({ member, committeeId, senator }: { member: SenStatsCommitteeMember; committeeId: string; senator?: SenStatsSenatorDocument }) {
   const { selectSenator } = useSenatorSelect();
   const initials = member.name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -25,7 +29,11 @@ function CommitteeMemberRow({ member, committeeId, senator }: { member: SenStats
     {photoUrl ? <img className="member-photo" src={photoUrl} alt="" loading="lazy" referrerPolicy="no-referrer" /> : <span aria-hidden="true" className="member-initials">{initials || '—'}</span>}
     <div>
       <strong>{member.name}</strong>
-      <small>{member.role || 'Member'}{member.party ? ` · ${groupLabel(member.party)}` : ''}{member.province ? ` · ${member.province}` : ''}</small>
+      <small className="member-meta-badges">
+        <span className={`member-role-badge ${isLeadershipRole(member.role) ? 'leadership' : ''}`}>{roleIcon(member.role)} {member.role || 'Member'}</span>
+        {member.party && <span>{groupLabel(member.party)}</span>}
+        {member.province && <span>{member.province}</span>}
+      </small>
     </div>
   </>;
   return <li key={committeeMemberKey(committeeId, member)} className={`committee-member-row ${isLeadershipRole(member.role) ? 'leadership' : ''} ${groupClassName(member.party || '')}`}>
@@ -45,6 +53,7 @@ function uniqueMembers(members: SenStatsCommitteeMember[]) {
 
 export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitteesViewProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [memberSearchTerm, setMemberSearchTerm] = useState('');
   const [selectedCommitteeId, setSelectedCommitteeId] = useState('');
   const senatorsById = useMemo(() => new Map(senators.map((senator) => [senator.id, senator])), [senators]);
   const senatorsByName = useMemo(() => new Map(senators.map((senator) => [senator.name.toLowerCase(), senator])), [senators]);
@@ -88,12 +97,18 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
         <span>Committees</span>
         <strong>{committeesWithMembers.length} with member data</strong>
         <small aria-live="polite">Showing {filteredCommittees.length} of {committeesWithMembers.length} committees{searchTerm.trim() ? ' matching your search' : ''}.</small>
-        {hiddenCommitteeCount > 0 && <small>{hiddenCommitteeCount} empty committee{hiddenCommitteeCount === 1 ? '' : 's'} hidden until data is available.</small>}
+        {hiddenCommitteeCount > 0 && <small className="committee-hidden-badge">{hiddenCommitteeCount} hidden</small>}
       </div>
-      <label>
-        Search committees
-        <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search by committee, code, or senator…" />
-      </label>
+      <div className="committee-search-grid">
+        <label>
+          Search committees
+          <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search committee or code…" />
+        </label>
+        <label>
+          Search senators
+          <input value={memberSearchTerm} onChange={(event) => setMemberSearchTerm(event.target.value)} placeholder="Filter selected members…" />
+        </label>
+      </div>
     </div>
 
     {filteredCommittees.length === 0 ? <div className="senstats-chart-empty">
@@ -112,34 +127,45 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
             className={`committee-picker-button ${isSelected ? 'active' : ''}`}
             onClick={() => setSelectedCommitteeId(committee.id)}
           >
-            <strong>{committee.code}</strong>
-            <span>{committee.name}</span>
-            <small>{(committee.members || []).length} member{(committee.members || []).length === 1 ? '' : 's'}</small>
+            <strong title={`${committee.name} · ${(committee.members || []).length} member${(committee.members || []).length === 1 ? '' : 's'}`}>{committee.code}</strong>
           </button>;
         })}
       </div>
       {selectedCommittee && (() => {
         const members = selectedCommittee.members || [];
         const dedupedMembers = uniqueMembers(members);
-        const leadership = dedupedMembers.filter((member) => isLeadershipRole(member.role));
-        const regularMembers = dedupedMembers.filter((member) => !isLeadershipRole(member.role));
+        const normalizedMemberSearch = memberSearchTerm.trim().toLowerCase();
+        const visibleMembers = normalizedMemberSearch ? dedupedMembers.filter((member) => [member.name, member.role, groupLabel(member.party || ''), member.province].filter(Boolean).join(' ').toLowerCase().includes(normalizedMemberSearch)) : dedupedMembers;
+        const leadership = visibleMembers.filter((member) => isLeadershipRole(member.role));
+        const regularMembers = visibleMembers.filter((member) => !isLeadershipRole(member.role));
+        const caucusStats = Object.entries(dedupedMembers.reduce<Record<string, number>>((counts, member) => {
+          const label = groupLabel(member.party || 'Unknown');
+          counts[label] = (counts[label] || 0) + 1;
+          return counts;
+        }, {})).sort(([, a], [, b]) => b - a);
         const nextMeeting = selectedCommittee.nextMeetingDate || selectedCommittee.nextMeeting || '';
         return <article className="committee-card committee-detail-panel" aria-live="polite">
           <header className="committee-card-header committee-detail-header">
             <div>
               <span>{selectedCommittee.code} · {selectedCommittee.type || 'Committee'}</span>
               <strong>{selectedCommittee.name}</strong>
+              <div className="committee-quick-stats" aria-label={`${selectedCommittee.name} caucus breakdown`}>
+                <span>{dedupedMembers.length} total</span>
+                {caucusStats.map(([label, count]) => <span key={label}>{count} {label}</span>)}
+              </div>
               <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'Next meeting date not posted yet'}</em>
             </div>
             <small>{selectedCommittee.session || 'Current session'}</small>
           </header>
-          {selectedCommittee.sourceUrl && <a className="committee-official-link" href={selectedCommittee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span aria-hidden="true">↗</span></a>}
-          {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${selectedCommittee.name} leadership`}>
-            {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
-          </ul>}
-          <ul className="committee-member-list" aria-label={`${selectedCommittee.name} members`}>
-            {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
-          </ul>
+          {selectedCommittee.sourceUrl && <a className="committee-official-link" href={selectedCommittee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span className="external-link-icon" aria-hidden="true">↗</span></a>}
+          {visibleMembers.length === 0 ? <div className="senstats-chart-empty committee-member-empty"><strong>No matching members</strong><span>Try a different senator, role, caucus, or province.</span></div> : <>
+            {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${selectedCommittee.name} leadership`}>
+              {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
+            </ul>}
+            <ul className="committee-member-list" aria-label={`${selectedCommittee.name} members`}>
+              {regularMembers.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
+            </ul>
+          </>}
         </article>;
       })()}
     </>}
