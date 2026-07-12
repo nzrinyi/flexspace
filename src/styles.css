@@ -1300,3 +1300,16 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .expense-profile-button:hover, .expense-profile-button:focus-visible { background: #e0e7ff; box-shadow: 0 10px 22px rgba(79,70,229,.18); outline: none; }
 .senstats-dashboard.senstats-dark .expense-profile-button { background: var(--sen-surface-2); border-color: var(--sen-border); color: var(--sen-link-text); }
 @media (max-width: 760px) { .expense-profile-button { justify-self: start; } }
+.senstats-filters.with-clear { grid-template-columns: 1.4fr 1fr 1fr auto; align-items: end; }
+.clear-filters-button { align-self: end; min-height: 43px; border: 1px solid #c7d2fe; border-radius: 999px; background: #eef2ff; color: #3730a3; padding: 8px 12px; font-size: .78rem; font-weight: 950; white-space: nowrap; cursor: pointer; }
+.clear-filters-button:hover, .clear-filters-button:focus-visible { background: #e0e7ff; box-shadow: 0 10px 22px rgba(79,70,229,.18); outline: none; }
+.senator-sort-button { display: inline-flex; align-items: center; gap: 5px; min-height: 0; border: 0; background: transparent; color: inherit; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
+.senator-sort-button span { color: #94a3b8; font-size: .66rem; letter-spacing: 0; }
+.senator-sort-button.active span { color: #2563eb; }
+.senator-table tbody tr.group-dimmed { opacity: .42; }
+.senator-table tbody tr.group-dimmed:hover { opacity: 1; }
+.senator-table tbody tr.active { box-shadow: inset 10px 0 0 var(--group-color, #2563eb), inset 0 0 0 999px color-mix(in srgb, var(--group-color, #2563eb) 5%, transparent); }
+.senstats-group-key span { cursor: default; transition: transform .16s ease, box-shadow .16s ease; }
+.senstats-group-key span:hover, .senstats-group-key span:focus-visible { transform: translateY(-1px); box-shadow: 0 10px 18px color-mix(in srgb, var(--group-color, #64748b) 18%, transparent); outline: none; }
+.senstats-dashboard.senstats-dark .clear-filters-button { background: var(--sen-surface-2); border-color: var(--sen-border); color: var(--sen-link-text); }
+@media (max-width: 900px) { .senstats-filter-bar .senstats-filters.with-clear { grid-template-columns: 1fr; } .clear-filters-button { justify-self: start; } }
