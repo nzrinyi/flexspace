@@ -3,12 +3,17 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches:
-      - '**'
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
   checks: write
   pull-requests: write
+
+concurrency:
+  group: firebase-hosting-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   deploy:

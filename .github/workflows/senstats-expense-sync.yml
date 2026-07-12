@@ -1,18 +1,16 @@
 name: SenStats Quarterly Expense Sync
 
 on:
-  # This path-scoped push trigger makes GitHub discover and list this new workflow
-  # as soon as the workflow file lands on the default branch. The quarterly
-  # schedule and manual workflow_dispatch remain the normal run paths.
-  push:
-    paths:
-      - '.github/workflows/senstats-expense-sync.yml'
   schedule:
     - cron: '17 10 2 1,4,7,10 *'
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: senstats-expense-sync
+  cancel-in-progress: true
 
 jobs:
   sync-senstats-expenses:
