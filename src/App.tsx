@@ -219,24 +219,24 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
     setPieces(defaultWallPieces);
   }, [setPieces, setScalePercent, setSnapEnabled, setWallHeight, setWallWidth, setZoomPercent]);
 
-  const applyGalleryPreset = useCallback(() => {
-    setPieces(defaultWallPieces);
-    setScalePercent(100);
-    setZoomPercent(100);
-    setSnapEnabled(true);
-    setSelectedPieceId(null);
-  }, [setPieces, setScalePercent, setSnapEnabled, setZoomPercent]);
-
   const selectedPiece = effectivePieces.find((piece) => piece.id === selectedPieceId);
-  const deleteSelectedPiece = useCallback(() => {
-    if (!selectedPieceId) return;
-    setPieces((current) => current.filter((piece) => piece.id !== selectedPieceId));
-    setSelectedPieceId(null);
-  }, [selectedPieceId, setPieces]);
-  const rotateSelectedPiece = useCallback(() => {
-    if (!selectedPieceId) return;
-    setPieces((current) => current.map((piece) => piece.id === selectedPieceId ? { ...piece, rotation: ((piece.rotation ?? 0) + 90) % 360 } : piece));
-  }, [selectedPieceId, setPieces]);
+  const deletePiece = useCallback((pieceId: string) => {
+    setPieces((current) => current.filter((piece) => piece.id !== pieceId));
+    setSelectedPieceId((current) => current === pieceId ? null : current);
+  }, [setPieces]);
+  const rotatePiece = useCallback((pieceId: string) => {
+    setPieces((current) => current.map((piece) => piece.id === pieceId ? { ...piece, rotation: ((piece.rotation ?? 0) + 90) % 360 } : piece));
+    setSelectedPieceId(pieceId);
+  }, [setPieces]);
+  const resizePiece = useCallback((pieceId: string, direction: 1 | -1) => {
+    setPieces((current) => current.map((piece) => {
+      if (piece.id !== pieceId) return piece;
+      const currentIndex = Math.max(standardArtSizes.findIndex((size) => size.label === piece.label), 0);
+      const nextSize = standardArtSizes[Math.min(Math.max(currentIndex + direction, 0), standardArtSizes.length - 1)];
+      return { ...piece, label: nextSize.label, width: nextSize.width, height: nextSize.height, color: nextSize.color };
+    }));
+    setSelectedPieceId(pieceId);
+  }, [setPieces]);
 
   return (
     <main className="shell artsizer-shell">
@@ -250,7 +250,7 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
               <label><span>Wall height</span><input type="number" min="24" max="144" value={wallHeight} onChange={(event) => setWallHeight(Number(event.target.value) || 60)} /></label>
               <label className="artsizer-scale"><span>Frame scale {scalePercent}%</span><input type="range" min="50" max="150" value={scalePercent} onChange={(event) => setScalePercent(Number(event.target.value))} /></label><label className="artsizer-scale"><span>Canvas zoom {zoomPercent}%</span><input type="range" min="60" max="180" value={zoomPercent} onChange={(event) => setZoomPercent(Number(event.target.value))} /></label>
             </div>
-            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={rotateSelectedPiece} disabled={!selectedPiece}>Rotate selected</button><button type="button" onClick={deleteSelectedPiece} disabled={!selectedPiece}>Delete selected</button><button type="button" onClick={applyGalleryPreset}>Gallery preset</button><button type="button" onClick={resetLayout}>Reset</button></div>{selectedPiece && <p className="artsizer-selection">Selected: <strong>{selectedPiece.label}</strong> · {selectedPiece.width}″ × {selectedPiece.height}″ · {selectedPiece.rotation ?? 0}°</p>}
+            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={resetLayout}>Reset</button></div>{selectedPiece && <p className="artsizer-selection">Hover the selected frame for resize, rotate, and delete controls.</p>}
             <div className="frame-drawer"><strong>Standard sizes</strong>{standardArtSizes.map((size) => <button key={size.label} type="button" draggable onDragStart={(event) => event.dataTransfer.setData('application/artsizer-frame', size.label)} onClick={() => addFrame(size)}><i style={{ background: size.color }} /><span>{size.label}</span><small>{size.width}″ × {size.height}″</small></button>)}</div>
           </aside>
           <div className="wall-stage">
@@ -259,9 +259,19 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
               <rect width={wallWidth} height={wallHeight} rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="0.5" />
               {snapEnabled && <rect width={wallWidth} height={wallHeight} fill="url(#snap-grid)" opacity="0.85" />}
               <line x1="0" y1={wallHeight / 2} x2={wallWidth} y2={wallHeight / 2} stroke="#cbd5e1" strokeDasharray="1.5 1.5" strokeWidth="0.25" />
-              {effectivePieces.map((piece) => <g key={piece.id} className={`wall-art-piece ${piece.id === selectedPieceId ? 'selected' : ''}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDraggingPieceId(piece.id); setSelectedPieceId(piece.id); }}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text></g>)}
+              {effectivePieces.map((piece) => {
+                const controlX = piece.x + Math.max(piece.width - 15, 1);
+                const controlY = piece.y + 2;
+                const controlButtons = [
+                  { label: 'Upsize frame', icon: '↑', x: controlX, y: controlY, onClick: () => resizePiece(piece.id, 1) },
+                  { label: 'Downsize frame', icon: '↓', x: controlX + 4, y: controlY, onClick: () => resizePiece(piece.id, -1) },
+                  { label: 'Rotate frame', icon: '↻', x: controlX + 8, y: controlY, onClick: () => rotatePiece(piece.id) },
+                  { label: 'Delete frame', icon: '×', x: controlX + 12, y: controlY, onClick: () => deletePiece(piece.id) },
+                ];
+                return <g key={piece.id} className={`wall-art-piece ${piece.id === selectedPieceId ? 'selected' : ''}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDraggingPieceId(piece.id); setSelectedPieceId(piece.id); }}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text><g className="frame-inline-controls">{controlButtons.map((control) => <g key={control.label} role="button" aria-label={control.label} tabIndex={0} transform={`translate(${control.x} ${control.y})`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); control.onClick(); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); control.onClick(); } }}><circle r="1.75" fill="#0f172a" opacity="0.9" /><text textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize="2.4" fontWeight="900">{control.icon}</text></g>)}</g></g>;
+              })}
             </svg></div></div>
-            <p className="artsizer-help">Tip: drag from the size drawer, click a size to add it, drag frames already on the wall, then rotate or delete the selected frame. Canvas zoom changes your view only — the wall dimensions stay fixed.</p>
+            <p className="artsizer-help">Tip: hover a frame for upsize, downsize, rotate, and delete icons. Canvas zoom changes your view only — the wall dimensions stay fixed.</p>
           </div>
         </div>
       </section>

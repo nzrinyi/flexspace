@@ -519,3 +519,8 @@ input, select, textarea { max-width: 100%; }
 .artsizer-selection { margin: 0; border: 1px solid #fbcfe8; border-radius: 14px; background: #fdf2f8; color: #831843; padding: 10px 12px; font-size: .86rem; font-weight: 800; }
 .artsizer-selection strong { color: #500724; }
 @media (max-width: 560px) { .wall-canvas-viewport { border-radius: 18px; } }
+.frame-inline-controls { opacity: 0; pointer-events: none; transition: opacity .14s ease; }
+.wall-art-piece:hover .frame-inline-controls { opacity: 1; pointer-events: auto; }
+.frame-inline-controls g { cursor: pointer; }
+.frame-inline-controls g:hover circle,
+.frame-inline-controls g:focus circle { fill: #db2777; opacity: 1; }
