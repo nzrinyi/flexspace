@@ -40,6 +40,23 @@ type WorkspaceApp = 'CarMatch' | 'ArtSizer' | 'AppSelection';
 
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
+
+const browserChromeByApp: Record<WorkspaceApp, { title: string; favicon: string }> = {
+  AppSelection: { title: 'FlexSpace', favicon: '/favicon-launcher.svg' },
+  CarMatch: { title: 'CarMatch', favicon: '/favicon.svg' },
+  ArtSizer: { title: 'ArtSizer', favicon: '/favicon-artsizer.svg' },
+};
+
+function setBrowserChrome(app: WorkspaceApp) {
+  const chrome = browserChromeByApp[app];
+  document.title = chrome.title;
+  const existingIcon = document.querySelector<HTMLLinkElement>("link[rel='icon']");
+  const icon = existingIcon ?? document.head.appendChild(document.createElement('link'));
+  icon.rel = 'icon';
+  icon.type = 'image/svg+xml';
+  icon.href = chrome.favicon;
+}
+
 interface Filters {
   query: string;
   bodyStyle: 'All' | BodyStyle;
@@ -297,6 +314,10 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [favoritesByProfile, setFavoritesByProfile] = useState<Record<ProfileName, string[]>>({ Emily: [], Nick: [] });
   const [profileWeights, setProfileWeights] = useState<Record<ProfileName, CriteriaWeights>>({ Emily: DEFAULT_WEIGHTS, Nick: DEFAULT_WEIGHTS });
   const [profileMeta, setProfileMeta] = useState<Record<ProfileName, ProfilePreferenceMeta>>({ Emily: {}, Nick: {} });
+
+  useEffect(() => {
+    setBrowserChrome(activeWorkspaceApp);
+  }, [activeWorkspaceApp]);
 
   const canReadSharedCollections = Boolean(sessionId && session?.partnerIds?.includes(activeUser.uid));
   const preferencesQuery = useMemo(() => (sessionId && canReadSharedCollections ? collection(db, 'sessions', sessionId, 'userPreferences') : null), [canReadSharedCollections, sessionId]);
