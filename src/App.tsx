@@ -127,7 +127,7 @@ function App() {
 
   const authFailureMessage = authError?.message ?? anonymousSignInError;
   if (authFailureMessage) {
-    return <main className="shell error"><section className="card"><p className="eyebrow">Firebase Auth setup required</p><h1>CarMatch could not start a secure anonymous session.</h1><p>{authFailureMessage}</p><p>Enable Authentication and the Anonymous provider for the <strong>flexspace-1</strong> project.</p></section></main>;
+    return <main className="shell error"><section className="card"><p className="eyebrow">Firebase Auth setup required</p><h1>CarMatch could not start a secure anonymous session.</h1><p>{authFailureMessage}</p><p>Enable Authentication and the Anonymous provider for the <strong>quorum-2</strong> project.</p></section></main>;
   }
   if (authLoading || !user) return <div style={{ padding: '20px', textAlign: 'center' }}>Initializing secure session...</div>;
   return <AuthenticatedSession activeUser={user} />;

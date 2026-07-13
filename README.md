@@ -21,7 +21,7 @@ The static model profiles use manufacturer model pages as source links. Vehicle 
 
 ## Firebase project
 
-This codebase is configured for the existing Firebase project `flexspace-1` / project number `544136326567` via `.firebaserc`.
+This codebase is configured for the existing Firebase project `quorum-2` / project number `594173636153` via `.firebaserc`.
 
 ## Register the Firebase web app
 
@@ -29,8 +29,8 @@ Use Firebase CLI credentials that have owner/editor access to the project:
 
 ```bash
 firebase login
-firebase apps:list --project flexspace-1
-firebase apps:sdkconfig WEB 1:544136326567:web:eeab9a468ce0f82299da82 --project flexspace-1
+firebase apps:list --project quorum-2
+firebase apps:sdkconfig WEB 1:594173636153:web:cf3c1d2aadde06508167e8 --project quorum-2
 ```
 
 The Firebase web app config has been added to `.env.example`; copy it to `.env.local` for local development. Vite exposes only variables prefixed with `VITE_` to the browser bundle.
@@ -46,7 +46,7 @@ npm run dev
 
 ```bash
 npm run build
-firebase deploy --only hosting --project flexspace-1
+firebase deploy --only hosting --project quorum-2
 ```
 
 Firebase Hosting is configured to serve `dist` and rewrite all routes, including `/join?session=...`, to `index.html` so invite links work as a single-page application.
@@ -64,9 +64,9 @@ The GitHub Hosting workflow intentionally does not deploy Firestore rules becaus
 
 ## Firebase console prerequisites
 
-Before the deployed site can create paired sessions, enable Firebase Authentication for the `flexspace-1` project and turn on the **Anonymous** sign-in provider:
+Before the deployed site can create paired sessions, enable Firebase Authentication for the `quorum-2` project and turn on the **Anonymous** sign-in provider:
 
-1. Open Firebase Console for `flexspace-1`.
+1. Open Firebase Console for `quorum-2`.
 2. Go to **Authentication** > **Sign-in method**.
 3. Enable **Anonymous** as a provider.
 4. Confirm Firestore is created for the same project.
@@ -77,12 +77,12 @@ If Anonymous Auth is not enabled, the deployed app will show `auth/configuration
 
 GitHub Actions deploys every pushed branch to the live Firebase Hosting site using `.github/workflows/firebase-hosting.yml`. Add these repository secrets before relying on automatic deployment:
 
-- `FIREBASE_SERVICE_ACCOUNT`: JSON service account credentials with permission to deploy Firebase Hosting for `flexspace-1`. Firestore rules deployment is kept as a separate manual command until this service account also has the required Firestore rules and Service Usage permissions.
+- `FIREBASE_SERVICE_ACCOUNT`: JSON service account credentials with permission to deploy Firebase Hosting for `quorum-2`. Firestore rules deployment is kept as a separate manual command until this service account also has the required Firestore rules and Service Usage permissions.
 
 The deployed site will be available at:
 
-- `https://flexspace-1.web.app`
-- `https://flexspace-1.firebaseapp.com`
+- `https://quorum-2.web.app`
+- `https://quorum-2.firebaseapp.com`
 
 ## SenStats daily data sync
 
