@@ -602,3 +602,8 @@ input, select, textarea { max-width: 100%; }
   .wall-canvas-zoom { min-width: max(180%, 560px); }
   .wall-canvas { min-height: 360px; }
 }
+
+/* ArtSizer explicit move mode for mobile drag fallback */
+.artsizer-selection.move-enabled { border-color: #f9a8d4; box-shadow: 0 0 0 4px rgba(219,39,119,.08); }
+.artsizer-selected-actions button.active { background: #db2777; border-color: #db2777; color: #fff; }
+.wall-canvas.move-mode { touch-action: none; cursor: grabbing; }
