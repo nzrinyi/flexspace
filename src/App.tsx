@@ -36,7 +36,7 @@ type MustHaveSettings = Record<MustHaveKey, boolean>;
 type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 'Nick has not reviewed' | 'Emily marked as finalist' | 'Needs shared note' | 'Deal breaker';
 
 type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary' | 'decision';
-type WorkspaceApp = 'CarMatch' | 'AppSelection';
+type WorkspaceApp = 'CarMatch' | 'ArtSizer' | 'AppSelection';
 
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
@@ -132,7 +132,111 @@ function App() {
 
 
 function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) => void }) {
-  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open app</small></button></div></section></main>;
+  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open app</small></button><button type="button" onClick={() => onSelectApp('ArtSizer')}><strong>ArtSizer</strong><span>Plan wall art layouts with draggable frames, snapping, wall dimensions, and scale controls.</span><small>Open app</small></button></div></section></main>;
+}
+
+
+interface ArtFrameSize {
+  label: string;
+  width: number;
+  height: number;
+  color: string;
+}
+
+interface WallArtPiece extends ArtFrameSize {
+  id: string;
+  x: number;
+  y: number;
+}
+
+const standardArtSizes: ArtFrameSize[] = [
+  { label: '8×10', width: 8, height: 10, color: '#84cc16' },
+  { label: '11×14', width: 11, height: 14, color: '#22c55e' },
+  { label: '12×16', width: 12, height: 16, color: '#06b6d4' },
+  { label: '16×20', width: 16, height: 20, color: '#3b82f6' },
+  { label: '18×24', width: 18, height: 24, color: '#8b5cf6' },
+  { label: '20×30', width: 20, height: 30, color: '#ec4899' },
+  { label: '24×36', width: 24, height: 36, color: '#f97316' },
+  { label: '30×40', width: 30, height: 40, color: '#0f766e' },
+];
+
+const defaultWallPieces: WallArtPiece[] = [
+  { ...standardArtSizes[5], id: 'hero-left', x: 24, y: 18 },
+  { ...standardArtSizes[3], id: 'stack-top', x: 58, y: 14 },
+  { ...standardArtSizes[3], id: 'stack-bottom', x: 58, y: 38 },
+];
+
+function clampArtPiece(piece: WallArtPiece, wallWidth: number, wallHeight: number) {
+  return { ...piece, x: Math.min(Math.max(piece.x, 0), Math.max(wallWidth - piece.width, 0)), y: Math.min(Math.max(piece.y, 0), Math.max(wallHeight - piece.height, 0)) };
+}
+
+function snapValue(value: number, enabled: boolean) {
+  return enabled ? Math.round(value / 2) * 2 : value;
+}
+
+function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
+  const [wallWidth, setWallWidth] = useLocalStorageState('artsizer.wallWidth', 96);
+  const [wallHeight, setWallHeight] = useLocalStorageState('artsizer.wallHeight', 60);
+  const [scalePercent, setScalePercent] = useLocalStorageState('artsizer.scalePercent', 100);
+  const [snapEnabled, setSnapEnabled] = useLocalStorageState('artsizer.snapEnabled', true);
+  const [pieces, setPieces] = useLocalStorageState<WallArtPiece[]>('artsizer.pieces', defaultWallPieces);
+  const [draggingPieceId, setDraggingPieceId] = useState<string | null>(null);
+
+  const effectivePieces = useMemo(() => pieces.map((piece) => clampArtPiece({ ...piece, width: Math.round(piece.width * scalePercent / 100), height: Math.round(piece.height * scalePercent / 100) }, wallWidth, wallHeight)), [pieces, scalePercent, wallHeight, wallWidth]);
+
+  const canvasPoint = useCallback((clientX: number, clientY: number, svg: SVGSVGElement) => {
+    const rect = svg.getBoundingClientRect();
+    return { x: ((clientX - rect.left) / rect.width) * wallWidth, y: ((clientY - rect.top) / rect.height) * wallHeight };
+  }, [wallHeight, wallWidth]);
+
+  const addFrame = useCallback((size: ArtFrameSize, x = wallWidth / 2 - size.width / 2, y = wallHeight / 2 - size.height / 2) => {
+    const nextPiece = clampArtPiece({ ...size, id: `${size.label}-${Date.now()}`, x: snapValue(x, snapEnabled), y: snapValue(y, snapEnabled) }, wallWidth, wallHeight);
+    setPieces((current) => [...current, nextPiece]);
+  }, [setPieces, snapEnabled, wallHeight, wallWidth]);
+
+  const resetLayout = useCallback(() => {
+    setWallWidth(96);
+    setWallHeight(60);
+    setScalePercent(100);
+    setSnapEnabled(true);
+    setPieces(defaultWallPieces);
+  }, [setPieces, setScalePercent, setSnapEnabled, setWallHeight, setWallWidth]);
+
+  const applyGalleryPreset = useCallback(() => {
+    setPieces(defaultWallPieces);
+    setScalePercent(100);
+    setSnapEnabled(true);
+  }, [setPieces, setScalePercent, setSnapEnabled]);
+
+  return (
+    <main className="shell artsizer-shell">
+      <section className="hero card artsizer-hero"><div className="hero-topline"><button className="app-name artsizer-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">ArtSizer</button><span className="session-pill">Wall layout planner</span></div></section>
+      <section className="card artsizer-app">
+        <div className="section-heading"><div><p className="eyebrow">Wall canvas</p><h2>Drag frames onto the wall</h2></div><span>{Math.round(wallWidth)}″ × {Math.round(wallHeight)}″ wall · {snapEnabled ? 'snapping on' : 'free placement'}</span></div>
+        <div className="artsizer-layout">
+          <aside className="artsizer-drawer" aria-label="Standard frame sizes">
+            <div className="artsizer-control-grid">
+              <label><span>Wall width</span><input type="number" min="24" max="240" value={wallWidth} onChange={(event) => setWallWidth(Number(event.target.value) || 96)} /></label>
+              <label><span>Wall height</span><input type="number" min="24" max="144" value={wallHeight} onChange={(event) => setWallHeight(Number(event.target.value) || 60)} /></label>
+              <label className="artsizer-scale"><span>Frame scale {scalePercent}%</span><input type="range" min="50" max="150" value={scalePercent} onChange={(event) => setScalePercent(Number(event.target.value))} /></label>
+            </div>
+            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={applyGalleryPreset}>Gallery preset</button><button type="button" onClick={resetLayout}>Reset</button></div>
+            <div className="frame-drawer"><strong>Standard sizes</strong>{standardArtSizes.map((size) => <button key={size.label} type="button" draggable onDragStart={(event) => event.dataTransfer.setData('application/artsizer-frame', size.label)} onClick={() => addFrame(size)}><i style={{ background: size.color }} /><span>{size.label}</span><small>{size.width}″ × {size.height}″</small></button>)}</div>
+          </aside>
+          <div className="wall-stage">
+            <svg className="wall-canvas" viewBox={`0 0 ${wallWidth} ${wallHeight}`} role="img" aria-label="Wall canvas for arranging framed art" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const label = event.dataTransfer.getData('application/artsizer-frame'); const size = standardArtSizes.find((option) => option.label === label); if (!size || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); addFrame(size, point.x - size.width / 2, point.y - size.height / 2); }} onPointerMove={(event) => { if (!draggingPieceId || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); setPieces((current) => current.map((piece) => piece.id === draggingPieceId ? clampArtPiece({ ...piece, x: snapValue(point.x - (piece.width * scalePercent / 100) / 2, snapEnabled), y: snapValue(point.y - (piece.height * scalePercent / 100) / 2, snapEnabled) }, wallWidth, wallHeight) : piece)); }} onPointerUp={() => setDraggingPieceId(null)} onPointerLeave={() => setDraggingPieceId(null)}>
+              <defs><pattern id="snap-grid" width="2" height="2" patternUnits="userSpaceOnUse"><path d="M 2 0 L 0 0 0 2" fill="none" stroke="#dbeafe" strokeWidth="0.12" /></pattern></defs>
+              <rect width={wallWidth} height={wallHeight} rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="0.5" />
+              {snapEnabled && <rect width={wallWidth} height={wallHeight} fill="url(#snap-grid)" opacity="0.85" />}
+              <line x1="0" y1={wallHeight / 2} x2={wallWidth} y2={wallHeight / 2} stroke="#cbd5e1" strokeDasharray="1.5 1.5" strokeWidth="0.25" />
+              {effectivePieces.map((piece) => <g key={piece.id} className="wall-art-piece" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDraggingPieceId(piece.id); }}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text></g>)}
+            </svg>
+            <p className="artsizer-help">Tip: drag from the size drawer, click a size to add it, or drag frames already on the wall. The grid snaps every 2 inches when snapping is on.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  );
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {
@@ -375,6 +479,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   }, [setSelectedVehicleIds]);
 
   if (activeWorkspaceApp === 'AppSelection') return <AppSelectionPage onSelectApp={setActiveWorkspaceApp} />;
+  if (activeWorkspaceApp === 'ArtSizer') return <ArtSizerApp onOpenAppSelection={() => setActiveWorkspaceApp('AppSelection')} />;
 
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>

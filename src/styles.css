@@ -469,3 +469,45 @@ input, select, textarea { max-width: 100%; }
   .compare-tray-item { grid-template-columns: 46px minmax(0,1fr) 34px; gap: 8px; }
   .compare-tray-item img { width: 46px; height: 38px; }
 }
+
+/* ArtSizer wall-planning app */
+.artsizer-shell { min-height: 100vh; }
+.artsizer-name { --accent: #db2777; color: #db2777; }
+.artsizer-hero { background: linear-gradient(135deg, #fff 0%, #fdf2f8 48%, #ecfeff 100%); }
+.artsizer-app { display: grid; gap: 18px; }
+.artsizer-layout { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.artsizer-drawer { display: grid; gap: 16px; border: 1px solid #e8edf7; border-radius: 24px; background: linear-gradient(180deg,#fff,#f8fafc); padding: 16px; box-shadow: 0 14px 32px rgba(15,23,42,.07); }
+.artsizer-control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.artsizer-control-grid label { display: grid; gap: 6px; color: #64748b; font-size: .76rem; font-weight: 950; letter-spacing: .08em; text-transform: uppercase; }
+.artsizer-control-grid input { width: 100%; border: 1px solid #dce4f2; border-radius: 14px; background: #fff; color: #14213d; padding: 10px 11px; font: inherit; font-weight: 800; }
+.artsizer-scale { grid-column: 1 / -1; }
+.artsizer-scale input { accent-color: #db2777; padding: 0; }
+.artsizer-actions { display: grid; grid-template-columns: 1fr; gap: 9px; }
+.artsizer-actions button { border: 1px solid #fbcfe8; border-radius: 999px; background: #fff; color: #9d174d; padding: 10px 12px; font-weight: 950; cursor: pointer; }
+.artsizer-actions button:hover { background: #fdf2f8; }
+.frame-drawer { display: grid; gap: 9px; }
+.frame-drawer > strong { color: #0f172a; font-size: .95rem; }
+.frame-drawer button { display: grid; grid-template-columns: 18px 1fr auto; align-items: center; gap: 9px; border: 1px solid #e8edf7; border-radius: 15px; background: #fff; color: #14213d; padding: 10px 11px; text-align: left; cursor: grab; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+.frame-drawer button:hover { transform: translateY(-1px); border-color: #f9a8d4; box-shadow: 0 10px 22px rgba(15,23,42,.08); }
+.frame-drawer i { width: 18px; height: 18px; border-radius: 6px; }
+.frame-drawer span { font-weight: 950; }
+.frame-drawer small { color: #64748b; font-size: .74rem; font-weight: 900; }
+.wall-stage { display: grid; gap: 12px; min-width: 0; }
+.wall-canvas { width: 100%; min-height: 420px; max-height: 68vh; border: 1px solid #dce4f2; border-radius: 26px; background: #fff; box-shadow: inset 0 0 0 10px #fff, 0 18px 42px rgba(15,23,42,.08); touch-action: none; }
+.wall-art-piece { cursor: move; filter: drop-shadow(0 8px 10px rgba(15,23,42,.12)); }
+.wall-art-piece text { pointer-events: none; user-select: none; }
+.artsizer-help { margin: 0; color: #53627c; font-size: .9rem; font-weight: 700; line-height: 1.5; }
+
+@media (max-width: 860px) {
+  .artsizer-layout { grid-template-columns: 1fr; }
+  .artsizer-drawer { order: 2; }
+  .wall-stage { order: 1; }
+  .wall-canvas { min-height: 320px; }
+}
+
+@media (max-width: 560px) {
+  .artsizer-control-grid { grid-template-columns: 1fr; }
+  .frame-drawer button { grid-template-columns: 16px 1fr; }
+  .frame-drawer small { grid-column: 2; }
+  .wall-canvas { min-height: 260px; border-radius: 18px; }
+}
