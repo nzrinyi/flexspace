@@ -39,6 +39,8 @@ type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 
 type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary' | 'decision';
 type WorkspaceApp = 'CarMatch' | 'SenStats' | 'AppSelection';
 
+const QUORUM_VERSION = '1.0.1';
+
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
 interface Filters {
@@ -125,7 +127,7 @@ function App() {
 
   const authFailureMessage = authError?.message ?? anonymousSignInError;
   if (authFailureMessage) {
-    return <main className="shell error"><section className="card"><p className="eyebrow">Firebase Auth setup required</p><h1>CarMatch could not start a secure anonymous session.</h1><p>{authFailureMessage}</p><p>Enable Authentication and the Anonymous provider for the <strong>flexspace-1</strong> project.</p></section></main>;
+    return <main className="shell error"><section className="card"><p className="eyebrow">Firebase Auth setup required</p><h1>CarMatch could not start a secure anonymous session.</h1><p>{authFailureMessage}</p><p>Enable Authentication and the Anonymous provider for the <strong>quorum-2</strong> project.</p></section></main>;
   }
   if (authLoading || !user) return <div style={{ padding: '20px', textAlign: 'center' }}>Initializing secure session...</div>;
   return <AuthenticatedSession activeUser={user} />;
@@ -133,11 +135,16 @@ function App() {
 
 
 function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) => void }) {
-  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">FlexSpace launcher</p><h2>Choose a workspace app</h2></div><span>Double-click an app name in either app header to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, shared notes, quotes, test-drive planning, and decision support.</span><small>Open CarMatch</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Canadian Senate dashboard with senators, groups, committees, expenses, public sources, sync status, and change history.</span><small>Open SenStats</small></button></div></section></main>;
+  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">FlexSpace launcher</p><h2>Choose a workspace app</h2></div><span>Double-click an app name in either app header to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, shared notes, quotes, test-drive planning, and decision support.</span><small>Open CarMatch</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>Quorum</strong><span>Canadian Senate dashboard with senators, groups, committees, expenses, public sources, sync status, and change history.</span><small>Open Quorum</small></button></div></section></main>;
+}
+
+function SettingsIcon({ className }: { className?: string }) {
+  return <svg className={className} viewBox="0 0 24 24" role="img" aria-hidden="true" focusable="false"><path d="M19.43 12.98c.04-.32.07-.65.07-.98s-.02-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46a.5.5 0 0 0-.61-.22l-2.49 1a7.28 7.28 0 0 0-1.69-.98L14.5 2.42A.5.5 0 0 0 14 2h-4a.5.5 0 0 0-.5.42L9.12 5.07c-.6.23-1.16.56-1.69.98l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46a.5.5 0 0 0 .12.64l2.11 1.65c-.04.32-.07.65-.07.98s.02.66.07.98l-2.11 1.65a.5.5 0 0 0-.12.64l2 3.46c.13.22.39.31.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.38-2.65c.6-.23 1.16-.56 1.69-.98l2.49 1c.23.08.48 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.11-1.65ZM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5Z" fill="currentColor" /></svg>;
 }
 
 function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('senstats.darkMode') === 'true');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     localStorage.setItem('senstats.darkMode', String(darkMode));
@@ -145,7 +152,7 @@ function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
     return () => document.body.classList.remove('senstats-body-dark');
   }, [darkMode]);
 
-  return <main className={`shell senstats-shell ${darkMode ? 'senstats-shell-dark' : ''}`}><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button><button className="theme-toggle" type="button" onClick={() => setDarkMode((current) => !current)} aria-pressed={darkMode}>{darkMode ? 'Light mode' : 'Dark mode'}</button></div></section><SenStatsDashboard darkMode={darkMode} /></main>;
+  return <main className={`shell senstats-shell ${darkMode ? 'senstats-shell-dark' : ''}`}><section className="hero card quorum-hero"><div className="hero-topline"><div className="quorum-brand"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">Quorum</button><span className="quorum-version">v{QUORUM_VERSION}</span></div><button className="settings-icon-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Open Quorum settings" title="Settings"><SettingsIcon /></button></div></section><SenStatsDashboard darkMode={darkMode} />{settingsOpen && <div className="settings-modal-backdrop" role="presentation" onMouseDown={() => setSettingsOpen(false)}><section className="settings-modal card" role="dialog" aria-modal="true" aria-labelledby="quorum-settings-title" onMouseDown={(event) => event.stopPropagation()}><div className="settings-modal-header"><div><p className="eyebrow">Quorum settings</p><h2 id="quorum-settings-title">Preferences</h2></div><button className="settings-close-button" type="button" onClick={() => setSettingsOpen(false)} aria-label="Close settings">×</button></div><div className="settings-option"><div><strong>Appearance</strong><span>Switch between light and dark themes for Quorum.</span></div><button className="theme-toggle" type="button" onClick={() => setDarkMode((current) => !current)} aria-pressed={darkMode}>{darkMode ? 'Light mode' : 'Dark mode'}</button></div><div className="settings-version-row"><span>Version</span><strong>Quorum v{QUORUM_VERSION}</strong></div></section></div>}</main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {

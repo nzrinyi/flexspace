@@ -6,9 +6,9 @@ function formatDate(value: SenStatsSyncStatusDocument['finishedAt']) {
 }
 
 export function SenStatsAdminView({ status }: { status?: SenStatsSyncStatusDocument | null }) {
-  if (!status) return <div className="senstats-chart-empty"><div className="empty-graphic" aria-hidden="true">!</div><strong>No sync status yet</strong><span>Run the SenStats daily sync once to populate the latest sync summary.</span></div>;
+  if (!status) return <div className="senstats-chart-empty"><div className="empty-graphic" aria-hidden="true">!</div><strong>No sync status yet</strong><span>Run the Quorum daily sync once to populate the latest sync summary.</span></div>;
   const failures = status.errors?.filter(Boolean) ?? [];
-  return <section className="admin-grid" aria-label="Latest SenStats sync results">
+  return <section className="admin-grid" aria-label="Latest Quorum sync results">
     <article className={`source-card sync-status ${status.status}`}><span>Latest sync</span><strong>{status.status || 'Unknown'}</strong><small>Finished {formatDate(status.finishedAt)}</small></article>
     <article className="source-card"><span>Senators</span><strong>{status.senatorCount ?? 0}</strong><small>{status.photoCount ?? 0} with photos · {status.missingPhotoCount ?? 0} missing photos</small></article>
     <article className="source-card"><span>Expenses</span><strong>{status.expenseCount ?? 0}</strong><small>Public disclosure records parsed</small></article>

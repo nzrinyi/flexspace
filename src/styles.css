@@ -1352,8 +1352,8 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-dashboard.senstats-dark .attendance-rate-cell { background: var(--sen-surface-2); }
 .senstats-dashboard.senstats-dark .attendance-sort-button i { background: var(--sen-surface-2); color: var(--sen-link-text); }
 
-/* Caucus comparison and audit log polish */
-.caucus-comparison-table > div { grid-template-columns: minmax(190px,1fr) minmax(80px,.35fr) minmax(170px,.7fr) minmax(150px,.65fr) minmax(90px,.4fr); }
+/* Group comparison and audit log polish */
+.group-comparison-table > div { grid-template-columns: minmax(190px,1fr) minmax(80px,.35fr) minmax(170px,.7fr) minmax(150px,.65fr) minmax(90px,.4fr); }
 .comparison-bar-cell { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; }
 .comparison-bar-cell b { color: var(--sen-text, #0f172a); }
 .comparison-bar-cell i { display: block; height: 9px; border-radius: 999px; background: var(--group-color, #64748b); min-width: 0; box-shadow: inset 0 0 0 1px rgba(15,23,42,.12); }
@@ -1381,9 +1381,39 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .change-diff i { color: #64748b; font-style: normal; font-weight: 950; }
 .senstats-dashboard.senstats-dark .change-diff { background: rgba(37, 99, 235, .16); color: #bfdbfe !important; }
 @media (max-width: 760px) {
-  .caucus-comparison-table > div, .audit-log-list .change-log-item { grid-template-columns: 1fr; }
+  .group-comparison-table > div, .audit-log-list .change-log-item { grid-template-columns: 1fr; }
   .comparison-bar-cell { grid-template-columns: 1fr; }
 }
+@media (max-width: 760px) {
+  .group-comparison-table > div:not(.source-table-head) > span,
+  .dashboard-table.attendance-table > div:not(.source-table-head) > span,
+  .dashboard-table.attendance-table > .dashboard-click-row > span,
+  .dashboard-table.attendance-table > .dashboard-click-row > em { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+  .group-comparison-table > div:not(.source-table-head) > span::before,
+  .dashboard-table.attendance-table > div:not(.source-table-head) > span::before,
+  .dashboard-table.attendance-table > .dashboard-click-row > span::before,
+  .dashboard-table.attendance-table > .dashboard-click-row > em::before { color: var(--sen-muted, #64748b); font-size: .72rem; font-weight: 950; letter-spacing: .06em; text-transform: uppercase; }
+  .group-comparison-table > div:not(.source-table-head) > span:nth-child(2)::before { content: 'Senators'; }
+  .group-comparison-table > div:not(.source-table-head) > span:nth-child(3)::before { content: 'Avg attendance'; }
+  .group-comparison-table > div:not(.source-table-head) > span:nth-child(4)::before { content: 'Upcoming retirements'; }
+  .group-comparison-table > div:not(.source-table-head) > span:nth-child(5)::before { content: 'Missed days'; }
+  .attendance-table.expanded > .dashboard-click-row > em:nth-child(2)::before { content: 'Group'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(3)::before { content: 'Province'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(4)::before { content: 'Rate'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(5)::before { content: 'Present'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(6)::before { content: 'Public business'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(7)::before { content: 'Illness'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(8)::before { content: 'Leave'; }
+  .attendance-table.expanded > .dashboard-click-row > span:nth-child(9)::before { content: 'Missed'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(2)::before { content: 'Rate'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(3)::before { content: 'Senators'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(4)::before { content: 'Present'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(5)::before { content: 'Public business'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(6)::before { content: 'Illness'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(7)::before { content: 'Leave'; }
+  .attendance-table.aggregate > div:not(.source-table-head) > span:nth-child(8)::before { content: 'Missed'; }
+}
+
 
 /* Tooltips, revised committees, and source matrix */
 .info-tooltip { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 5px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: .72rem; font-weight: 950; cursor: help; vertical-align: middle; }
@@ -1412,3 +1442,28 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .filter-rail-heading.compact-results { align-content: center; gap: 4px; }
 .filter-rail-heading.compact-results strong { display: none; }
 .filter-rail-heading.compact-results small { color: var(--sen-muted, #64748b); font-size: .86rem; font-weight: 850; text-transform: none; letter-spacing: 0; }
+
+/* Quorum settings controls */
+.quorum-hero { position: relative; }
+.quorum-brand { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 10px; }
+.quorum-version { border: 1px solid #d7def5; border-radius: 999px; background: #f8fafc; color: #64748b; padding: 5px 10px; font-size: .75rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.settings-icon-button { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 1px solid #d7def5; border-radius: 999px; background: #fff; color: #4338ca; box-shadow: 0 12px 30px rgba(15,23,42,.1); transition: transform .18s ease, box-shadow .18s ease, background .18s ease; }
+.settings-icon-button:hover, .settings-icon-button:focus-visible { transform: translateY(-1px); background: #eef2ff; box-shadow: 0 16px 36px rgba(15,23,42,.14); outline: none; }
+.settings-icon-button svg { width: 22px; height: 22px; }
+.settings-modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(15,23,42,.48); backdrop-filter: blur(8px); }
+.settings-modal { width: min(100%, 520px); display: grid; gap: 22px; }
+.settings-modal-header, .settings-option, .settings-version-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.settings-modal-header h2 { margin-bottom: 0; }
+.settings-close-button { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #d7def5; border-radius: 999px; background: #fff; color: #475569; font-size: 1.5rem; line-height: 1; }
+.settings-option, .settings-version-row { border: 1px solid #e8edf7; border-radius: 18px; background: #f8fafc; padding: 16px; }
+.settings-option div { display: grid; gap: 4px; }
+.settings-option span, .settings-version-row span { color: #64748b; font-size: .88rem; font-weight: 800; }
+.senstats-shell-dark .quorum-version, .senstats-shell-dark .settings-icon-button, .senstats-shell-dark .settings-close-button { background: #1e293b; border-color: #475569; color: #e0e7ff; }
+.senstats-shell-dark .settings-modal { background: #0f172a; border-color: #334155; color: #f8fafc; box-shadow: 0 30px 90px rgba(0,0,0,.45); }
+.senstats-shell-dark .settings-option, .senstats-shell-dark .settings-version-row { background: #1e293b; border-color: #334155; }
+.senstats-shell-dark .settings-option span, .senstats-shell-dark .settings-version-row span { color: #cbd5e1; }
+@media (max-width: 560px) { .settings-modal-header, .settings-option, .settings-version-row { align-items: flex-start; flex-direction: column; } .settings-icon-button { width: 40px; height: 40px; } }
+
+/* React-rendered menu icons */
+.senstats-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.tab-icon { width: 1rem; height: 1rem; flex: 0 0 auto; }

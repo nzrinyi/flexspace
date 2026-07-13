@@ -4,13 +4,13 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyDaDRpUyUGtQcpb7EOa3kyOECLJOx3c9Lk',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'flexspace-1.firebaseapp.com',
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'flexspace-1',
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? 'flexspace-1.firebasestorage.app',
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '544136326567',
-  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '1:544136326567:web:eeab9a468ce0f82299da82',
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? 'G-LVT5RRD31W',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? 'AIzaSyCp1HdSHYQXE-yY8ga6alvLv2gka2d9Ltw',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? 'quorum-2.firebaseapp.com',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? 'quorum-2',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? 'quorum-2.firebasestorage.app',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ?? '594173636153',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? '1:594173636153:web:cf3c1d2aadde06508167e8',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? 'G-PLLC7GDQMM',
 };
 
 export const app = initializeApp(firebaseConfig);

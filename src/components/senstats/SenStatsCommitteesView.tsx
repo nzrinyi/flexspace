@@ -95,7 +95,7 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
         <i />
       </div>
       <strong>No committee data available yet</strong>
-      <span>The next SenStats sync will attempt to read current committee pages and membership from the Senate website.</span>
+      <span>The next Quorum sync will attempt to read current committee pages and membership from the Senate website.</span>
     </div>;
   }
 
@@ -146,7 +146,7 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
         const visibleMembers = normalizedMemberSearch ? dedupedMembers.filter((member) => [member.name, member.role, groupLabel(member.party || ''), member.province].filter(Boolean).join(' ').toLowerCase().includes(normalizedMemberSearch)) : dedupedMembers;
         const leadership = visibleMembers.filter((member) => isLeadershipRole(member.role));
         const regularMembers = visibleMembers.filter((member) => !isLeadershipRole(member.role));
-        const caucusStats = Object.entries(dedupedMembers.reduce<Record<string, number>>((counts, member) => {
+        const groupStats = Object.entries(dedupedMembers.reduce<Record<string, number>>((counts, member) => {
           const label = groupLabel(member.party || 'Unknown');
           counts[label] = (counts[label] || 0) + 1;
           return counts;
@@ -161,15 +161,15 @@ export function SenStatsCommitteesView({ committees, senators }: SenStatsCommitt
                 <strong>{selectedCommittee.name}</strong>
               </div>
             </div>
-            <div className="committee-quick-stats" aria-label={`${selectedCommittee.name} caucus breakdown`}>
+            <div className="committee-quick-stats" aria-label={`${selectedCommittee.name} group breakdown`}>
               <span>{dedupedMembers.length} total</span>
               {leadership.length > 0 && <span>{leadership.length} leadership</span>}
-              {caucusStats.map(([label, count]) => <span key={label}>{count} {label}</span>)}
+              {groupStats.map(([label, count]) => <span key={label}>{count} {label}</span>)}
             </div>
             <em className={nextMeeting ? 'meeting-status posted' : 'meeting-status pending'}>{nextMeeting ? `Next meeting: ${nextMeeting}` : 'No meeting posted'}</em>
           </header>
           {selectedCommittee.sourceUrl && <a className="committee-official-link" href={selectedCommittee.sourceUrl} target="_blank" rel="noreferrer">Official committee page <span className="external-link-icon" aria-hidden="true">↗</span></a>}
-          {visibleMembers.length === 0 ? <div className="senstats-chart-empty committee-member-empty"><strong>No matching members</strong><span>Try a different senator, role, caucus, or province.</span></div> : <>
+          {visibleMembers.length === 0 ? <div className="senstats-chart-empty committee-member-empty"><strong>No matching members</strong><span>Try a different senator, role, group, or province.</span></div> : <>
             {leadership.length > 0 && <ul className="committee-member-list leadership-list" aria-label={`${selectedCommittee.name} leadership`}>
               {leadership.map((member) => <CommitteeMemberRow key={committeeMemberKey(selectedCommittee.id, member)} committeeId={selectedCommittee.id} member={member} senator={senatorsById.get(member.senatorId || '') || senatorsByName.get(member.name.toLowerCase())} />)}
             </ul>}

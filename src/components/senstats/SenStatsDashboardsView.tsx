@@ -4,10 +4,21 @@ import { SenStatsExpensesDashboardView } from './SenStatsExpensesDashboardView';
 import { SenStatsGroupsView } from './SenStatsGroupsView';
 import { groupClassName, groupLabel } from './SenStatsHelpers';
 
-type DashboardTab = 'groups' | 'caucus' | 'retirement' | 'attendance' | 'expenses';
+type DashboardTab = 'groups' | 'groupComparison' | 'retirement' | 'attendance' | 'expenses';
 type AttendanceView = 'senators' | 'groups' | 'provinces';
 type RetirementSort = 'date' | 'served';
 type AttendanceSort = 'missed' | 'rate' | 'present' | 'illness' | 'leave' | 'business';
+
+function DashboardIcon({ tab }: { tab: DashboardTab }) {
+  const paths: Record<DashboardTab, string> = {
+    groups: 'M7 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm10 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM7 13c-3 0-5 1.6-5 4v2h10v-2c0-2.4-2-4-5-4Zm10 0c-3 0-5 1.6-5 4v2h10v-2c0-2.4-2-4-5-4Z',
+    groupComparison: 'M4 19h16v2H4v-2Zm1-7h4v5H5v-5Zm5-6h4v11h-4V6Zm5 3h4v8h-4V9Z',
+    expenses: 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm1 12.7V16h-2v-1.3c-1.2-.3-2.1-1.1-2.5-2.2l1.8-.8c.3.8.9 1.2 1.8 1.2.8 0 1.3-.3 1.3-.9 0-.7-.7-.9-1.8-1.2-1.4-.4-2.7-1-2.7-2.7 0-1.3.8-2.3 2.1-2.7V4h2v1.3c1 .3 1.7.9 2.1 1.8l-1.7.9c-.3-.6-.7-.9-1.4-.9-.6 0-1.1.3-1.1.8 0 .6.6.8 1.7 1.1 1.5.4 2.9 1.1 2.9 2.8 0 1.4-.9 2.4-2.5 2.8Z',
+    retirement: 'M12 2a10 10 0 1 0 10 10H12V2Zm2 0v8h8a10 10 0 0 0-8-8ZM7 13h5v5h-2v-3H7v-2Z',
+    attendance: 'M7 2h2v2h6V2h2v2h3v18H4V4h3V2Zm11 8H6v10h12V10Zm-9 3h2v2H9v-2Zm4 0h2v2h-2v-2Z',
+  };
+  return <svg className="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={paths[tab]} fill="currentColor" /></svg>;
+}
 
 function yearFromValue(value: string) {
   const match = value.match(/\b(19|20)\d{2}\b/);
@@ -141,7 +152,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     const currentYear = new Date().getFullYear();
     const upcomingRows = retirementRows.filter((row) => row.daysUntilRetirement === undefined || row.daysUntilRetirement >= 0);
     const nextFive = upcomingRows.slice(0, 5);
-    const caucusBalance = Array.from(nextFive.reduce((counts, row) => {
+    const groupBalance = Array.from(nextFive.reduce((counts, row) => {
       const label = groupLabel(row.senator.party || 'Unknown');
       counts.set(label, (counts.get(label) || 0) + 1);
       return counts;
@@ -152,7 +163,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
       thisQuarter: upcomingRows.filter((row) => row.daysUntilRetirement !== undefined && row.daysUntilRetirement <= 92).length,
       thisYear: upcomingRows.filter((row) => row.retirementYear === currentYear).length,
       averageTenure,
-      caucusBalance,
+      groupBalance,
     };
   }, [retirementRows]);
   const senatorsById = useMemo(() => new Map(senators.map((senator) => [senator.id, senator])), [senators]);
@@ -176,7 +187,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
   const attendanceByGroup = useMemo(() => aggregateAttendance(attendance, (row) => row.party || 'Unknown'), [attendance]);
   const attendanceByProvince = useMemo(() => aggregateAttendance(attendance, (row) => senatorsById.get(row.senatorId || '')?.province || 'Unknown'), [attendance, senatorsById]);
 
-  const caucusComparisonRows = useMemo(() => groupedSenators.map(({ group, senators: groupSenators }) => {
+  const groupComparisonRows = useMemo(() => groupedSenators.map(({ group, senators: groupSenators }) => {
     const senatorIds = new Set(groupSenators.map((senator) => senator.id));
     const groupAttendance = attendance.filter((row) => row.senatorId && senatorIds.has(row.senatorId));
     const attendanceTotals = groupAttendance.reduce((sum, row) => {
@@ -187,7 +198,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     const upcomingRetirements = retirementRows.filter((row) => row.senator.party === group && row.daysUntilRetirement !== undefined && row.daysUntilRetirement >= 0 && row.daysUntilRetirement <= 730).length;
     return { group, count: groupSenators.length, averageAttendance, missed: attendanceTotals.missed, upcomingRetirements };
   }).sort((a, b) => b.averageAttendance - a.averageAttendance || b.upcomingRetirements - a.upcomingRetirements), [attendance, groupedSenators, retirementRows]);
-  const maxUpcomingRetirements = Math.max(...caucusComparisonRows.map((row) => row.upcomingRetirements), 1);
+  const maxUpcomingRetirements = Math.max(...groupComparisonRows.map((row) => row.upcomingRetirements), 1);
   const forecastRows = useMemo(() => {
     const cutoff = forecastMonths * 30;
     const retiringIds = new Set(retirementRows.filter((row) => row.daysUntilRetirement !== undefined && row.daysUntilRetirement >= 0 && row.daysUntilRetirement <= cutoff).map((row) => row.senator.id));
@@ -197,9 +208,9 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     }).sort((a, b) => b.current - a.current);
   }, [forecastMonths, groupedSenators, retirementRows]);
 
-  return <section className="dashboards-view" aria-label="SenStats dashboards">
+  return <section className="dashboards-view" aria-label="Quorum dashboards">
     <div className="senstats-tabs nested-tabs" role="tablist" aria-label="Dashboards">
-      {(['groups', 'caucus', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'caucus' ? 'Caucus Comparison' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
+      {(['groups', 'groupComparison', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}><DashboardIcon tab={tab} /><span>{tab === 'groups' ? 'Groups' : tab === 'groupComparison' ? 'Group Comparison' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</span></button>)}
     </div>
 
     {activeDashboard === 'groups' && <>
@@ -210,11 +221,11 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
     </>}
 
 
-    {activeDashboard === 'caucus' && <div className="source-card source-wide"><div className="source-heading"><span>Caucus comparison</span><strong>Attendance and retirement pressure by group <InfoTooltip label="Compares caucus size, average attendance, missed sitting days, and mandatory retirements expected within 24 months." /></strong><small className="muted">Average attendance is calculated from synced attendance rows; retirement pressure counts mandatory retirements in the next 24 months.</small></div><div className="dashboard-table caucus-comparison-table" role="table" aria-label="Caucus comparison dashboard"><div role="row" className="source-table-head"><span>Caucus</span><span>Senators</span><span>Avg attendance</span><span>Upcoming retirements</span><span>Missed days</span></div>{caucusComparisonRows.map((row) => <div role="row" key={row.group} className={groupClassName(row.group)}><strong>{groupLabel(row.group)}</strong><span>{row.count}</span><span><AttendanceRateCell rate={row.averageAttendance} /></span><span className="comparison-bar-cell"><b>{row.upcomingRetirements}</b><i style={{ width: `${Math.max((row.upcomingRetirements / maxUpcomingRetirements) * 100, row.upcomingRetirements ? 8 : 0)}%` }} aria-hidden="true" /></span><span>{row.missed}</span></div>)}</div></div>}
+    {activeDashboard === 'groupComparison' && <div className="source-card source-wide"><div className="source-heading"><span>Group comparison</span><strong>Attendance and retirement pressure by group <InfoTooltip label="Compares group size, average attendance, missed sitting days, and mandatory retirements expected within 24 months." /></strong><small className="muted">Average attendance is calculated from synced attendance rows; retirement pressure counts mandatory retirements in the next 24 months.</small></div><div className="dashboard-table group-comparison-table" role="table" aria-label="Group comparison dashboard"><div role="row" className="source-table-head"><span>Group</span><span>Senators</span><span>Avg attendance</span><span>Upcoming retirements</span><span>Missed days</span></div>{groupComparisonRows.map((row) => <div role="row" key={row.group} className={groupClassName(row.group)}><strong>{groupLabel(row.group)}</strong><span>{row.count}</span><span><AttendanceRateCell rate={row.averageAttendance} /></span><span className="comparison-bar-cell"><b>{row.upcomingRetirements}</b><i style={{ width: `${Math.max((row.upcomingRetirements / maxUpcomingRetirements) * 100, row.upcomingRetirements ? 8 : 0)}%` }} aria-hidden="true" /></span><span>{row.missed}</span></div>)}</div></div>}
 
     {activeDashboard === 'expenses' && <div className="dashboard-info-wrap"><InfoTooltip label="Expense dashboards use the separate proactive disclosure scrape, so values may lag the daily roster sync. Clicking a senator shows expense details first, with profile available by button." /><SenStatsExpensesDashboardView senators={senators} expenses={expenses} selectedSenator={selectedSenator} onSelectSenator={onSelectSenator} loading={expensesLoading} /></div>}
 
-    {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure <InfoTooltip label="Mandatory retirement dates are modeled from synced retirement fields; use the slider to forecast caucus composition up to 24 months ahead." /></strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="retirement-forecast-control"><label><span>Forecast composition over {forecastMonths} months</span><input type="range" min="1" max="24" value={forecastMonths} onChange={(event) => setForecastMonths(Number(event.target.value))} /></label><div className="forecast-bars">{forecastRows.map((row) => <div key={row.group} className={groupClassName(row.group)}><span>{groupLabel(row.group)}</span><b>{row.projected}</b><i style={{ width: `${Math.max((row.projected / Math.max(row.current, 1)) * 100, 4)}%` }} aria-hidden="true" /><small>{row.retiring ? `${row.retiring} retiring` : 'No mandatory retirements'}</small></div>)}</div></div><div className="retirement-summary-grid" aria-label="Retirement summary"><article><span>Retiring this quarter</span><strong>{retirementSummary.thisQuarter}</strong><small>Within 92 days</small></article><article><span>Retiring this year</span><strong>{retirementSummary.thisYear}</strong><small>{new Date().getFullYear()}</small></article><article><span>Average tenure retiring</span><strong>{retirementSummary.averageTenure || '—'}</strong><small>Years served</small></article><article className="wide"><span>Next 5 caucus balance</span><strong>{retirementSummary.caucusBalance || 'Not enough data'}</strong><small>Based on soonest upcoming retirements</small></article></div><div className="dashboard-table retirement-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, appointedDate, age, yearsServed, daysUntilRetirement }) => <button type="button" role="row" key={senator.id} className={`dashboard-click-row ${groupClassName(senator.party)}`} onClick={() => onSelectSenator(senator.id)} title={appointedDate ? `Appointed ${appointedDate}` : 'Appointment date not synced'}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span className={`retirement-date-cell ${urgencyClass(daysUntilRetirement)}`}><b>{retirementDate || 'Not synced'}</b>{retirementDate && <small>{timeToEventLabel(daysUntilRetirement)}</small>}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></button>)}</div></div>}
+    {activeDashboard === 'retirement' && <div className="source-card source-wide"><div className="source-heading"><span>Retirement</span><strong>Upcoming retirements and tenure <InfoTooltip label="Mandatory retirement dates are modeled from synced retirement fields; use the slider to forecast group composition up to 24 months ahead." /></strong><select value={retirementSort} onChange={(event) => setRetirementSort(event.target.value as RetirementSort)}><option value="date">Retiring soonest</option><option value="served">Longest served</option></select></div><div className="retirement-forecast-control"><label><span>Forecast composition over {forecastMonths} months</span><input type="range" min="1" max="24" value={forecastMonths} onChange={(event) => setForecastMonths(Number(event.target.value))} /></label><div className="forecast-bars">{forecastRows.map((row) => <div key={row.group} className={groupClassName(row.group)}><span>{groupLabel(row.group)}</span><b>{row.projected}</b><i style={{ width: `${Math.max((row.projected / Math.max(row.current, 1)) * 100, 4)}%` }} aria-hidden="true" /><small>{row.retiring ? `${row.retiring} retiring` : 'No mandatory retirements'}</small></div>)}</div></div><div className="retirement-summary-grid" aria-label="Retirement summary"><article><span>Retiring this quarter</span><strong>{retirementSummary.thisQuarter}</strong><small>Within 92 days</small></article><article><span>Retiring this year</span><strong>{retirementSummary.thisYear}</strong><small>{new Date().getFullYear()}</small></article><article><span>Average tenure retiring</span><strong>{retirementSummary.averageTenure || '—'}</strong><small>Years served</small></article><article className="wide"><span>Next 5 group balance</span><strong>{retirementSummary.groupBalance || 'Not enough data'}</strong><small>Based on soonest upcoming retirements</small></article></div><div className="dashboard-table retirement-table" role="table" aria-label="Senator retirement dashboard"><div role="row" className="source-table-head"><span>Name</span><span>Group</span><span>Retirement</span><span>Approx. age</span><span>Years served</span></div>{retirementRows.map(({ senator, retirementDate, appointedDate, age, yearsServed, daysUntilRetirement }) => <button type="button" role="row" key={senator.id} className={`dashboard-click-row ${groupClassName(senator.party)}`} onClick={() => onSelectSenator(senator.id)} title={appointedDate ? `Appointed ${appointedDate}` : 'Appointment date not synced'}><strong>{senator.name}</strong><em>{groupLabel(senator.party)}</em><span className={`retirement-date-cell ${urgencyClass(daysUntilRetirement)}`}><b>{retirementDate || 'Not synced'}</b>{retirementDate && <small>{timeToEventLabel(daysUntilRetirement)}</small>}</span><span>{age ?? '—'}</span><span>{yearsServed || '—'}</span></button>)}</div></div>}
 
     {activeDashboard === 'attendance' && <div className="source-card source-wide"><div className="source-heading"><span>Attendance</span><strong>Senators' Attendance and Activities on Sitting Days <InfoTooltip label="Attendance rates use present days divided by sitting days; public business, illness, and leave are shown separately for context." /></strong><select value={attendanceSort} onChange={(event) => setAttendanceSort(event.target.value as AttendanceSort)}><option value="missed">Most days missed</option><option value="rate">Lowest attendance rate</option><option value="present">Most present days</option><option value="illness">Most illness days</option><option value="leave">Most leave days</option><option value="business">Most public business</option></select><a href="https://sencanada.ca/en/attendance/" target="_blank" rel="noreferrer">Open source</a></div>{attendanceRows.length === 0 ? <p className="muted">{syncedAttendanceCount > 0 ? `${syncedAttendanceCount} attendance rows were reported by the latest sync, but the realtime listener did not return row documents. Check deployed Firestore rules for senstats_attendance reads.` : 'No attendance rows synced yet. The ingestion script reads the public attendance register and stores summary rows after the next sync.'}</p> : <>
       <div className="senstats-tabs nested-tabs attendance-view-tabs" role="tablist" aria-label="Attendance dashboard views">

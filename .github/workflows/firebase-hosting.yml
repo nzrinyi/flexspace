@@ -28,13 +28,13 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          VITE_FIREBASE_API_KEY: AIzaSyDaDRpUyUGtQcpb7EOa3kyOECLJOx3c9Lk
-          VITE_FIREBASE_AUTH_DOMAIN: flexspace-1.firebaseapp.com
-          VITE_FIREBASE_PROJECT_ID: flexspace-1
-          VITE_FIREBASE_STORAGE_BUCKET: flexspace-1.firebasestorage.app
-          VITE_FIREBASE_MESSAGING_SENDER_ID: '544136326567'
-          VITE_FIREBASE_APP_ID: '1:544136326567:web:eeab9a468ce0f82299da82'
-          VITE_FIREBASE_MEASUREMENT_ID: G-LVT5RRD31W
+          VITE_FIREBASE_API_KEY: AIzaSyCp1HdSHYQXE-yY8ga6alvLv2gka2d9Ltw
+          VITE_FIREBASE_AUTH_DOMAIN: quorum-2.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: quorum-2
+          VITE_FIREBASE_STORAGE_BUCKET: quorum-2.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: '594173636153'
+          VITE_FIREBASE_APP_ID: '1:594173636153:web:cf3c1d2aadde06508167e8'
+          VITE_FIREBASE_MEASUREMENT_ID: G-PLLC7GDQMM
 
 
       - name: Deploy to Firebase Hosting
@@ -42,5 +42,5 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: flexspace-1
+          projectId: quorum-2
           channelId: live
