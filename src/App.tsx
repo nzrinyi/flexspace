@@ -39,7 +39,7 @@ type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 
 type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary' | 'decision';
 type WorkspaceApp = 'CarMatch' | 'SenStats' | 'AppSelection';
 
-const QUORUM_VERSION = '1.0.0';
+const QUORUM_VERSION = '1.0.1';
 
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 

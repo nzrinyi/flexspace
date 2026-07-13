@@ -15,7 +15,7 @@ function actionLabel(change: SenStatsChangeLogDocument) {
 }
 
 function changeText(change: SenStatsChangeLogDocument) {
-  if (change.type === 'group_change') return 'Normalized caucus values changed between sync snapshots.';
+  if (change.type === 'group_change') return 'Normalized group values changed between sync snapshots.';
   if (change.type === 'new_senator') return `New senator added for ${change.newProvince || change.previousProvince || 'unknown province'}.`;
   if (change.type === 'retired_senator') return 'Senator no longer appears in the current public roster.';
   return 'Roster data changed.';
