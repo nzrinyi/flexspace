@@ -388,3 +388,7 @@ a { color: var(--accent); font-weight: 700; }
 .app-tiles small { color: var(--accent); font-weight: 900; }
 .secondary-action { border: 1px solid #d7def5; border-radius: 999px; background: #fff; color: #26395f; padding: 10px 15px; font-weight: 900; }
 .blank-app { display: grid; gap: 8px; }
+
+/* Deploy visibility */
+.deploy-version-badge { margin-left: auto; border: 1px solid #dbe4f0; border-radius: 999px; background: #f8fafc; color: #64748b; padding: 6px 9px; font-size: .72rem; font-weight: 950; letter-spacing: .02em; white-space: nowrap; }
+@media (max-width: 720px) { .deploy-version-badge { order: 3; width: 100%; margin-left: 0; text-align: center; } }

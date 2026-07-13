@@ -40,6 +40,11 @@ type WorkspaceApp = 'CarMatch' | 'AppSelection';
 
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
+const deployBranch = import.meta.env.VITE_DEPLOY_BRANCH || 'local';
+const deploySha = String(import.meta.env.VITE_DEPLOY_SHA || 'dev').slice(0, 7);
+const deployRunNumber = import.meta.env.VITE_DEPLOY_RUN_NUMBER || 'local';
+const deployVersionLabel = `Deploy #${deployRunNumber} · ${deployBranch} · ${deploySha}`;
+
 interface Filters {
   query: string;
   bodyStyle: 'All' | BodyStyle;
@@ -378,7 +383,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>
       <section className="hero card">
-        <div className="hero-topline"><div className="brand-status"><button className="app-name" type="button" onDoubleClick={() => setActiveWorkspaceApp('AppSelection')} title="Double-click to switch apps">CarMatch</button><SessionStatusIcon status={sessionStatus} /></div><div className="profile-switcher" aria-label="User profile selector">{profileNames.map((profileName) => <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>)}</div></div>
+        <div className="hero-topline"><div className="brand-status"><button className="app-name" type="button" onDoubleClick={() => setActiveWorkspaceApp('AppSelection')} title="Double-click to switch apps">CarMatch</button><SessionStatusIcon status={sessionStatus} /></div><span className="deploy-version-badge" title={`Deploy run ${deployRunNumber} from ${deployBranch} at ${deploySha}`}>{deployVersionLabel}</span><div className="profile-switcher" aria-label="User profile selector">{profileNames.map((profileName) => <button key={profileName} className={activeProfile === profileName ? 'active' : ''} onClick={() => setActiveProfile(profileName)}>{profileName}</button>)}</div></div>
       </section>
 
       <button className="menu-toggle" type="button" aria-expanded={isMenuOpen} aria-controls="primary-app-menu" onClick={() => setIsMenuOpen((open: boolean) => !open)}><span className="menu-icon" aria-hidden="true"><span /><span /><span /></span><span>{activeSectionLabel}</span></button>

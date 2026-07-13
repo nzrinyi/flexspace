@@ -77,7 +77,7 @@ If Anonymous Auth is not enabled, the deployed app will show `auth/configuration
 
 GitHub Actions deploys the configured working branch to the live Firebase Hosting site using `.github/workflows/firebase-hosting.yml`. Add these repository secrets before relying on automatic deployment:
 
-- `FIREBASE_SERVICE_ACCOUNT`: JSON service account credentials with permission to deploy Firebase Hosting for `flexspace-1`. Firestore rules deployment is kept as a separate manual command until this service account also has the required Firestore rules and Service Usage permissions.
+- `FLEXSPACE_FIREBASE_SERVICE_ACCOUNT` preferred, or `FIREBASE_SERVICE_ACCOUNT` as a fallback: JSON service account credentials with permission to deploy Firebase Hosting for the `flexspace-1` project. Firestore rules deployment is kept as a separate manual command until this service account also has the required Firestore rules and Service Usage permissions.
 
 The deployed site will be available at:
 

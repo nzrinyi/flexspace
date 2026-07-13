@@ -47,10 +47,13 @@ jobs:
           VITE_DEPLOY_RUN_NUMBER: ${{ github.run_number }}
 
 
+      - name: Confirm Firebase target
+        run: echo "Deploying ${{ github.ref_name }} @ ${{ github.sha }} to Firebase project flexspace-1"
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          firebaseServiceAccount: ${{ secrets.FLEXSPACE_FIREBASE_SERVICE_ACCOUNT || secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: flexspace-1
           channelId: live
