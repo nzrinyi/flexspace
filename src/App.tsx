@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { signInAnonymously, type User } from 'firebase/auth';
 import { arrayUnion, collection, doc, getDoc, increment, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
@@ -208,6 +208,7 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
   const [pieces, setPieces] = useLocalStorageState<WallArtPiece[]>('artsizer.pieces', defaultWallPieces);
   const [draggingPiece, setDraggingPiece] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
+  const longPressTimerRef = useRef<number | null>(null);
 
   const effectivePieces = useMemo(() => pieces.map((piece) => {
     const renderedSize = renderedArtSize(piece, scalePercent);
@@ -218,6 +219,40 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
     const rect = svg.getBoundingClientRect();
     return { x: ((clientX - rect.left) / rect.width) * wallWidth, y: ((clientY - rect.top) / rect.height) * wallHeight };
   }, [wallHeight, wallWidth]);
+
+  const clearLongPressTimer = useCallback(() => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearLongPressTimer, [clearLongPressTimer]);
+
+  const beginFramePointer = useCallback((event: PointerEvent<SVGGElement>, piece: WallArtPiece) => {
+    const svg = event.currentTarget.ownerSVGElement;
+    if (!svg) return;
+    clearLongPressTimer();
+    const point = canvasPoint(event.clientX, event.clientY, svg);
+    const nextDrag = { id: piece.id, offsetX: point.x - piece.x, offsetY: point.y - piece.y };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSelectedPieceId(piece.id);
+
+    if (event.pointerType === 'touch' || event.pointerType === 'pen') {
+      longPressTimerRef.current = window.setTimeout(() => {
+        setDraggingPiece(nextDrag);
+        longPressTimerRef.current = null;
+      }, 320);
+      return;
+    }
+
+    setDraggingPiece(nextDrag);
+  }, [canvasPoint, clearLongPressTimer]);
+
+  const endFramePointer = useCallback(() => {
+    clearLongPressTimer();
+    setDraggingPiece(null);
+  }, [clearLongPressTimer]);
 
   const addFrame = useCallback((size: ArtFrameSize, x = wallWidth / 2 - size.width / 2, y = wallHeight / 2 - size.height / 2) => {
     const renderedSize = renderedArtSize({ ...size, id: `${size.label}-${Date.now()}`, x, y, rotation: 0 }, scalePercent);
@@ -271,7 +306,7 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
             <div className="frame-drawer"><strong>Standard sizes</strong>{standardArtSizes.map((size) => <button key={size.label} type="button" draggable onDragStart={(event) => event.dataTransfer.setData('application/artsizer-frame', size.label)} onClick={() => addFrame(size)}><i style={{ background: size.color }} /><span>{size.label}</span><small>{size.width}″ × {size.height}″</small></button>)}</div>
           </aside>
           <div className="wall-stage">
-            <div className="wall-canvas-viewport"><div className="wall-canvas-zoom" style={{ width: `${zoomPercent}%` }}><svg className="wall-canvas" viewBox={`0 0 ${wallWidth} ${wallHeight}`} role="img" aria-label="Wall canvas for arranging framed art" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const label = event.dataTransfer.getData('application/artsizer-frame'); const size = standardArtSizes.find((option) => option.label === label); if (!size || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); addFrame(size, point.x - size.width / 2, point.y - size.height / 2); }} onPointerMove={(event) => { if (!draggingPiece || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); setPieces((current) => current.map((piece) => { if (piece.id !== draggingPiece.id) return piece; const size = renderedArtSize(piece, scalePercent); return clampArtPiece({ ...piece, x: snapValue(point.x - draggingPiece.offsetX, snapEnabled), y: snapValue(point.y - draggingPiece.offsetY, snapEnabled) }, wallWidth, wallHeight, size.width, size.height); })); }} onPointerUp={() => setDraggingPiece(null)} onPointerCancel={() => setDraggingPiece(null)} onPointerLeave={() => setDraggingPiece(null)}>
+            <div className="wall-canvas-viewport"><div className="wall-canvas-zoom" style={{ width: `${zoomPercent}%` }}><svg className="wall-canvas" viewBox={`0 0 ${wallWidth} ${wallHeight}`} role="img" aria-label="Wall canvas for arranging framed art" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const label = event.dataTransfer.getData('application/artsizer-frame'); const size = standardArtSizes.find((option) => option.label === label); if (!size || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); addFrame(size, point.x - size.width / 2, point.y - size.height / 2); }} onPointerMove={(event) => { if (!draggingPiece || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); setPieces((current) => current.map((piece) => { if (piece.id !== draggingPiece.id) return piece; const size = renderedArtSize(piece, scalePercent); return clampArtPiece({ ...piece, x: snapValue(point.x - draggingPiece.offsetX, snapEnabled), y: snapValue(point.y - draggingPiece.offsetY, snapEnabled) }, wallWidth, wallHeight, size.width, size.height); })); }} onPointerUp={endFramePointer} onPointerCancel={endFramePointer} onPointerLeave={endFramePointer}>
               <defs><pattern id="snap-grid" width="2" height="2" patternUnits="userSpaceOnUse"><path d="M 2 0 L 0 0 0 2" fill="none" stroke="#dbeafe" strokeWidth="0.12" /></pattern></defs>
               <rect width={wallWidth} height={wallHeight} rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="0.5" />
               {snapEnabled && <rect width={wallWidth} height={wallHeight} fill="url(#snap-grid)" opacity="0.85" />}
@@ -285,10 +320,10 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
                   { label: 'Rotate frame', icon: '↻', x: controlX + 8, y: controlY, onClick: () => rotatePiece(piece.id) },
                   { label: 'Delete frame', icon: '×', x: controlX + 12, y: controlY, onClick: () => deletePiece(piece.id) },
                 ];
-                return <g key={piece.id} className={`wall-art-piece ${piece.id === selectedPieceId ? 'selected controls-visible' : ''}`} onPointerDown={(event) => { const svg = event.currentTarget.ownerSVGElement; if (!svg) return; const point = canvasPoint(event.clientX, event.clientY, svg); event.currentTarget.setPointerCapture(event.pointerId); setDraggingPiece({ id: piece.id, offsetX: point.x - piece.x, offsetY: point.y - piece.y }); setSelectedPieceId(piece.id); }}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text><g className="frame-inline-controls">{controlButtons.map((control) => <g key={control.label} role="button" aria-label={control.label} tabIndex={0} transform={`translate(${control.x} ${control.y})`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); control.onClick(); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); control.onClick(); } }}><circle r="1.75" fill="#0f172a" opacity="0.9" /><text textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize="2.4" fontWeight="900">{control.icon}</text></g>)}</g></g>;
+                return <g key={piece.id} className={`wall-art-piece ${piece.id === selectedPieceId ? 'selected controls-visible' : ''}`} onPointerDown={(event) => beginFramePointer(event, piece)} onContextMenu={(event) => event.preventDefault()}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text><g className="frame-inline-controls">{controlButtons.map((control) => <g key={control.label} role="button" aria-label={control.label} tabIndex={0} transform={`translate(${control.x} ${control.y})`} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); control.onClick(); }} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.stopPropagation(); control.onClick(); } }}><circle r="1.75" fill="#0f172a" opacity="0.9" /><text textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize="2.4" fontWeight="900">{control.icon}</text></g>)}</g></g>;
               })}
             </svg></div></div>
-            <p className="artsizer-help">Tip: tap a frame to reveal its controls on mobile. Canvas zoom changes your view only — the wall dimensions stay fixed.</p>
+            <p className="artsizer-help">Tip: tap a frame to select it, then long-press and drag to move it on mobile. Canvas zoom changes your view only — the wall dimensions stay fixed.</p>
           </div>
         </div>
       </section>
