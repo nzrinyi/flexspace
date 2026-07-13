@@ -147,6 +147,7 @@ interface WallArtPiece extends ArtFrameSize {
   id: string;
   x: number;
   y: number;
+  rotation?: number;
 }
 
 const standardArtSizes: ArtFrameSize[] = [
@@ -166,8 +167,15 @@ const defaultWallPieces: WallArtPiece[] = [
   { ...standardArtSizes[3], id: 'stack-bottom', x: 58, y: 38 },
 ];
 
-function clampArtPiece(piece: WallArtPiece, wallWidth: number, wallHeight: number) {
-  return { ...piece, x: Math.min(Math.max(piece.x, 0), Math.max(wallWidth - piece.width, 0)), y: Math.min(Math.max(piece.y, 0), Math.max(wallHeight - piece.height, 0)) };
+function renderedArtSize(piece: WallArtPiece, scalePercent: number) {
+  const scaledWidth = Math.round(piece.width * scalePercent / 100);
+  const scaledHeight = Math.round(piece.height * scalePercent / 100);
+  const isSideways = Math.abs(piece.rotation ?? 0) % 180 === 90;
+  return { width: isSideways ? scaledHeight : scaledWidth, height: isSideways ? scaledWidth : scaledHeight };
+}
+
+function clampArtPiece(piece: WallArtPiece, wallWidth: number, wallHeight: number, renderedWidth = piece.width, renderedHeight = piece.height) {
+  return { ...piece, x: Math.min(Math.max(piece.x, 0), Math.max(wallWidth - renderedWidth, 0)), y: Math.min(Math.max(piece.y, 0), Math.max(wallHeight - renderedHeight, 0)) };
 }
 
 function snapValue(value: number, enabled: boolean) {
@@ -178,11 +186,16 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
   const [wallWidth, setWallWidth] = useLocalStorageState('artsizer.wallWidth', 96);
   const [wallHeight, setWallHeight] = useLocalStorageState('artsizer.wallHeight', 60);
   const [scalePercent, setScalePercent] = useLocalStorageState('artsizer.scalePercent', 100);
+  const [zoomPercent, setZoomPercent] = useLocalStorageState('artsizer.zoomPercent', 100);
   const [snapEnabled, setSnapEnabled] = useLocalStorageState('artsizer.snapEnabled', true);
   const [pieces, setPieces] = useLocalStorageState<WallArtPiece[]>('artsizer.pieces', defaultWallPieces);
   const [draggingPieceId, setDraggingPieceId] = useState<string | null>(null);
+  const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
 
-  const effectivePieces = useMemo(() => pieces.map((piece) => clampArtPiece({ ...piece, width: Math.round(piece.width * scalePercent / 100), height: Math.round(piece.height * scalePercent / 100) }, wallWidth, wallHeight)), [pieces, scalePercent, wallHeight, wallWidth]);
+  const effectivePieces = useMemo(() => pieces.map((piece) => {
+    const renderedSize = renderedArtSize(piece, scalePercent);
+    return clampArtPiece({ ...piece, ...renderedSize, rotation: piece.rotation ?? 0 }, wallWidth, wallHeight, renderedSize.width, renderedSize.height);
+  }), [pieces, scalePercent, wallHeight, wallWidth]);
 
   const canvasPoint = useCallback((clientX: number, clientY: number, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect();
@@ -190,23 +203,40 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
   }, [wallHeight, wallWidth]);
 
   const addFrame = useCallback((size: ArtFrameSize, x = wallWidth / 2 - size.width / 2, y = wallHeight / 2 - size.height / 2) => {
-    const nextPiece = clampArtPiece({ ...size, id: `${size.label}-${Date.now()}`, x: snapValue(x, snapEnabled), y: snapValue(y, snapEnabled) }, wallWidth, wallHeight);
+    const renderedSize = renderedArtSize({ ...size, id: `${size.label}-${Date.now()}`, x, y, rotation: 0 }, scalePercent);
+    const nextPiece = clampArtPiece({ ...size, id: `${size.label}-${Date.now()}`, x: snapValue(x, snapEnabled), y: snapValue(y, snapEnabled), rotation: 0 }, wallWidth, wallHeight, renderedSize.width, renderedSize.height);
     setPieces((current) => [...current, nextPiece]);
-  }, [setPieces, snapEnabled, wallHeight, wallWidth]);
+    setSelectedPieceId(nextPiece.id);
+  }, [scalePercent, setPieces, snapEnabled, wallHeight, wallWidth]);
 
   const resetLayout = useCallback(() => {
     setWallWidth(96);
     setWallHeight(60);
     setScalePercent(100);
+    setZoomPercent(100);
     setSnapEnabled(true);
+    setSelectedPieceId(null);
     setPieces(defaultWallPieces);
-  }, [setPieces, setScalePercent, setSnapEnabled, setWallHeight, setWallWidth]);
+  }, [setPieces, setScalePercent, setSnapEnabled, setWallHeight, setWallWidth, setZoomPercent]);
 
   const applyGalleryPreset = useCallback(() => {
     setPieces(defaultWallPieces);
     setScalePercent(100);
+    setZoomPercent(100);
     setSnapEnabled(true);
-  }, [setPieces, setScalePercent, setSnapEnabled]);
+    setSelectedPieceId(null);
+  }, [setPieces, setScalePercent, setSnapEnabled, setZoomPercent]);
+
+  const selectedPiece = effectivePieces.find((piece) => piece.id === selectedPieceId);
+  const deleteSelectedPiece = useCallback(() => {
+    if (!selectedPieceId) return;
+    setPieces((current) => current.filter((piece) => piece.id !== selectedPieceId));
+    setSelectedPieceId(null);
+  }, [selectedPieceId, setPieces]);
+  const rotateSelectedPiece = useCallback(() => {
+    if (!selectedPieceId) return;
+    setPieces((current) => current.map((piece) => piece.id === selectedPieceId ? { ...piece, rotation: ((piece.rotation ?? 0) + 90) % 360 } : piece));
+  }, [selectedPieceId, setPieces]);
 
   return (
     <main className="shell artsizer-shell">
@@ -218,20 +248,20 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
             <div className="artsizer-control-grid">
               <label><span>Wall width</span><input type="number" min="24" max="240" value={wallWidth} onChange={(event) => setWallWidth(Number(event.target.value) || 96)} /></label>
               <label><span>Wall height</span><input type="number" min="24" max="144" value={wallHeight} onChange={(event) => setWallHeight(Number(event.target.value) || 60)} /></label>
-              <label className="artsizer-scale"><span>Frame scale {scalePercent}%</span><input type="range" min="50" max="150" value={scalePercent} onChange={(event) => setScalePercent(Number(event.target.value))} /></label>
+              <label className="artsizer-scale"><span>Frame scale {scalePercent}%</span><input type="range" min="50" max="150" value={scalePercent} onChange={(event) => setScalePercent(Number(event.target.value))} /></label><label className="artsizer-scale"><span>Canvas zoom {zoomPercent}%</span><input type="range" min="60" max="180" value={zoomPercent} onChange={(event) => setZoomPercent(Number(event.target.value))} /></label>
             </div>
-            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={applyGalleryPreset}>Gallery preset</button><button type="button" onClick={resetLayout}>Reset</button></div>
+            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={rotateSelectedPiece} disabled={!selectedPiece}>Rotate selected</button><button type="button" onClick={deleteSelectedPiece} disabled={!selectedPiece}>Delete selected</button><button type="button" onClick={applyGalleryPreset}>Gallery preset</button><button type="button" onClick={resetLayout}>Reset</button></div>{selectedPiece && <p className="artsizer-selection">Selected: <strong>{selectedPiece.label}</strong> · {selectedPiece.width}″ × {selectedPiece.height}″ · {selectedPiece.rotation ?? 0}°</p>}
             <div className="frame-drawer"><strong>Standard sizes</strong>{standardArtSizes.map((size) => <button key={size.label} type="button" draggable onDragStart={(event) => event.dataTransfer.setData('application/artsizer-frame', size.label)} onClick={() => addFrame(size)}><i style={{ background: size.color }} /><span>{size.label}</span><small>{size.width}″ × {size.height}″</small></button>)}</div>
           </aside>
           <div className="wall-stage">
-            <svg className="wall-canvas" viewBox={`0 0 ${wallWidth} ${wallHeight}`} role="img" aria-label="Wall canvas for arranging framed art" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const label = event.dataTransfer.getData('application/artsizer-frame'); const size = standardArtSizes.find((option) => option.label === label); if (!size || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); addFrame(size, point.x - size.width / 2, point.y - size.height / 2); }} onPointerMove={(event) => { if (!draggingPieceId || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); setPieces((current) => current.map((piece) => piece.id === draggingPieceId ? clampArtPiece({ ...piece, x: snapValue(point.x - (piece.width * scalePercent / 100) / 2, snapEnabled), y: snapValue(point.y - (piece.height * scalePercent / 100) / 2, snapEnabled) }, wallWidth, wallHeight) : piece)); }} onPointerUp={() => setDraggingPieceId(null)} onPointerLeave={() => setDraggingPieceId(null)}>
+            <div className="wall-canvas-viewport"><div className="wall-canvas-zoom" style={{ width: `${zoomPercent}%` }}><svg className="wall-canvas" viewBox={`0 0 ${wallWidth} ${wallHeight}`} role="img" aria-label="Wall canvas for arranging framed art" onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); const label = event.dataTransfer.getData('application/artsizer-frame'); const size = standardArtSizes.find((option) => option.label === label); if (!size || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); addFrame(size, point.x - size.width / 2, point.y - size.height / 2); }} onPointerMove={(event) => { if (!draggingPieceId || !(event.currentTarget instanceof SVGSVGElement)) return; const point = canvasPoint(event.clientX, event.clientY, event.currentTarget); setPieces((current) => current.map((piece) => { if (piece.id !== draggingPieceId) return piece; const size = renderedArtSize(piece, scalePercent); return clampArtPiece({ ...piece, x: snapValue(point.x - size.width / 2, snapEnabled), y: snapValue(point.y - size.height / 2, snapEnabled) }, wallWidth, wallHeight, size.width, size.height); })); }} onPointerUp={() => setDraggingPieceId(null)} onPointerLeave={() => setDraggingPieceId(null)}>
               <defs><pattern id="snap-grid" width="2" height="2" patternUnits="userSpaceOnUse"><path d="M 2 0 L 0 0 0 2" fill="none" stroke="#dbeafe" strokeWidth="0.12" /></pattern></defs>
               <rect width={wallWidth} height={wallHeight} rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="0.5" />
               {snapEnabled && <rect width={wallWidth} height={wallHeight} fill="url(#snap-grid)" opacity="0.85" />}
               <line x1="0" y1={wallHeight / 2} x2={wallWidth} y2={wallHeight / 2} stroke="#cbd5e1" strokeDasharray="1.5 1.5" strokeWidth="0.25" />
-              {effectivePieces.map((piece) => <g key={piece.id} className="wall-art-piece" onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDraggingPieceId(piece.id); }}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text></g>)}
-            </svg>
-            <p className="artsizer-help">Tip: drag from the size drawer, click a size to add it, or drag frames already on the wall. The grid snaps every 2 inches when snapping is on.</p>
+              {effectivePieces.map((piece) => <g key={piece.id} className={`wall-art-piece ${piece.id === selectedPieceId ? 'selected' : ''}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); setDraggingPieceId(piece.id); setSelectedPieceId(piece.id); }}><rect x={piece.x} y={piece.y} width={piece.width} height={piece.height} rx="1.5" fill="white" stroke={piece.color} strokeWidth="1" /><rect x={piece.x + piece.width * 0.08} y={piece.y + piece.height * 0.08} width={piece.width * 0.84} height={piece.height * 0.84} rx="1" fill={piece.color} opacity="0.16" /><text x={piece.x + piece.width / 2} y={piece.y + piece.height / 2} textAnchor="middle" dominantBaseline="middle" fill="#0f172a" fontSize="3" fontWeight="800">{piece.label}</text></g>)}
+            </svg></div></div>
+            <p className="artsizer-help">Tip: drag from the size drawer, click a size to add it, drag frames already on the wall, then rotate or delete the selected frame. Canvas zoom changes your view only — the wall dimensions stay fixed.</p>
           </div>
         </div>
       </section>

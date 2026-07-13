@@ -511,3 +511,11 @@ input, select, textarea { max-width: 100%; }
   .frame-drawer small { grid-column: 2; }
   .wall-canvas { min-height: 260px; border-radius: 18px; }
 }
+.wall-canvas-viewport { overflow: auto; border-radius: 26px; border: 1px solid #dce4f2; background: #fff; box-shadow: inset 0 0 0 10px #fff, 0 18px 42px rgba(15,23,42,.08); }
+.wall-canvas-zoom { min-width: 100%; transition: width .18s ease; }
+.wall-canvas-viewport .wall-canvas { border: 0; border-radius: 0; box-shadow: none; max-height: none; display: block; }
+.wall-art-piece.selected rect:first-child { stroke-width: 1.8; filter: drop-shadow(0 0 4px rgba(219,39,119,.35)); }
+.artsizer-actions button:disabled { cursor: not-allowed; opacity: .45; background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+.artsizer-selection { margin: 0; border: 1px solid #fbcfe8; border-radius: 14px; background: #fdf2f8; color: #831843; padding: 10px 12px; font-size: .86rem; font-weight: 800; }
+.artsizer-selection strong { color: #500724; }
+@media (max-width: 560px) { .wall-canvas-viewport { border-radius: 18px; } }
