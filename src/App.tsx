@@ -10,7 +10,6 @@ import { CompareTray } from './components/CompareTray';
 import { ComparisonTable as EnhancedComparisonTable } from './components/ComparisonTable';
 import { PaymentCalculator as EnhancedPaymentCalculator } from './components/PaymentCalculator';
 import { TestDriveDiary as EnhancedTestDriveDiary } from './components/TestDriveDiary';
-import { SenStatsDashboard } from './components/SenStatsDashboard';
 import { useLocalStorageState } from './hooks/useLocalStorageState';
 import './styles.css';
 
@@ -37,7 +36,7 @@ type MustHaveSettings = Record<MustHaveKey, boolean>;
 type ReadinessStatus = 'Ready to decide' | 'Needs test drive' | 'Needs quote' | 'Nick has not reviewed' | 'Emily marked as finalist' | 'Needs shared note' | 'Deal breaker';
 
 type AppSection = 'dashboard' | 'browse' | 'compare' | 'calculator' | 'deals' | 'diary' | 'decision';
-type WorkspaceApp = 'CarMatch' | 'SenStats' | 'AppSelection';
+type WorkspaceApp = 'CarMatch' | 'AppSelection';
 
 const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared priorities', browse: 'Browse vehicles', compare: 'Compare', calculator: 'Payment calculator', deals: 'Deal tracker', diary: 'Test drive diary', decision: 'Decision Room' };
 
@@ -133,11 +132,7 @@ function App() {
 
 
 function AppSelectionPage({ onSelectApp }: { onSelectApp: (app: WorkspaceApp) => void }) {
-  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open existing app</small></button><button type="button" onClick={() => onSelectApp('SenStats')}><strong>SenStats</strong><span>Blank workspace ready for the next app build-out.</span><small>Open blank app</small></button></div></section></main>;
-}
-
-function SenStatsApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
-  return <main className="shell senstats-shell"><section className="hero card"><div className="hero-topline"><button className="app-name senstats-name" type="button" onDoubleClick={onOpenAppSelection} title="Double-click to switch apps">SenStats</button></div></section><SenStatsDashboard /></main>;
+  return <main className="shell app-selector-shell"><section className="card app-selector"><div className="section-heading"><div><p className="eyebrow">Workspace</p><h2>Choose an app</h2></div><span>Double-click the app name any time to return here.</span></div><div className="app-tiles"><button type="button" onClick={() => onSelectApp('CarMatch')}><strong>CarMatch</strong><span>Vehicle research, scoring, notes, quotes, and test-drive planning.</span><small>Open app</small></button></div></section></main>;
 }
 
 function AuthenticatedSession({ activeUser }: { activeUser: User }) {
@@ -380,7 +375,6 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   }, [setSelectedVehicleIds]);
 
   if (activeWorkspaceApp === 'AppSelection') return <AppSelectionPage onSelectApp={setActiveWorkspaceApp} />;
-  if (activeWorkspaceApp === 'SenStats') return <SenStatsApp onOpenAppSelection={() => setActiveWorkspaceApp('AppSelection')} />;
 
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>
