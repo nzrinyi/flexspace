@@ -43,7 +43,8 @@ const sectionLabels: Record<AppSection, string> = { dashboard: 'Shared prioritie
 const deployBranch = import.meta.env.VITE_DEPLOY_BRANCH || 'local';
 const deploySha = String(import.meta.env.VITE_DEPLOY_SHA || 'dev').slice(0, 7);
 const deployRunNumber = import.meta.env.VITE_DEPLOY_RUN_NUMBER || 'local';
-const deployVersionLabel = `Deploy #${deployRunNumber} · ${deployBranch} · ${deploySha}`;
+const appVersion = import.meta.env.VITE_APP_VERSION || '0.1.1';
+const deployVersionLabel = `v${appVersion} · Deploy #${deployRunNumber} · ${deployBranch} · ${deploySha}`;
 
 interface Filters {
   query: string;

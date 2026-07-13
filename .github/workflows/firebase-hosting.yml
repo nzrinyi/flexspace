@@ -45,6 +45,7 @@ jobs:
           VITE_DEPLOY_BRANCH: ${{ github.ref_name }}
           VITE_DEPLOY_SHA: ${{ github.sha }}
           VITE_DEPLOY_RUN_NUMBER: ${{ github.run_number }}
+          VITE_APP_VERSION: 0.1.1
 
 
       - name: Confirm Firebase target
