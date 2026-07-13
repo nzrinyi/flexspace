@@ -9,6 +9,17 @@ type AttendanceView = 'senators' | 'groups' | 'provinces';
 type RetirementSort = 'date' | 'served';
 type AttendanceSort = 'missed' | 'rate' | 'present' | 'illness' | 'leave' | 'business';
 
+function DashboardIcon({ tab }: { tab: DashboardTab }) {
+  const paths: Record<DashboardTab, string> = {
+    groups: 'M7 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm10 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM7 13c-3 0-5 1.6-5 4v2h10v-2c0-2.4-2-4-5-4Zm10 0c-3 0-5 1.6-5 4v2h10v-2c0-2.4-2-4-5-4Z',
+    groupComparison: 'M4 19h16v2H4v-2Zm1-7h4v5H5v-5Zm5-6h4v11h-4V6Zm5 3h4v8h-4V9Z',
+    expenses: 'M12 2a7 7 0 0 0-7 7c0 5.2 7 13 7 13s7-7.8 7-13a7 7 0 0 0-7-7Zm1 12.7V16h-2v-1.3c-1.2-.3-2.1-1.1-2.5-2.2l1.8-.8c.3.8.9 1.2 1.8 1.2.8 0 1.3-.3 1.3-.9 0-.7-.7-.9-1.8-1.2-1.4-.4-2.7-1-2.7-2.7 0-1.3.8-2.3 2.1-2.7V4h2v1.3c1 .3 1.7.9 2.1 1.8l-1.7.9c-.3-.6-.7-.9-1.4-.9-.6 0-1.1.3-1.1.8 0 .6.6.8 1.7 1.1 1.5.4 2.9 1.1 2.9 2.8 0 1.4-.9 2.4-2.5 2.8Z',
+    retirement: 'M12 2a10 10 0 1 0 10 10H12V2Zm2 0v8h8a10 10 0 0 0-8-8ZM7 13h5v5h-2v-3H7v-2Z',
+    attendance: 'M7 2h2v2h6V2h2v2h3v18H4V4h3V2Zm11 8H6v10h12V10Zm-9 3h2v2H9v-2Zm4 0h2v2h-2v-2Z',
+  };
+  return <svg className="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={paths[tab]} fill="currentColor" /></svg>;
+}
+
 function yearFromValue(value: string) {
   const match = value.match(/\b(19|20)\d{2}\b/);
   return match ? Number(match[0]) : 0;
@@ -199,7 +210,7 @@ export function SenStatsDashboardsView({ senators, attendance, expenses, selecte
 
   return <section className="dashboards-view" aria-label="Quorum dashboards">
     <div className="senstats-tabs nested-tabs" role="tablist" aria-label="Dashboards">
-      {(['groups', 'groupComparison', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}>{tab === 'groups' ? 'Groups' : tab === 'groupComparison' ? 'Group Comparison' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</button>)}
+      {(['groups', 'groupComparison', 'expenses', 'retirement', 'attendance'] as DashboardTab[]).map((tab) => <button key={tab} type="button" className={activeDashboard === tab ? 'active' : ''} onClick={() => setActiveDashboard(tab)}><DashboardIcon tab={tab} /><span>{tab === 'groups' ? 'Groups' : tab === 'groupComparison' ? 'Group Comparison' : tab === 'expenses' ? 'Expenses' : tab === 'retirement' ? 'Retirement' : 'Attendance'}</span></button>)}
     </div>
 
     {activeDashboard === 'groups' && <>

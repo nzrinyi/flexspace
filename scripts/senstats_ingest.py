@@ -1199,6 +1199,30 @@ def extract_committee_html_payload(raw: str) -> str:
     return best
 
 
+def committee_role_rank(role: str) -> int:
+    normalized = str(role or "").lower()
+    if re.search(r"\b(deputy|vice)[ -]?chair", normalized):
+        return 3
+    if re.search(r"\bchair", normalized):
+        return 4
+    if re.search(r"\bex officio\b", normalized):
+        return 2
+    if re.search(r"\bmember\b", normalized):
+        return 1
+    return 0
+
+
+def better_committee_role(existing_role: str, next_role: str) -> str:
+    return next_role if committee_role_rank(next_role) > committee_role_rank(existing_role) else existing_role
+
+
+def committee_has_required_leadership(members: list[dict[str, str]]) -> bool:
+    roles = [str(member.get("role") or "").lower() for member in members]
+    has_chair = any(re.search(r"\bchair\b", role) and not re.search(r"\b(deputy|vice)[ -]?chair", role) for role in roles)
+    has_deputy = any(re.search(r"\b(deputy|vice)[ -]?chair", role) for role in roles)
+    return has_chair and has_deputy
+
+
 def parse_committee_page(html: str, source_url: str, code: str, senators_by_name: dict[str, SenatorRecord], senators_by_profile: dict[str, SenatorRecord]) -> CommitteeRecord:
     soup = BeautifulSoup(extract_committee_html_payload(html), "html.parser")
     heading = soup.find("h1")
@@ -1235,10 +1259,10 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         if not key:
             return
         if key in seen or (name_key and name_key in seen_names):
-            if role and any(token in role.lower() for token in ["chair", "vice"]):
+            if role:
                 for member in members:
                     if member.get("senatorId") == key or (name_key and stable_id(str(member.get("name") or "")) == name_key):
-                        member["role"] = role
+                        member["role"] = better_committee_role(str(member.get("role") or ""), role)
                         break
             return
         seen.add(key)
@@ -1296,7 +1320,7 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
         )
 
     text_lines = [cleaned for line in raw_text.splitlines() if (cleaned := clean_committee_text_line(line))]
-    role_tokens = {"chair", "deputy chair", "vice chair", "deputy-chair", "vice-chair", "member", "ex officio"}
+    role_tokens = {"chair", "the chair", "deputy chair", "deputy chairs", "deputy chair(s)", "vice chair", "vice chairs", "vice-chair", "deputy-chair", "member", "members", "ex officio"}
     affiliation_pattern = re.compile(r"\b(C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b\s*-\s*\(([^)]+)\)", re.IGNORECASE)
     for index, line in enumerate(text_lines):
         normalized_role = " ".join(line.split()).lower()
@@ -1317,6 +1341,18 @@ def parse_committee_page(html: str, source_url: str, code: str, senators_by_name
                 break
         if name_text:
             append_member(name_text, line, party, province, "")
+
+    leadership_inline_pattern = re.compile(
+        r"\b(?P<role>chair|deputy chairs?|deputy chair\(s\)|vice chairs?)\b\s*[:–—-]?\s*(?:the honourable|honourable|senator)?\s*(?P<name>[A-Z][A-Za-zÀ-ÖØ-öø-ÿ' .-]{2,80})",
+        re.IGNORECASE,
+    )
+    for line in text_lines:
+        for match in leadership_inline_pattern.finditer(line):
+            role = normalized_member_role(match.group("role"))
+            name_text = clean_display_name(match.group("name"))
+            name_text = re.split(r"\s{2,}|\b(?:C|CPC|CSG|GRO|ISG|PSG|Non-affiliated)\b", name_text)[0].strip(" -·,;:")
+            if name_text:
+                append_member(name_text, role, "", "", "")
 
     for senator_name, senator in senators_by_name.items():
         if senator.senator_id in seen or senator_name.lower() not in raw_text.lower():
@@ -1458,10 +1494,12 @@ def fetch_committee_records(http: requests.Session, senators: Iterable[SenatorRe
                 write_committee_debug_response(code, candidate_url, response.text, f"candidate_{candidate_count}_parse_error")
                 continue
             minimum_committee_members = minimum_committee_member_count(code)
-            if len(committee.members) >= minimum_committee_members:
-                LOGGER.info("Parsed %s committee %s member rows from %s", len(committee.members), code, candidate_url)
+            if len(committee.members) >= minimum_committee_members and committee_has_required_leadership(committee.members):
+                LOGGER.info("Parsed %s committee %s member rows with chair/deputy chair leadership from %s", len(committee.members), code, candidate_url)
                 parsed_committee = committee
                 break
+            if len(committee.members) >= minimum_committee_members:
+                LOGGER.warning("Parsed %s committee %s member rows from %s, but chair/deputy chair leadership was incomplete; trying the next membership candidate.", len(committee.members), code, candidate_url)
             if committee.members:
                 LOGGER.warning(
                     "Committee %s candidate %s from %s returned only %s member row(s), below minimum %s; treating it as partial and continuing.",
@@ -1876,7 +1914,14 @@ def write_committees(db: Any, committees: Iterable[CommitteeRecord]) -> None:
         seen_members: set[str] = set()
         for member in committee.members:
             member_key = (member.get("senatorId") or member.get("name") or "").lower()
-            if not member_key or member_key in seen_members:
+            if not member_key:
+                continue
+            if member_key in seen_members:
+                for existing_member in deduped_members:
+                    existing_key = (existing_member.get("senatorId") or existing_member.get("name") or "").lower()
+                    if existing_key == member_key:
+                        existing_member["role"] = better_committee_role(str(existing_member.get("role") or ""), str(member.get("role") or ""))
+                        break
                 continue
             seen_members.add(member_key)
             deduped_members.append(member)

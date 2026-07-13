@@ -19,6 +19,17 @@ type SenStatsAttendance = SenStatsAttendanceDocument & { id: string };
 type SenStatsChange = SenStatsChangeLogDocument & { id: string };
 type SenStatsTab = 'senators' | 'dashboards' | 'committees' | 'sources' | 'changes';
 
+function TabIcon({ tab }: { tab: SenStatsTab }) {
+  const paths: Record<SenStatsTab, string> = {
+    senators: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 9a7 7 0 0 1 14 0H5Zm14.5-9.5 1.5 1.5 2.5-2.5-1.5-1.5-2.5 2.5ZM19 4h4v2h-4V4Zm0 4h3v2h-3V8Z',
+    dashboards: 'M4 19h16v2H4v-2Zm1-8h4v6H5v-6Zm5-6h4v12h-4V5Zm5 3h4v9h-4V8Z',
+    committees: 'M7 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm10 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM7 13c-3 0-5 1.6-5 4v2h10v-2c0-2.4-2-4-5-4Zm10 0c-3 0-5 1.6-5 4v2h10v-2c0-2.4-2-4-5-4Z',
+    sources: 'M12 3C7 3 4 4.5 4 7v10c0 2.5 3 4 8 4s8-1.5 8-4V7c0-2.5-3-4-8-4Zm0 2c4 0 6 1 6 2s-2 2-6 2-6-1-6-2 2-2 6-2Zm0 14c-4 0-6-1-6-2v-2c1.4.9 3.5 1.4 6 1.4s4.6-.5 6-1.4v2c0 1-2 2-6 2Zm0-4.5c-4 0-6-1-6-2v-2c1.4.9 3.5 1.4 6 1.4s4.6-.5 6-1.4v2c0 1-2 2-6 2Z',
+    changes: 'M12 6V3L8 7l4 4V8c2.8 0 5 2.2 5 5 0 .9-.2 1.7-.6 2.4l1.5 1.5c.7-1.1 1.1-2.4 1.1-3.9 0-3.9-3.1-7-7-7Zm-5 5c0-.9.2-1.7.6-2.4L6.1 7.1C5.4 8.2 5 9.5 5 11c0 3.9 3.1 7 7 7v3l4-4-4-4v3c-2.8 0-5-2.2-5-5Z',
+  };
+  return <svg className="tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d={paths[tab]} fill="currentColor" /></svg>;
+}
+
 class SenStatsErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
 
@@ -181,7 +192,7 @@ function SenStatsDashboardContent({ darkMode }: { darkMode: boolean }) {
   return (
     <section className={`card senstats-dashboard ${darkMode ? 'senstats-dark' : ''}`}>
       <div className="senstats-tabs" role="tablist" aria-label="Quorum sections">
-        {(['senators', 'dashboards', 'committees', 'sources', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : 'Change log'}</button>)}
+        {(['senators', 'dashboards', 'committees', 'sources', 'changes'] as SenStatsTab[]).map((tab) => <button key={tab} type="button" className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}><TabIcon tab={tab} /><span>{tab === 'senators' ? 'Senators' : tab === 'dashboards' ? 'Dashboards' : tab === 'committees' ? 'Committees' : tab === 'sources' ? 'Data sources' : 'Change log'}</span></button>)}
       </div>
 
       {activeTab === 'senators' && <SenStatsSenatorsView senators={senators} selectedSenator={selectedSenator} filteredSenators={filteredSenators} groupOptions={groupOptions} provinceOptions={provinceOptions} groupFilter={groupFilter} provinceFilter={provinceFilter} searchTerm={searchTerm} onGroupFilterChange={setGroupFilter} onProvinceFilterChange={setProvinceFilter} onSearchTermChange={setSearchTerm} onSelectSenator={(id) => { setSelectedSenatorId(id); selectSenator(id, 'Senators'); }} />}

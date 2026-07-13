@@ -1463,3 +1463,7 @@ body.senstats-body-dark { background: #020617; color: #e2e8f0; }
 .senstats-shell-dark .settings-option, .senstats-shell-dark .settings-version-row { background: #1e293b; border-color: #334155; }
 .senstats-shell-dark .settings-option span, .senstats-shell-dark .settings-version-row span { color: #cbd5e1; }
 @media (max-width: 560px) { .settings-modal-header, .settings-option, .settings-version-row { align-items: flex-start; flex-direction: column; } .settings-icon-button { width: 40px; height: 40px; } }
+
+/* React-rendered menu icons */
+.senstats-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.tab-icon { width: 1rem; height: 1rem; flex: 0 0 auto; }
