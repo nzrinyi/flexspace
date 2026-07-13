@@ -1,0 +1,3 @@
+export function SenStatsLoadingSkeleton() {
+  return <section className="card senstats-dashboard"><div className="section-heading"><div><p className="eyebrow skeleton-line short" /><h2 className="skeleton-line title" /></div><span className="skeleton-line badge" /></div><div className="senstats-grid"><aside className="senator-list">{Array.from({ length: 8 }).map((_, index) => <div className="senstats-skeleton-card" key={index}><span /><strong /><em /></div>)}</aside><div className="expense-panel"><div className="senstats-skeleton-block" /><div className="senstats-skeleton-block tall" /></div></div></section>;
+}
