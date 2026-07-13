@@ -575,3 +575,30 @@ input, select, textarea { max-width: 100%; }
   .wall-canvas-zoom { min-width: 155%; }
   .frame-drawer button { flex-basis: 118px; }
 }
+
+/* ArtSizer mobile fixes: visible size drawer, stable selected-frame actions, canvas panning */
+.artsizer-selection { display: grid; gap: 10px; }
+.artsizer-selection p { margin: 0; }
+.artsizer-selected-actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.artsizer-selected-actions button { min-height: 38px; border: 1px solid #fbcfe8; border-radius: 12px; background: #fff; color: #9d174d; font-size: .78rem; font-weight: 950; cursor: pointer; }
+.artsizer-selected-actions button:hover { background: #fdf2f8; }
+.artsizer-selected-actions button.danger { border-color: #fecdd3; color: #be123c; }
+.wall-canvas { touch-action: pan-x pan-y; }
+.wall-art-piece { touch-action: none; }
+
+@media (max-width: 760px) {
+  .frame-drawer { display: grid; grid-template-columns: repeat(8, minmax(118px, 1fr)); overflow-x: auto; padding: 2px 2px 12px; scroll-snap-type: x proximity; }
+  .frame-drawer > strong { grid-column: 1 / -1; position: sticky; left: 0; width: max-content; padding: 0 10px 2px 0; background: linear-gradient(90deg,#fff 74%,rgba(255,255,255,0)); z-index: 1; }
+  .frame-drawer button { min-width: 118px; grid-template-columns: 16px 1fr; scroll-snap-align: start; }
+  .wall-canvas-viewport { max-height: 62vh; overflow: auto; touch-action: pan-x pan-y; }
+  .wall-canvas-zoom { min-width: max(150%, 620px); }
+  .wall-canvas { min-height: 390px; }
+}
+
+@media (max-width: 430px) {
+  .artsizer-selected-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .frame-drawer { grid-template-columns: repeat(8, minmax(110px, 1fr)); }
+  .wall-canvas-viewport { max-height: 58vh; }
+  .wall-canvas-zoom { min-width: max(180%, 560px); }
+  .wall-canvas { min-height: 360px; }
+}
