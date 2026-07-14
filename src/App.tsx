@@ -167,6 +167,17 @@ interface WallArtPiece extends ArtFrameSize {
   rotation?: number;
 }
 
+interface FrameSpacingMeasurement {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  labelX: number;
+  labelY: number;
+  distance: number;
+}
+
 const standardArtSizes: ArtFrameSize[] = [
   { label: '8×10', width: 8, height: 10, color: '#84cc16' },
   { label: '11×14', width: 11, height: 14, color: '#22c55e' },
@@ -199,12 +210,58 @@ function snapValue(value: number, enabled: boolean) {
   return enabled ? Math.round(value / 2) * 2 : value;
 }
 
+function formatSpacingDistance(distance: number) {
+  return `${Number(distance.toFixed(1))}″`;
+}
+
+function getFrameSpacingMeasurements(pieces: WallArtPiece[]): FrameSpacingMeasurement[] {
+  const measurements: FrameSpacingMeasurement[] = [];
+  pieces.forEach((first, firstIndex) => {
+    pieces.slice(firstIndex + 1).forEach((second) => {
+      const firstRight = first.x + first.width;
+      const secondRight = second.x + second.width;
+      const firstBottom = first.y + first.height;
+      const secondBottom = second.y + second.height;
+      const verticalOverlapStart = Math.max(first.y, second.y);
+      const verticalOverlapEnd = Math.min(firstBottom, secondBottom);
+      const horizontalOverlapStart = Math.max(first.x, second.x);
+      const horizontalOverlapEnd = Math.min(firstRight, secondRight);
+      const verticalOverlap = verticalOverlapEnd - verticalOverlapStart;
+      const horizontalOverlap = horizontalOverlapEnd - horizontalOverlapStart;
+
+      if (verticalOverlap > 0) {
+        const left = firstRight <= second.x ? first : second;
+        const right = left === first ? second : first;
+        const leftRightEdge = left.x + left.width;
+        const distance = right.x - leftRightEdge;
+        if (distance > 0.25) {
+          const y = (Math.max(left.y, right.y) + Math.min(left.y + left.height, right.y + right.height)) / 2;
+          measurements.push({ id: `${left.id}-${right.id}-h`, x1: leftRightEdge, y1: y, x2: right.x, y2: y, labelX: leftRightEdge + distance / 2, labelY: y - 1.2, distance });
+        }
+      }
+
+      if (horizontalOverlap > 0) {
+        const top = firstBottom <= second.y ? first : second;
+        const bottom = top === first ? second : first;
+        const topBottomEdge = top.y + top.height;
+        const distance = bottom.y - topBottomEdge;
+        if (distance > 0.25) {
+          const x = (Math.max(top.x, bottom.x) + Math.min(top.x + top.width, bottom.x + bottom.width)) / 2;
+          measurements.push({ id: `${top.id}-${bottom.id}-v`, x1: x, y1: topBottomEdge, x2: x, y2: bottom.y, labelX: x + 1.2, labelY: topBottomEdge + distance / 2, distance });
+        }
+      }
+    });
+  });
+  return measurements;
+}
+
 function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void }) {
   const [wallWidth, setWallWidth] = useLocalStorageState('artsizer.wallWidth', 96);
   const [wallHeight, setWallHeight] = useLocalStorageState('artsizer.wallHeight', 60);
   const [scalePercent, setScalePercent] = useLocalStorageState('artsizer.scalePercent', 100);
   const [zoomPercent, setZoomPercent] = useLocalStorageState('artsizer.zoomPercent', 100);
   const [snapEnabled, setSnapEnabled] = useLocalStorageState('artsizer.snapEnabled', true);
+  const [showSpacing, setShowSpacing] = useLocalStorageState('artsizer.showSpacing', false);
   const [pieces, setPieces] = useLocalStorageState<WallArtPiece[]>('artsizer.pieces', defaultWallPieces);
   const [draggingPiece, setDraggingPiece] = useState<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const [selectedPieceId, setSelectedPieceId] = useState<string | null>(null);
@@ -215,6 +272,7 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
     const renderedSize = renderedArtSize(piece, scalePercent);
     return clampArtPiece({ ...piece, ...renderedSize, rotation: piece.rotation ?? 0 }, wallWidth, wallHeight, renderedSize.width, renderedSize.height);
   }), [pieces, scalePercent, wallHeight, wallWidth]);
+  const spacingMeasurements = useMemo(() => getFrameSpacingMeasurements(effectivePieces), [effectivePieces]);
 
   const canvasPoint = useCallback((clientX: number, clientY: number, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect();
@@ -270,9 +328,10 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
     setScalePercent(100);
     setZoomPercent(100);
     setSnapEnabled(true);
+    setShowSpacing(false);
     setSelectedPieceId(null);
     setPieces(defaultWallPieces);
-  }, [setPieces, setScalePercent, setSnapEnabled, setWallHeight, setWallWidth, setZoomPercent]);
+  }, [setPieces, setScalePercent, setShowSpacing, setSnapEnabled, setWallHeight, setWallWidth, setZoomPercent]);
 
   const selectedPiece = effectivePieces.find((piece) => piece.id === selectedPieceId);
   const deletePiece = useCallback((pieceId: string) => {
@@ -306,7 +365,7 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
               <label><span>Wall height</span><input type="number" min="24" max="144" value={wallHeight} onChange={(event) => setWallHeight(Number(event.target.value) || 60)} /></label>
               <label className="artsizer-scale"><span>Frame scale {scalePercent}%</span><input type="range" min="50" max="150" value={scalePercent} onChange={(event) => setScalePercent(Number(event.target.value))} /></label><label className="artsizer-scale"><span>Canvas zoom {zoomPercent}%</span><input type="range" min="60" max="180" value={zoomPercent} onChange={(event) => setZoomPercent(Number(event.target.value))} /></label>
             </div>
-            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={resetLayout}>Reset</button></div>{selectedPiece && <div className={`artsizer-selection ${moveModePieceId === selectedPiece.id ? 'move-enabled' : ''}`}><p>Selected: <strong>{selectedPiece.label}</strong>. {moveModePieceId === selectedPiece.id ? 'Move mode is on — drag this frame freely.' : 'Use Move if mobile scrolling blocks drag.'}</p><div className="artsizer-selected-actions" aria-label="Selected frame actions"><button type="button" className={moveModePieceId === selectedPiece.id ? 'active' : ''} onClick={() => setMoveModePieceId((current) => current === selectedPiece.id ? null : selectedPiece.id)}>✥ Move</button><button type="button" onClick={() => resizePiece(selectedPiece.id, 1)}>↑ Upsize</button><button type="button" onClick={() => resizePiece(selectedPiece.id, -1)}>↓ Downsize</button><button type="button" onClick={() => rotatePiece(selectedPiece.id)}>↻ Rotate</button><button type="button" className="danger" onClick={() => deletePiece(selectedPiece.id)}>× Delete</button></div></div>}
+            <div className="artsizer-actions"><button type="button" onClick={() => setSnapEnabled((current) => !current)}>{snapEnabled ? 'Turn snapping off' : 'Turn snapping on'}</button><button type="button" onClick={() => setShowSpacing((current) => !current)}>{showSpacing ? 'Hide spacing' : 'Show spacing'}</button><button type="button" onClick={resetLayout}>Reset</button></div>{selectedPiece && <div className={`artsizer-selection ${moveModePieceId === selectedPiece.id ? 'move-enabled' : ''}`}><p>Selected: <strong>{selectedPiece.label}</strong>. {moveModePieceId === selectedPiece.id ? 'Move mode is on — drag this frame freely.' : 'Use Move if mobile scrolling blocks drag.'}</p><div className="artsizer-selected-actions" aria-label="Selected frame actions"><button type="button" className={moveModePieceId === selectedPiece.id ? 'active' : ''} onClick={() => setMoveModePieceId((current) => current === selectedPiece.id ? null : selectedPiece.id)}>✥ Move</button><button type="button" onClick={() => resizePiece(selectedPiece.id, 1)}>↑ Upsize</button><button type="button" onClick={() => resizePiece(selectedPiece.id, -1)}>↓ Downsize</button><button type="button" onClick={() => rotatePiece(selectedPiece.id)}>↻ Rotate</button><button type="button" className="danger" onClick={() => deletePiece(selectedPiece.id)}>× Delete</button></div></div>}
             <div className="frame-drawer"><strong>Standard sizes</strong>{standardArtSizes.map((size) => <button key={size.label} type="button" draggable onDragStart={(event) => event.dataTransfer.setData('application/artsizer-frame', size.label)} onClick={() => addFrame(size)}><i style={{ background: size.color }} /><span>{size.label}</span><small>{size.width}″ × {size.height}″</small></button>)}</div>
           </aside>
           <div className="wall-stage">
@@ -315,6 +374,7 @@ function ArtSizerApp({ onOpenAppSelection }: { onOpenAppSelection: () => void })
               <rect width={wallWidth} height={wallHeight} rx="2" fill="#f8fafc" stroke="#cbd5e1" strokeWidth="0.5" />
               {snapEnabled && <rect width={wallWidth} height={wallHeight} fill="url(#snap-grid)" opacity="0.85" />}
               <line x1="0" y1={wallHeight / 2} x2={wallWidth} y2={wallHeight / 2} stroke="#cbd5e1" strokeDasharray="1.5 1.5" strokeWidth="0.25" />
+              {showSpacing && spacingMeasurements.map((measurement) => <g key={measurement.id} className="spacing-measurement" aria-label={`Spacing ${formatSpacingDistance(measurement.distance)}`}><line x1={measurement.x1} y1={measurement.y1} x2={measurement.x2} y2={measurement.y2} /><circle cx={measurement.x1} cy={measurement.y1} r="0.55" /><circle cx={measurement.x2} cy={measurement.y2} r="0.55" /><text x={measurement.labelX} y={measurement.labelY} textAnchor="middle" dominantBaseline="middle">{formatSpacingDistance(measurement.distance)}</text></g>)}
               {effectivePieces.map((piece) => {
                 const controlX = piece.x + Math.max(piece.width - 15, 1);
                 const controlY = piece.y + 2;
