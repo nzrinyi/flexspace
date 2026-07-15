@@ -620,3 +620,16 @@ input, select, textarea { max-width: 100%; }
 .artsizer-nudge-pad button { min-height: 42px; border: 1px solid #f9a8d4; border-radius: 14px; background: #fff; color: #9d174d; font-size: 1.05rem; font-weight: 950; cursor: pointer; }
 .artsizer-nudge-pad button:hover { background: #fdf2f8; }
 @media (max-width: 430px) { .artsizer-nudge-pad { grid-template-columns: repeat(4, minmax(0, 1fr)); } .artsizer-nudge-pad span { grid-column: 1 / -1; } }
+
+/* Mobile-only canvas-adjacent frame controls */
+.artsizer-canvas-actions { display: none; }
+@media (max-width: 760px) {
+  .artsizer-canvas-actions { display: grid; grid-template-columns: minmax(72px, 1fr) repeat(6, minmax(38px, 44px)); gap: 7px; align-items: center; padding: 9px; border: 1px solid #fbcfe8; border-radius: 18px; background: #fff; box-shadow: 0 12px 26px rgba(15,23,42,.08); }
+  .artsizer-canvas-actions strong { min-width: 0; color: #831843; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .artsizer-canvas-actions button { min-height: 40px; border: 1px solid #f9a8d4; border-radius: 12px; background: #fdf2f8; color: #9d174d; font-weight: 950; }
+  .artsizer-canvas-actions button.danger { border-color: #fecdd3; color: #be123c; background: #fff1f2; }
+}
+@media (max-width: 430px) {
+  .artsizer-canvas-actions { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .artsizer-canvas-actions strong { grid-column: 1 / -1; }
+}
