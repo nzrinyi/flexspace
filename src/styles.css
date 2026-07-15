@@ -613,3 +613,10 @@ input, select, textarea { max-width: 100%; }
 .spacing-measurement line { stroke: #db2777; stroke-width: .38; stroke-dasharray: 1.1 0.8; }
 .spacing-measurement circle { fill: #db2777; stroke: #fff; stroke-width: .25; }
 .spacing-measurement text { fill: #831843; stroke: #fff; stroke-width: .5; paint-order: stroke; font-size: 3px; font-weight: 950; letter-spacing: -.02em; }
+
+/* ArtSizer selected-frame arrow movement */
+.artsizer-nudge-pad { display: grid; grid-template-columns: 1fr repeat(4, minmax(38px, 48px)); gap: 8px; align-items: center; }
+.artsizer-nudge-pad span { color: #831843; font-size: .78rem; font-weight: 950; text-transform: uppercase; letter-spacing: .08em; }
+.artsizer-nudge-pad button { min-height: 42px; border: 1px solid #f9a8d4; border-radius: 14px; background: #fff; color: #9d174d; font-size: 1.05rem; font-weight: 950; cursor: pointer; }
+.artsizer-nudge-pad button:hover { background: #fdf2f8; }
+@media (max-width: 430px) { .artsizer-nudge-pad { grid-template-columns: repeat(4, minmax(0, 1fr)); } .artsizer-nudge-pad span { grid-column: 1 / -1; } }
