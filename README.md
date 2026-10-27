@@ -94,3 +94,28 @@ Required secrets/environment values:
 - `SENSTATS_CONTACT_EMAIL`: Contact email included in the scraper User-Agent, e.g. `SenStats-Data-Sync/1.0 (Contact: you@example.com)`.
 
 The pipeline first tries Open North Represent for senator metadata, falls back to the official Senate current-senators AJAX endpoint when Represent has no Senate records, and writes senator master records to `/senstats_senators/{senatorId}` plus quarterly expense records to `/senstats_senators/{senatorId}/expenses/{expenseId}`. Failed requests, parsing issues, and suspected HTML structure changes are logged to `senstats_ingest_errors.log` and uploaded as a workflow artifact.
+
+## Development checks and decision workflow
+
+Use Node 24 (`nvm use`) and `npm ci`. Dependencies are locked in `package-lock.json`.
+
+```bash
+npm test                 # Finance, evidence, readiness, and calendar regressions
+npm run build            # TypeScript and production bundle
+npx playwright install chromium
+npm run test:browser     # Desktop and mobile flows with an isolated Firebase fixture
+```
+
+Browser tests use a separate Vite configuration on port 5174 and an in-memory Firebase adapter. They never authenticate to or write to the live Firebase project. They cover the UI and failure recovery; they do not validate deployed Firestore rules or backend availability. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` to use an existing browser. The normal `npm run dev` workflow continues to use the real backend.
+
+Emily/Nick selection and the existing honour-system permissions are unchanged. The session URL can be copied from the header and saved for another device; the current browser also remembers its last session. Existing Firebase session membership limits still apply. No new account or household authorization flow is introduced.
+
+The Home screen highlights the shortlist, upcoming drives, expiring offers, shared favourites, and reviews to discuss. Open the priorities disclosure to adjust the shared weights. Vehicle details open independently of the comparison tray. Comparison supports differences-only and a two-vehicle view.
+
+Purchase scenarios use raw vehicle prices, add fees/tax once, then apply trade-in and cash down. Total monthly ownership includes the loan, estimated energy, insurance, and maintenance everywhere a monthly budget is used. Household assumptions and each vehicle's selected price source are stored on this device, as are named scenario snapshots. Quotes and diary records remain shared through Firestore. Expired and archived quotes are excluded from automatic offer selection and evidence. The tax model assumes an Ontario-style dealer trade-in tax credit; verify local taxes with the dealer. Loan comparisons use the household APR unless you explicitly apply an offered rate. Catalogue energy estimates are approximate; enter consumption and annual kilometres in Ownership mode. PHEVs default to gasoline operation.
+
+Only completed, nonarchived drives contribute ratings. Unrated profiles stay unreviewed; older entries retain their legacy partner rating. Unknown car-seat fit and equipment generate verification tasks, while explicit failures and the deal-breaker control can block readiness. Free-text notes never reject a vehicle. Catalogue prices, scores, and equipment remain planning estimates; unrecorded verification dates are displayed honestly, and manufacturer links are provided.
+
+Quotes and drives can be edited, archived, and restored. Forms retain their draft when a save fails. Drive photos (JPG, PNG, WebP) are resized in the browser and saved directly with the diary record, up to three compressed images; no separate Storage credentials are required. Calendar export includes appointment and optional reminders. CarMatch itself does not send reminder notifications.
+
+“Needs review” actions open the named profile's reaction control. Vehicle details link directly to a new quote or planned drive with that vehicle preselected. Recommendations within three points are presented as “Similar fit” in groups anchored to their highest score, without chaining distant scores together. This is a planning heuristic, not statistical confidence; compare trade-offs and real quotes. Exact planning scores remain available in the vehicle details disclosure.

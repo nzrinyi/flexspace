@@ -1,13 +1,28 @@
-import type { Timestamp } from 'firebase/firestore';
+import type { Timestamp } from "firebase/firestore";
 
-export type CriteriaKey = 'space' | 'winterTraction' | 'valueMSRP' | 'reliability' | 'fuelEfficiency' | 'safetyTech' | 'comfort';
-export type Drivetrain = 'AWD' | 'FWD' | '4WD';
-export type Powertrain = 'Gas' | 'Hybrid' | 'Plug-in Hybrid' | 'Electric';
-export type BodyStyle = 'Compact SUV' | 'Midsize SUV' | 'Wagon';
-export type ProfileName = 'Emily' | 'Nick';
-export type VehicleStage = 'Browsing' | 'Shortlisted' | 'Test drive booked' | 'Test driven' | 'Quote received' | 'Finalist' | 'Rejected' | 'Winner';
-export type UserReaction = 'Love' | 'Maybe' | 'No' | 'Unrated';
-export type TestDriveStatus = 'Planned' | 'Completed';
+export type CriteriaKey =
+  | "space"
+  | "winterTraction"
+  | "valueMSRP"
+  | "reliability"
+  | "fuelEfficiency"
+  | "safetyTech"
+  | "comfort";
+export type Drivetrain = "AWD" | "FWD" | "4WD";
+export type Powertrain = "Gas" | "Hybrid" | "Plug-in Hybrid" | "Electric";
+export type BodyStyle = "Compact SUV" | "Midsize SUV" | "Wagon";
+export type ProfileName = "Emily" | "Nick";
+export type VehicleStage =
+  | "Browsing"
+  | "Shortlisted"
+  | "Test drive booked"
+  | "Test driven"
+  | "Quote received"
+  | "Finalist"
+  | "Rejected"
+  | "Winner";
+export type UserReaction = "Love" | "Maybe" | "No" | "Unrated";
+export type TestDriveStatus = "Planned" | "Completed";
 
 export interface CriteriaWeights {
   space: number;
@@ -44,9 +59,12 @@ export interface VehicleNoteDocument {
   stage: VehicleStage;
   reactions: Record<ProfileName, UserReaction>;
   updatedAt?: Timestamp;
+  dealBreaker?: boolean;
+  stageSetBy?: ProfileName;
 }
 
 export interface DealQuoteDocument {
+  archived?: boolean;
   id?: string;
   vehicleId: string;
   dealer: string;
@@ -114,6 +132,7 @@ export interface VehicleReference {
   manufacturerUrl: string;
   imageUrl?: string;
   photoCredit: string;
+  lastVerified?: string;
   hasHeatedRearSeats?: boolean;
   hasMemorySeats?: boolean;
   hasSpareTire?: boolean;
@@ -123,6 +142,10 @@ export interface VehicleReference {
 }
 
 export interface ScoredVehicle extends VehicleReference {
+  fitSummary?: string;
+  financials?: import("./domain/finance").FinanceResult;
+  hasDriveEvidence?: boolean;
+  hasQuoteEvidence?: boolean;
   familyCompatibilityScore: number;
   confidenceScore: number;
   testDriveScore: number;
@@ -131,6 +154,9 @@ export interface ScoredVehicle extends VehicleReference {
 }
 
 export interface TestDriveEntry {
+  archived?: boolean;
+  carSeatResult?: "Unknown" | "Pass" | "Fail";
+  ratings?: Partial<Record<ProfileName, number>>;
   id?: string;
   vehicleId: string;
   date: string;

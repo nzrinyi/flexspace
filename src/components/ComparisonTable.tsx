@@ -1,128 +1,320 @@
-import type { DealQuoteDocument, ProfileName, ScoredVehicle, TestDriveEntry, VehicleNoteDocument, VehicleStage } from '../types';
-import { quoteNetPrice } from '../hooks/useDealQuotes';
-
-const stageOptions: VehicleStage[] = ['Browsing', 'Shortlisted', 'Test drive booked', 'Test driven', 'Quote received', 'Finalist', 'Rejected', 'Winner'];
-
-const metricGroups = [
-  { label: 'Financial Specs', rows: ['Actual / quote', 'MSRP', 'Monthly', 'Best quote'] },
-  { label: 'Algorithm Scores', rows: ['Overall', 'Confidence', 'Test drive', 'Deal'] },
-  { label: 'Family Evaluation', rows: ['Seats', 'Cargo', 'Drive', 'Powertrain', 'Emily', 'Nick', 'Diary entries'] },
-] as const;
-
-type ComparisonRowName = (typeof metricGroups)[number]['rows'][number];
-
-interface ComparisonTableProps {
+import { fitSummary } from "../domain/recommendations";
+import { useState } from "react";
+import type {
+  DealQuoteDocument,
+  ProfileName,
+  ScoredVehicle,
+  TestDriveEntry,
+  VehicleNoteDocument,
+  VehicleStage,
+} from "../types";
+import { money, vehicleFinance } from "../domain/finance";
+const stages: VehicleStage[] = [
+  "Browsing",
+  "Shortlisted",
+  "Test drive booked",
+  "Test driven",
+  "Quote received",
+  "Finalist",
+  "Rejected",
+  "Winner",
+];
+interface Props {
   vehicles: ScoredVehicle[];
   favoritesByProfile: Record<ProfileName, string[]>;
   notes: Record<string, VehicleNoteDocument>;
   quotes: DealQuoteDocument[];
   entries: TestDriveEntry[];
-  onStageChange: (vehicleId: string, stage: VehicleStage) => void;
-  onReorder: (fromIndex: number, toIndex: number) => void;
-  onRemove: (vehicleId: string) => void;
+  onStageChange: (id: string, stage: VehicleStage) => void;
+  onReorder: (from: number, to: number) => void;
+  onRemove: (id: string) => void;
 }
-
-function ArrowLeftIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5M8 10h8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-function ArrowRightIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5M4 10h8" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-function TrashIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M7 8v7M13 8v7M5 5h10M8 5l.5-1h3l.5 1M6 5l.5 12h7L14 5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-function ChevronDownIcon() {
-  return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5.5 7.5 10 12l4.5-4.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>;
-}
-
-export function ComparisonTable({ vehicles, favoritesByProfile, notes, quotes, entries, onStageChange, onReorder, onRemove }: ComparisonTableProps) {
-  const bestScore = Math.max(...vehicles.map((vehicle) => vehicle.overallRecommendationScore), 0);
-  const gridTemplateColumns = `minmax(135px, .62fr) repeat(${Math.max(vehicles.length, 1)}, minmax(210px, 1fr))`;
-
+export function ComparisonTable({
+  vehicles,
+  favoritesByProfile,
+  notes,
+  entries,
+  onStageChange,
+  onReorder,
+  onRemove,
+}: Props) {
+  const [differences, setDifferences] = useState(false),
+    [two, setTwo] = useState(false),
+    [pair, setPair] = useState<string[]>([]);
+  const validPair = [
+    ...pair.filter((id) => vehicles.some((v) => v.id === id)),
+    ...vehicles.map((v) => v.id),
+  ]
+    .filter((id, i, all) => all.indexOf(id) === i)
+    .slice(0, 2);
+  const shown = two
+    ? validPair.map((id) => vehicles.find((v) => v.id === id)!)
+    : vehicles;
+  const rows: Array<{
+    label: string;
+    value: (v: ScoredVehicle) => string;
+    group: string;
+  }> = [
+    {
+      group: "Cost estimates · shared scenario assumptions",
+      label: "Price source",
+      value: (v) => vehicleFinance(v).source,
+    },
+    {
+      group: "Cost estimates · shared scenario assumptions",
+      label: "Out-the-door before trade-in",
+      value: (v) => money(vehicleFinance(v).outTheDoor),
+    },
+    {
+      group: "Cost estimates · shared scenario assumptions",
+      label: "Amount financed",
+      value: (v) => money(vehicleFinance(v).principal),
+    },
+    {
+      group: "Cost estimates · shared scenario assumptions",
+      label: "Loan / month",
+      value: (v) => money(vehicleFinance(v).payment),
+    },
+    {
+      group: "Cost estimates · shared scenario assumptions",
+      label: "Total ownership / month",
+      value: (v) => money(vehicleFinance(v).ownership),
+    },
+    {
+      group: "Fit & evidence",
+      label: "Recommendation",
+      value: (v) => fitSummary(v),
+    },
+    {
+      group: "Fit & evidence",
+      label: "Evidence completeness",
+      value: (v) => `${v.confidenceScore}%`,
+    },
+    {
+      group: "Fit & evidence",
+      label: "Completed drive rating",
+      value: (v) =>
+        v.hasDriveEvidence ? `${v.testDriveScore}/100` : "Not evaluated",
+    },
+    {
+      group: "Fit & evidence",
+      label: "Active quote evidence",
+      value: (v) =>
+        v.hasQuoteEvidence ? `${v.dealScore}/100` : "No active quote",
+    },
+    {
+      group: "Catalogue · verify chosen-trim specifications",
+      label: "Model year",
+      value: (v) => String(v.year),
+    },
+    {
+      group: "Catalogue · verify chosen-trim specifications",
+      label: "Last verified",
+      value: (v) => v.lastVerified || "Not recorded",
+    },
+    {
+      group: "Catalogue · verify chosen-trim specifications",
+      label: "Seats",
+      value: (v) => String(v.seats),
+    },
+    {
+      group: "Catalogue · verify chosen-trim specifications",
+      label: "Cargo",
+      value: (v) => `${v.cargoLitres} L`,
+    },
+    {
+      group: "Catalogue · verify chosen-trim specifications",
+      label: "Drivetrain",
+      value: (v) => v.drivetrain,
+    },
+    {
+      group: "Catalogue · verify chosen-trim specifications",
+      label: "Powertrain",
+      value: (v) => v.powertrain,
+    },
+    ...(["Emily", "Nick"] as const).map((p) => ({
+      group: "Your observations",
+      label: p,
+      value: (v: ScoredVehicle) =>
+        `${favoritesByProfile[p].includes(v.id) ? "★ Favourite · " : ""}${notes[v.id]?.reactions[p] ?? "Unrated"}`,
+    })),
+    {
+      group: "Your observations",
+      label: "Completed drives",
+      value: (v) =>
+        String(
+          entries.filter(
+            (e) =>
+              e.vehicleId === v.id && !e.archived && e.status === "Completed",
+          ).length,
+        ),
+    },
+  ];
+  rows.push({
+    group: "Trade-offs to discuss",
+    label: "Watch-outs",
+    value: (v) => v.tradeoffs.join(" · "),
+  });
+  const visibleRows = rows.filter(
+    (row) => !differences || new Set(shown.map(row.value)).size > 1,
+  );
   return (
     <section className="card stack comparison-panel">
-      <div className="section-heading"><div><p className="eyebrow">Side-by-side comparison</p><h2>Compare finalists at a glance.</h2></div><span>Drag headers or use arrows to reorder columns</span></div>
-      <div className="comparison-grid" style={{ gridTemplateColumns }}>
-        <div className="compare-grid-corner">Metric</div>
-        {vehicles.map((vehicle, index) => {
-          const isBestMatch = vehicle.overallRecommendationScore === bestScore;
-          return (
-            <div
-              className={`compare-column-card compare-head-card ${isBestMatch ? 'best-match' : ''}`}
-              key={vehicle.id}
-              draggable
-              onDragStart={(event) => event.dataTransfer.setData('text/plain', String(index))}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                const fromIndex = Number(event.dataTransfer.getData('text/plain'));
-                if (!Number.isNaN(fromIndex)) onReorder(fromIndex, index);
-              }}
-            >
-              {isBestMatch && <span className="best-match-badge">Best Match</span>}
-              <div className="compare-column-actions">
-                <button type="button" onClick={() => onReorder(index, Math.max(index - 1, 0))} aria-label={`Move ${vehicle.name} left`}><ArrowLeftIcon /></button>
-                <button type="button" onClick={() => onReorder(index, Math.min(index + 1, vehicles.length - 1))} aria-label={`Move ${vehicle.name} right`}><ArrowRightIcon /></button>
-                <button className="remove" type="button" onClick={() => onRemove(vehicle.id)} aria-label={`Remove ${vehicle.name}`}><TrashIcon /></button>
-              </div>
-              {vehicle.imageUrl && <img className="vehicle-photo" src={vehicle.imageUrl} alt={`${vehicle.name} thumbnail`} />}
-              <strong>{vehicle.name}</strong>
-              <small>${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')} actual / quote</small>
-              <label className="stage-select"><span className="sr-only">Stage for {vehicle.name}</span><select value={notes[vehicle.id]?.stage ?? 'Browsing'} onChange={(event) => onStageChange(vehicle.id, event.target.value as VehicleStage)}>{stageOptions.map((stage) => <option key={stage}>{stage}</option>)}</select><ChevronDownIcon /></label>
-            </div>
-          );
-        })}
-        {metricGroups.map((group) => (
-          <ComparisonMetricGroup key={group.label} group={group} vehicles={vehicles} favoritesByProfile={favoritesByProfile} notes={notes} quotes={quotes} entries={entries} bestScore={bestScore} />
-        ))}
+      <div>
+        <p className="eyebrow">Side by side</p>
+        <h2>Compare the trade-offs.</h2>
       </div>
+      {!vehicles.length ? (
+        <p role="status">
+          Your comparison is empty. Add vehicles from Browse vehicles to start.
+        </p>
+      ) : (
+        <>
+          <div className="action-row">
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={differences}
+                onChange={(e) => setDifferences(e.target.checked)}
+              />
+              Show differences only
+            </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={two}
+                onChange={(e) => setTwo(e.target.checked)}
+              />
+              Two-vehicle view
+            </label>
+          </div>
+          {two && (
+            <div className="action-row">
+              {validPair.map((id, i) => (
+                <label key={i}>
+                  Vehicle {i + 1}
+                  <select
+                    value={id}
+                    onChange={(e) => {
+                      const next = [...validPair];
+                      const other = next.indexOf(e.target.value);
+                      if (other !== -1) next[other] = id;
+                      next[i] = e.target.value;
+                      setPair(next);
+                    }}
+                  >
+                    {vehicles.map((v) => (
+                      <option value={v.id} key={v.id}>
+                        {v.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
+          <div
+            className="comparison-scroll"
+            tabIndex={0}
+            aria-label="Vehicle comparison, scroll for more rows and columns"
+          >
+            <table className="comparison-table">
+              <caption className="sr-only">
+                Vehicle comparison using shared purchase assumptions
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Metric</th>
+                  {shown.map((v) => {
+                    const i = vehicles.findIndex((x) => x.id === v.id);
+                    return (
+                      <th
+                        key={v.id}
+                        scope="col"
+                        draggable
+                        onDragStart={(e) =>
+                          e.dataTransfer.setData("text/plain", String(i))
+                        }
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const raw = e.dataTransfer.getData("text/plain");
+                          if (/^\d+$/.test(raw)) onReorder(+raw, i);
+                        }}
+                      >
+                        <strong>{v.name}</strong>
+                        <div className="action-row">
+                          <button
+                            disabled={i === 0}
+                            aria-label={`Move ${v.name} left`}
+                            onClick={() => onReorder(i, i - 1)}
+                          >
+                            ←
+                          </button>
+                          <button
+                            disabled={i === vehicles.length - 1}
+                            aria-label={`Move ${v.name} right`}
+                            onClick={() => onReorder(i, i + 1)}
+                          >
+                            →
+                          </button>
+                          <button
+                            aria-label={`Remove ${v.name}`}
+                            onClick={() => onRemove(v.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <label>
+                          <span className="sr-only">Stage for {v.name}</span>
+                          <select
+                            value={notes[v.id]?.stage ?? "Browsing"}
+                            onChange={(e) =>
+                              onStageChange(
+                                v.id,
+                                e.target.value as VehicleStage,
+                              )
+                            }
+                          >
+                            {stages.map((s) => (
+                              <option key={s}>{s}</option>
+                            ))}
+                          </select>
+                        </label>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleRows.map((row, i) => (
+                  <tr key={row.label}>
+                    <th scope="row">
+                      <small>
+                        {visibleRows[i - 1]?.group !== row.group
+                          ? row.group
+                          : ""}
+                      </small>
+                      {row.label}
+                    </th>
+                    {shown.map((v) => (
+                      <td key={v.id}>{row.value(v)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!visibleRows.length && (
+              <p>No differences in the displayed metrics.</p>
+            )}
+          </div>
+          <p className="muted">
+            Costs and catalogue specifications are estimates. Drive ratings and
+            reactions are your observations. Use two-vehicle view for a focused
+            mobile comparison.
+          </p>
+        </>
+      )}
     </section>
   );
-}
-
-function ComparisonMetricGroup({ group, vehicles, favoritesByProfile, notes, quotes, entries, bestScore }: { group: (typeof metricGroups)[number]; vehicles: ScoredVehicle[]; favoritesByProfile: Record<ProfileName, string[]>; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; entries: TestDriveEntry[]; bestScore: number }) {
-  return <><div className="compare-category">{group.label}</div>{group.rows.map((row, rowIndex) => <ComparisonRow key={row} row={row} rowIndex={rowIndex} vehicles={vehicles} favoritesByProfile={favoritesByProfile} notes={notes} quotes={quotes} entries={entries} bestScore={bestScore} />)}</>;
-}
-
-function ComparisonRow({ row, rowIndex, vehicles, favoritesByProfile, notes, quotes, entries, bestScore }: { row: ComparisonRowName; rowIndex: number; vehicles: ScoredVehicle[]; favoritesByProfile: Record<ProfileName, string[]>; notes: Record<string, VehicleNoteDocument>; quotes: DealQuoteDocument[]; entries: TestDriveEntry[]; bestScore: number }) {
-  return <><div className={`compare-label-card ${rowIndex % 2 ? 'alt' : ''}`}>{row}</div>{vehicles.map((vehicle) => <div className={`compare-value-card ${rowIndex % 2 ? 'alt' : ''} ${vehicle.overallRecommendationScore === bestScore ? 'best-match' : ''}`} key={`${row}-${vehicle.id}`}>{comparisonValue(row, vehicle, favoritesByProfile, notes, quotes, entries)}</div>)}</>;
-}
-
-function actualVehiclePrice(vehicle: ScoredVehicle, quotes: DealQuoteDocument[]) {
-  const bestQuote = quotes.filter((quote) => quote.vehicleId === vehicle.id).sort((a, b) => quoteNetPrice(a) - quoteNetPrice(b))[0];
-  return bestQuote ? quoteNetPrice(bestQuote) : Math.round((vehicle.msrp + 2495) * 1.13);
-}
-
-function comparisonValue(row: string, vehicle: ScoredVehicle, favoritesByProfile: Record<ProfileName, string[]>, notes: Record<string, VehicleNoteDocument>, quotes: DealQuoteDocument[], entries: TestDriveEntry[]) {
-  const note = notes[vehicle.id] ?? { reactions: { Emily: 'Unrated', Nick: 'Unrated' } };
-  const bestQuote = quotes.filter((quote) => quote.vehicleId === vehicle.id).sort((a, b) => quoteNetPrice(a) - quoteNetPrice(b))[0];
-  const diaryCount = entries.filter((entry) => entry.vehicleId === vehicle.id).length;
-  const values: Record<string, string> = {
-    'Actual / quote': `$${actualVehiclePrice(vehicle, quotes).toLocaleString('en-CA')}`,
-    MSRP: `$${vehicle.msrp.toLocaleString('en-CA')}`,
-    Monthly: `$${estimateMonthlyPayment(vehicle).toLocaleString('en-CA')}`,
-    Overall: `${vehicle.overallRecommendationScore}`,
-    Confidence: `${vehicle.confidenceScore}`,
-    'Test drive': `${vehicle.testDriveScore}`,
-    Deal: `${vehicle.dealScore}`,
-    Seats: `${vehicle.seats}`,
-    Cargo: `${vehicle.cargoLitres} L`,
-    Drive: vehicle.drivetrain,
-    Powertrain: vehicle.powertrain,
-    Emily: `${favoritesByProfile.Emily.includes(vehicle.id) ? '★ ' : ''}${note.reactions?.Emily ?? 'Unrated'}`,
-    Nick: `${favoritesByProfile.Nick.includes(vehicle.id) ? '★ ' : ''}${note.reactions?.Nick ?? 'Unrated'}`,
-    'Best quote': bestQuote ? `$${quoteNetPrice(bestQuote).toLocaleString('en-CA')}` : 'None',
-    'Diary entries': `${diaryCount}`,
-  };
-  return values[row] ?? '';
-}
-
-function estimateMonthlyPayment(vehicle: ScoredVehicle) {
-  const allIn = (vehicle.msrp + 2495) * 1.13;
-  const principal = Math.max(allIn - 5000, 0);
-  const monthlyRate = 0.0599 / 12;
-  return Math.round((principal * monthlyRate) / (1 - (1 + monthlyRate) ** -60));
 }
