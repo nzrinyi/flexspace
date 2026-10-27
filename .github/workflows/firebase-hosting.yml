@@ -38,9 +38,46 @@ jobs:
 
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: flexspace-1
-          channelId: live
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/firebase-hosting-credentials.json"
+          trap 'rm -f "$GOOGLE_APPLICATION_CREDENTIALS"' EXIT
+          node <<'NODE'
+          const fs = require('node:fs');
+          const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+          if (!raw) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Deployment blocked: FIREBASE_SERVICE_ACCOUNT repository secret is missing.\n');
+            process.exit(1);
+          }
+          let credentials;
+          try { credentials = JSON.parse(raw); } catch {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Deployment blocked: FIREBASE_SERVICE_ACCOUNT is not valid JSON.\n');
+            process.exit(1);
+          }
+          if (credentials.type !== 'service_account' || !credentials.private_key || !credentials.client_email) {
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Deployment blocked: FIREBASE_SERVICE_ACCOUNT must contain a complete Google service-account key.\n');
+            process.exit(1);
+          }
+          fs.writeFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, raw, { mode: 0o600 });
+          NODE
+          unset FIREBASE_SERVICE_ACCOUNT_JSON
+          set +e
+          npm exec --yes --package firebase-tools@15.34.1 -- firebase deploy --only hosting --project flexspace-1 --non-interactive > "$RUNNER_TEMP/firebase-deploy.log" 2>&1
+          deploy_status=$?
+          set -e
+          cat "$RUNNER_TEMP/firebase-deploy.log"
+          if [ "$deploy_status" -ne 0 ]; then
+            node <<'NODE'
+          const fs = require('node:fs');
+          const log = fs.readFileSync(process.env.RUNNER_TEMP + '/firebase-deploy.log', 'utf8');
+          const errors = log.split('\n').filter(line => /Error:|HTTP Error|Permission denied|Failed to authenticate/.test(line));
+          // Never publish credentials or debug logs in the summary.
+          const safe = errors.map(line => line.replace(/https?:\/\/\S+/g, '[URL]').replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').slice(0, 600));
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Firebase Hosting deployment failed.\n\n' + (safe.length ? safe.join('\n') : 'See the deployment step logs.') + '\n');
+          NODE
+            exit "$deploy_status"
+          fi
+          echo 'Firebase Hosting deployed successfully to https://flexspace-1.web.app' >> "$GITHUB_STEP_SUMMARY"
