@@ -76,6 +76,8 @@ jobs:
           const errors = log.split('\n').filter(line => /Error:|HTTP Error|Permission denied|Failed to authenticate/.test(line));
           // Never publish credentials or debug logs in the summary.
           const safe = errors.map(line => line.replace(/https?:\/\/\S+/g, '[URL]').replace(/Bearer\s+\S+/gi, 'Bearer [redacted]').slice(0, 600));
+          for (const message of safe) console.log('::error::' + message.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A'));
+          if (!safe.length) console.log('::error::Firebase CLI deployment failed; see deployment logs.');
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Firebase Hosting deployment failed.\n\n' + (safe.length ? safe.join('\n') : 'See the deployment step logs.') + '\n');
           NODE
             exit "$deploy_status"
