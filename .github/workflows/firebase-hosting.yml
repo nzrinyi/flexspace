@@ -3,7 +3,7 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches:
-      - '**'
+      - "**"
 
 permissions:
   contents: read
@@ -32,10 +32,9 @@ jobs:
           VITE_FIREBASE_AUTH_DOMAIN: flexspace-1.firebaseapp.com
           VITE_FIREBASE_PROJECT_ID: flexspace-1
           VITE_FIREBASE_STORAGE_BUCKET: flexspace-1.firebasestorage.app
-          VITE_FIREBASE_MESSAGING_SENDER_ID: '544136326567'
-          VITE_FIREBASE_APP_ID: '1:544136326567:web:eeab9a468ce0f82299da82'
+          VITE_FIREBASE_MESSAGING_SENDER_ID: "544136326567"
+          VITE_FIREBASE_APP_ID: "1:544136326567:web:eeab9a468ce0f82299da82"
           VITE_FIREBASE_MEASUREMENT_ID: G-LVT5RRD31W
-
 
       - name: Deploy to Firebase Hosting
         env:
@@ -65,7 +64,9 @@ jobs:
           NODE
           unset FIREBASE_SERVICE_ACCOUNT_JSON
           set +e
-          npm exec --yes --package firebase-tools@15.34.1 -- firebase deploy --only hosting --project flexspace-1 --non-interactive > "$RUNNER_TEMP/firebase-deploy.log" 2>&1
+          # 15.34 adds a Service Usage preflight that requires extra IAM permissions.
+          # Keep the official 15.33 CLI for this Hosting-only service account.
+          npm exec --yes --package firebase-tools@15.33.0 -- firebase deploy --only hosting --project flexspace-1 --non-interactive > "$RUNNER_TEMP/firebase-deploy.log" 2>&1
           deploy_status=$?
           set -e
           cat "$RUNNER_TEMP/firebase-deploy.log"
