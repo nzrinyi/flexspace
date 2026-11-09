@@ -43,26 +43,10 @@ test.beforeEach(async ({ page }) => {
     }),
   ).toBeVisible();
 });
-test("budget launches without Firebase and demo data never changes the real budget", async ({
-  page,
-}) => {
-  await expect(
-    page.getByRole("heading", { name: "Give your money a clearer path." }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Explore a demo", exact: true })
-    .click();
-  await expect(page.getByText("Demo workspace", { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Your cash-flow forecast" }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate((key) => localStorage.getItem(key), KEY),
-  ).toBeNull();
-  await page.getByRole("button", { name: "Exit demo", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Give your money a clearer path." }),
-  ).toBeVisible();
+test("personal budget launches without Firebase or demo controls", async ({ page }) => {
+  await expect(page.getByRole("heading", { name: "Give your money a clearer path." })).toBeVisible();
+  await expect(page.getByRole("button", { name: /demo/i })).toHaveCount(0);
+  expect(await page.evaluate((key) => localStorage.getItem(key), KEY)).toBeNull();
 });
 test("account and transaction persist, monthly budgets and reports reflect real entries", async ({
   page,
@@ -235,9 +219,7 @@ test("backup export and validation preserve existing data", async ({
 test("responsive budget layouts have no page overflow", async ({
   page,
 }, info) => {
-  await page
-    .getByRole("button", { name: "Explore a demo", exact: true })
-    .click();
+  await account(page);
   await page.screenshot({
     path: `/tmp/flowbudget-${info.project.name}.png`,
     fullPage: true,
@@ -377,14 +359,9 @@ test("private preload links are consumed locally and unknown starting balances n
     "base64url",
   );
   await page.goto("/?app=budget#flow-plan=" + encoded);
-  const dialog = page.getByRole("dialog");
-  await expect(
-    dialog.getByRole("heading", { name: "Load your budget plan" }),
-  ).toBeVisible();
+  await expect(page.getByText("Your household plan is loaded and saved on this device.", { exact: true })).toBeVisible();
   expect(page.url()).not.toContain("#");
-  await dialog
-    .getByRole("button", { name: "Load household plan", exact: true })
-    .click();
+  await page.reload();
   await expect(
     page.getByRole("heading", { name: "Add your actual starting balance" }),
   ).toBeVisible();
@@ -450,10 +427,7 @@ test("tracked savings and investment snapshots do not inflate bill-paying cash",
     "base64url",
   );
   await page.goto("/?app=budget#flow-plan=" + encoded);
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Load household plan", exact: true })
-    .click();
+  await expect(page.getByText("Your household plan is loaded and saved on this device.", { exact: true })).toBeVisible();
   await expect(
     page.locator(".flow-stat").filter({ hasText: "Current balance" }),
   ).toContainText("$1,000.00");
@@ -489,4 +463,16 @@ test("tracked savings and investment snapshots do not inflate bill-paying cash",
   await expect(
     page.getByRole("heading", { name: "Investment snapshot", exact: true }),
   ).toBeVisible();
+});
+
+test("private setup never overwrites an existing personal budget automatically", async ({ page }) => {
+  await account(page);
+  const preset = emptyBudget();
+  preset.accounts = [{ id: "replacement", name: "Replacement account", type: "Checking", openingCents: 90000, openingDate: TODAY() }];
+  const encoded = gzipSync(Buffer.from(JSON.stringify(preset))).toString("base64url");
+  await page.goto("/?app=budget#flow-plan=" + encoded);
+  await expect(page.getByRole("dialog").getByRole("heading", { name: "Load your budget plan" })).toBeVisible();
+  const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), KEY);
+  expect(saved.accounts[0].name).toBe("Everyday");
+  expect(page.url()).not.toContain("#");
 });

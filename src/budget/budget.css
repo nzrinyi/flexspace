@@ -1062,25 +1062,8 @@
   color: #708a83;
   padding: 0;
 }
-.flow-demo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 38px;
-  background: #fff5df;
-  border-bottom: 1px solid #eee0bd;
-  color: #8a6c32;
-  font-size: 12px;
-}
-.flow-demo button {
-  margin-left: auto;
-  border: 1px solid #dac79a;
-  border-radius: 6px;
-  background: #fffbf2;
-  color: #8a6c32;
-  padding: 5px 10px;
-}
+
+
 .flow-modal {
   --flow-ink: #202b3c;
   --accent: #267870;
@@ -1386,18 +1369,9 @@
     gap: 14px;
     width: 100%;
   }
-  .flow-demo {
-    padding: 10px 15px;
-    font-size: 11px;
-    gap: 5px 12px;
-  }
-  .flow-demo > span {
-    flex-basis: 100%;
-    order: 2;
-  }
-  .flow-demo button {
-    font-size: 11px;
-  }
+
+
+
   .flow-footer {
     justify-content: flex-start;
     font-size: 9px;
@@ -1441,7 +1415,6 @@
   }
   .flow-sidebar,
   .flow-topbar,
-  .flow-demo,
   .flow-footer,
   .flow-app button,
   .flow-notice {

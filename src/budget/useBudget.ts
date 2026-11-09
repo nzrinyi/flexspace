@@ -21,7 +21,6 @@ export function useBudget() {
   if (!initial.current) initial.current = load();
   const [data, setData] = useState(initial.current.data),
     [storageError, setStorageError] = useState(initial.current.error);
-  const [demo, setDemo] = useState<BudgetData | null>(null);
   const current = useRef(data);
   current.current = data;
   const undoRef = useRef<BudgetData | null>(null);
@@ -45,12 +44,8 @@ export function useBudget() {
     return () => window.removeEventListener("storage", changed);
   }, []);
   function commit(next: BudgetData, replacing = false) {
-    const source = demo ?? current.current;
+    const source = current.current;
     const checked = validateBudget({ ...next, revision: source.revision + 1 });
-    if (demo) {
-      setDemo(checked);
-      return;
-    }
     let stored: BudgetData | undefined;
     try {
       const raw = localStorage.getItem(BUDGET_KEY);
@@ -87,13 +82,10 @@ export function useBudget() {
     setCanUndo(false);
   }
   return {
-    data: demo ?? data,
+    data,
     commit,
     storageError,
-    canUndo: canUndo && !demo,
+    canUndo,
     undo,
-    demo: Boolean(demo),
-    startDemo: (sample: BudgetData) => setDemo(sample),
-    exitDemo: () => setDemo(null),
   };
 }

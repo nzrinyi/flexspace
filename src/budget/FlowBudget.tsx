@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { BudgetEditor, type Editor } from "./BudgetForms";
 import { BudgetChart } from "./BudgetChart";
 import { useBudget, BUDGET_KEY } from "./useBudget";
@@ -11,7 +11,6 @@ import {
   categoryLimit,
   categorySpent,
   removeRecord,
-  demoBudget,
   money,
   parseMoney,
   TODAY,
@@ -59,6 +58,8 @@ export default function FlowBudget({
 }) {
   const store = useBudget(),
     data = store.data;
+  const latestStore = useRef(store);
+  latestStore.current = store;
   const [view, setView] = useState<View>("overview"),
     [month, setMonth] = useState(TODAY().slice(0, 7)),
     [editor, setEditor] = useState<Editor | null>(null),
@@ -180,10 +181,20 @@ export default function FlowBudget({
       if (!encoded) return;
       void decodeSetup(encoded)
         .then((value) => {
-          setEditor({ kind: "restore", value, setup: true });
-          setMessage(
-            "Your private household plan is ready to load. Existing data will be replaced only after confirmation.",
-          );
+          const currentStore = latestStore.current;
+          if (
+            !currentStore.data.accounts.length &&
+            !currentStore.data.entries.length &&
+            !currentStore.storageError
+          ) {
+            currentStore.commit(value);
+            setMessage("Your household plan is loaded and saved on this device.");
+          } else {
+            setEditor({ kind: "restore", value, setup: true });
+            setMessage(
+              "Your household plan is ready. Confirm before replacing this device’s budget.",
+            );
+          }
         })
         .catch((e) =>
           setError(
@@ -266,19 +277,6 @@ export default function FlowBudget({
             Flexspace <span>/</span> FlowBudget
           </span>
           <div className="flow-topbar-actions">
-            {!store.demo && (
-              <button
-                className="flow-button quiet"
-                onClick={() => {
-                  store.startDemo(demoBudget());
-                  setMessage(
-                    "You are exploring sample data. Your real budget is untouched.",
-                  );
-                }}
-              >
-                Try demo
-              </button>
-            )}
             <button
               className="flow-button"
               disabled={!data.accounts.length}
@@ -291,23 +289,6 @@ export default function FlowBudget({
             </button>
           </div>
         </header>
-        {store.demo && (
-          <div className="flow-demo" role="status">
-            <strong>Demo workspace</strong>
-            <span>
-              Sample balances only. Changes here are not saved to your real
-              budget.
-            </span>
-            <button
-              onClick={() => {
-                store.exitDemo();
-                setMessage("Back to your real budget.");
-              }}
-            >
-              Exit demo
-            </button>
-          </div>
-        )}
         <main className="flow-content">
           <div className="flow-page-heading">
             <div>
@@ -409,12 +390,6 @@ export default function FlowBudget({
                   onClick={() => setEditor({ kind: "account" })}
                 >
                   Add your first account
-                </button>
-                <button
-                  className="flow-button"
-                  onClick={() => store.startDemo(demoBudget())}
-                >
-                  Explore a demo
                 </button>
               </div>
               <ol>
@@ -1169,7 +1144,6 @@ export default function FlowBudget({
               onSave={(next) => save(next, "Settings saved.")}
               onBackup={exportBackup}
               onRestore={(value) => setEditor({ kind: "restore", value })}
-              demo={store.demo}
             />
           )}
           <footer className="flow-footer">
@@ -1597,13 +1571,11 @@ function Settings({
   onSave,
   onBackup,
   onRestore,
-  demo,
 }: {
   data: BudgetData;
   onSave: (data: BudgetData) => void;
   onBackup: () => void;
   onRestore: (data: BudgetData) => void;
-  demo: boolean;
 }) {
   const [currency, setCurrency] = useState(data.currency),
     [reserve, setReserve] = useState((data.reserveCents / 100).toFixed(2)),
@@ -1692,7 +1664,6 @@ function Settings({
         <label className="flow-file-label">
           Restore JSON backup
           <input
-            disabled={demo}
             type="file"
             accept=".json,application/json"
             onChange={async (e) => {
@@ -1712,9 +1683,6 @@ function Settings({
             }}
           />
         </label>
-        {demo && (
-          <p className="flow-help">Exit demo to restore a real backup.</p>
-        )}
         <button
           className="flow-text-button"
           onClick={() => {
