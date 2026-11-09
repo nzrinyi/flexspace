@@ -49,11 +49,7 @@ import { ComparisonTable as EnhancedComparisonTable } from "./components/Compari
 import { PaymentCalculator as EnhancedPaymentCalculator } from "./components/PaymentCalculator";
 import { TestDriveDiary as EnhancedTestDriveDiary } from "./components/TestDriveDiary";
 import { lazy, Suspense } from "react";
-const SenStatsDashboard = lazy(() =>
-  import("./components/SenStatsDashboard").then((m) => ({
-    default: m.SenStatsDashboard,
-  })),
-);
+const FlowBudget = lazy(() => import("./budget/FlowBudget"));
 import {
   DealTracker,
   defaultDealQuote as makeDealQuote,
@@ -158,7 +154,7 @@ type AppSection =
   | "deals"
   | "diary"
   | "decision";
-type WorkspaceApp = "CarMatch" | "SenStats" | "AppSelection";
+type WorkspaceApp = "CarMatch" | "FlowBudget" | "AppSelection";
 
 const sectionLabels: Record<AppSection, string> = {
   dashboard: "Home",
@@ -240,6 +236,25 @@ function emptyVehicleNote(vehicleId: string): VehicleNoteDocument {
 }
 
 function App() {
+  const [workspaceApp, saveWorkspaceApp] = useLocalStorageState<WorkspaceApp>(
+    "carmatch.workspaceApp",
+    "CarMatch",
+  );
+  const requestedBudget =
+    new URLSearchParams(window.location.search).get("app") === "budget";
+  const activeWorkspaceApp: WorkspaceApp = requestedBudget
+    ? "FlowBudget"
+    : ["CarMatch", "FlowBudget", "AppSelection"].includes(workspaceApp)
+      ? workspaceApp
+      : "AppSelection";
+  function setActiveWorkspaceApp(app: WorkspaceApp) {
+    const url = new URL(window.location.href);
+    if (app === "FlowBudget") url.searchParams.set("app", "budget");
+    else url.searchParams.delete("app");
+    window.history.replaceState({}, "", url.pathname + url.search);
+    saveWorkspaceApp(app);
+  }
+
   const [user, authLoading, authError] = useAuthState(auth);
   const [anonymousSignInError, setAnonymousSignInError] = useState<
     string | null
@@ -247,7 +262,7 @@ function App() {
   const [authAttempt, setAuthAttempt] = useState(0);
 
   useEffect(() => {
-    if (authLoading || user) return;
+    if (activeWorkspaceApp !== "CarMatch" || authLoading || user) return;
     void signInAnonymously(auth)
       .then(() => setAnonymousSignInError(null))
       .catch((error: unknown) => {
@@ -255,8 +270,22 @@ function App() {
           error instanceof Error ? error.message : "Anonymous sign-in failed.",
         );
       });
-  }, [authLoading, user, authAttempt]);
+  }, [authLoading, user, authAttempt, activeWorkspaceApp]);
 
+  if (activeWorkspaceApp === "FlowBudget")
+    return (
+      <Suspense
+        fallback={
+          <main className="shell">
+            <p>Opening FlowBudget…</p>
+          </main>
+        }
+      >
+        <FlowBudget onSwitchApp={() => setActiveWorkspaceApp("AppSelection")} />
+      </Suspense>
+    );
+  if (activeWorkspaceApp === "AppSelection")
+    return <AppSelectionPage onSelectApp={setActiveWorkspaceApp} />;
   const authFailureMessage = authError?.message ?? anonymousSignInError;
   if (authFailureMessage) {
     return (
@@ -276,6 +305,9 @@ function App() {
           >
             Retry connection
           </button>
+          <button onClick={() => setActiveWorkspaceApp("AppSelection")}>
+            Choose another app
+          </button>
           <details>
             <summary>Connection details</summary>
             <p>{authFailureMessage}</p>
@@ -290,7 +322,12 @@ function App() {
         Initializing secure session...
       </div>
     );
-  return <AuthenticatedSession activeUser={user} />;
+  return (
+    <AuthenticatedSession
+      activeUser={user}
+      setActiveWorkspaceApp={setActiveWorkspaceApp}
+    />
+  );
 }
 
 function AppSelectionPage({
@@ -316,10 +353,12 @@ function AppSelectionPage({
             </span>
             <small>Open existing app</small>
           </button>
-          <button type="button" onClick={() => onSelectApp("SenStats")}>
-            <strong>SenStats</strong>
-            <span>Explore Canadian senators and expenses.</span>
-            <small>Open SenStats</small>
+          <button type="button" onClick={() => onSelectApp("FlowBudget")}>
+            <strong>FlowBudget</strong>
+            <span>
+              Plan bills, track spending, and see your future cash flow.
+            </span>
+            <small>Open FlowBudget</small>
           </button>
         </div>
       </section>
@@ -327,44 +366,13 @@ function AppSelectionPage({
   );
 }
 
-function SenStatsApp({
-  onOpenAppSelection,
-  onBackToCarMatch,
+function AuthenticatedSession({
+  activeUser,
+  setActiveWorkspaceApp,
 }: {
-  onOpenAppSelection: () => void;
-  onBackToCarMatch: () => void;
+  activeUser: User;
+  setActiveWorkspaceApp: (app: WorkspaceApp) => void;
 }) {
-  return (
-    <main className="shell senstats-shell">
-      <section className="hero card">
-        <div className="hero-topline">
-          <button
-            className="app-name senstats-name"
-            type="button"
-            onClick={onOpenAppSelection}
-            aria-label="Switch app"
-          >
-            SenStats
-          </button>
-          <button
-            className="secondary-action"
-            type="button"
-            onClick={onBackToCarMatch}
-          >
-            Back to CarMatch
-          </button>
-        </div>
-      </section>
-      <section className="card blank-app">
-        <Suspense fallback={<p>Loading SenStats…</p>}>
-          <SenStatsDashboard />
-        </Suspense>
-      </section>
-    </main>
-  );
-}
-
-function AuthenticatedSession({ activeUser }: { activeUser: User }) {
   const [sessionId, setSessionId] = useState<string | null>(
     () => getSessionIdFromUrl() ?? readSessionId(),
   );
@@ -439,8 +447,7 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
     "carmatch.activeSection",
     "dashboard",
   );
-  const [activeWorkspaceApp, setActiveWorkspaceApp] =
-    useLocalStorageState<WorkspaceApp>("carmatch.workspaceApp", "CarMatch");
+
   const [compareMessage, setCompareMessage] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeProfile, setActiveProfile] = useLocalStorageState<ProfileName>(
@@ -1049,16 +1056,6 @@ function AuthenticatedSession({ activeUser }: { activeUser: User }) {
     },
     [setSelectedVehicleIds],
   );
-
-  if (activeWorkspaceApp === "AppSelection")
-    return <AppSelectionPage onSelectApp={setActiveWorkspaceApp} />;
-  if (activeWorkspaceApp === "SenStats")
-    return (
-      <SenStatsApp
-        onOpenAppSelection={() => setActiveWorkspaceApp("AppSelection")}
-        onBackToCarMatch={() => setActiveWorkspaceApp("CarMatch")}
-      />
-    );
 
   return (
     <main className={`shell profile-${activeProfile.toLowerCase()}`}>

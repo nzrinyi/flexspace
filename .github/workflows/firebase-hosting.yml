@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Test calculations
+        run: npm test
+
       - name: Build
         run: npm run build
         env:
@@ -84,3 +87,34 @@ jobs:
             exit "$deploy_status"
           fi
           echo 'Firebase Hosting deployed successfully to https://flexspace-1.web.app' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify the published build
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const crypto = require('node:crypto');
+          const {setTimeout: wait} = require('node:timers/promises');
+          const root = 'https://flexspace-1.firebaseapp.com';
+          const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+          (async () => {
+            for (let attempt=0; attempt<6; attempt++) {
+              try {
+                const response = await fetch(root + '/?app=budget&verify=' + process.env.GITHUB_SHA, { signal: AbortSignal.timeout(15000), headers:{'Cache-Control':'no-cache'} });
+                if (!response.ok) throw new Error('Live page returned HTTP ' + response.status);
+                const live = await response.text();
+                const local = fs.readFileSync('dist/index.html','utf8');
+                const assets = text => [...text.matchAll(/(?:src|href)="([^"]+\.(?:js|css))"/g)].map(match=>match[1]).sort().join('|');
+                if (assets(live) !== assets(local)) throw new Error('Live HTML has not updated to this build yet.');
+                for (const name of fs.readdirSync('dist/assets').filter(name=>/\.(?:js|css)$/.test(name))) {
+                  const asset = await fetch(root + '/assets/' + name, {signal:AbortSignal.timeout(15000)});
+                  if (!asset.ok || hash(Buffer.from(await asset.arrayBuffer())) !== hash(fs.readFileSync('dist/assets/'+name))) throw new Error('Live asset does not match: ' + name);
+                }
+                console.log('::notice::Published HTML and all JavaScript/CSS assets match this build.');
+                return;
+              } catch (error) {
+                if (attempt===5) throw error;
+                await wait(10000);
+              }
+            }
+          })().catch(error=>{console.log('::error::' + error.message);process.exit(1);});
+          NODE

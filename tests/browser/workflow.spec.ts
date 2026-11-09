@@ -144,9 +144,12 @@ test("honour-system profile switch and visible app switching remain available", 
     page.getByRole("button", { name: "Nick", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Switch app", exact: true }).click();
-  await page.getByRole("button", { name: "SenStats", exact: false }).click();
+  await page.getByRole("button", { name: "FlowBudget", exact: false }).click();
   await expect(
-    page.getByRole("heading", { name: "Senator expenses", exact: true }),
+    page.getByRole("heading", {
+      name: "Your money, a little clearer.",
+      exact: true,
+    }),
   ).toBeVisible();
 });
 

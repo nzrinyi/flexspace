@@ -1,4 +1,8 @@
-# CarMatch
+# Flexspace
+
+Flexspace contains CarMatch and FlowBudget. Use the visible app menu to switch workspaces.
+
+## CarMatch
 
 CarMatch is a shared decision-making prototype for paired partners comparing family vehicles with live Firebase synchronization.
 
@@ -84,17 +88,6 @@ The deployed site will be available at:
 - `https://flexspace-1.web.app`
 - `https://flexspace-1.firebaseapp.com`
 
-## SenStats daily data sync
-
-SenStats data ingestion runs from `.github/workflows/senstats-data-sync.yml` and calls `scripts/senstats_ingest.py` on a daily schedule or manual dispatch.
-
-Required secrets/environment values:
-
-- `FIREBASE_SERVICE_ACCOUNT`: Firebase service-account JSON used by the Python Admin SDK. The script also accepts `GOOGLE_APPLICATION_CREDENTIALS_JSON` or `FIREBASE_SERVICE_ACCOUNT_JSON` when running locally.
-- `SENSTATS_CONTACT_EMAIL`: Contact email included in the scraper User-Agent, e.g. `SenStats-Data-Sync/1.0 (Contact: you@example.com)`.
-
-The pipeline first tries Open North Represent for senator metadata, falls back to the official Senate current-senators AJAX endpoint when Represent has no Senate records, and writes senator master records to `/senstats_senators/{senatorId}` plus quarterly expense records to `/senstats_senators/{senatorId}/expenses/{expenseId}`. Failed requests, parsing issues, and suspected HTML structure changes are logged to `senstats_ingest_errors.log` and uploaded as a workflow artifact.
-
 ## Development checks and decision workflow
 
 Use Node 24 (`nvm use`) and `npm ci`. Dependencies are locked in `package-lock.json`.
@@ -119,3 +112,22 @@ Only completed, nonarchived drives contribute ratings. Unrated profiles stay unr
 Quotes and drives can be edited, archived, and restored. Forms retain their draft when a save fails. Drive photos (JPG, PNG, WebP) are resized in the browser and saved directly with the diary record, up to three compressed images; no separate Storage credentials are required. Calendar export includes appointment and optional reminders. CarMatch itself does not send reminder notifications.
 
 “Needs review” actions open the named profile's reaction control. Vehicle details link directly to a new quote or planned drive with that vehicle preselected. Recommendations within three points are presented as “Similar fit” in groups anchored to their highest score, without chaining distant scores together. This is a planning heuristic, not statistical confidence; compare trade-offs and real quotes. Exact planning scores remain available in the vehicle details disclosure.
+
+
+## FlowBudget
+
+Open `/?app=budget` or choose FlowBudget in the app launcher. FlowBudget works independently of CarMatch’s Firebase sign-in and stores its data in the current browser. No banking login, bank feed, or cross-device synchronization is configured. Export JSON backups before switching devices or clearing browser data.
+
+Features include manual accounts and transactions, transfers, statement-cleared status, mapped CSV import with preview/duplicate detection, spending categories and income targets, monthly plans, recurring bills/paychecks, a daily cash-flow forecast, account filtering, reserve planning, reports, editable records and undo. Demo mode uses a separate in-memory workspace and never writes sample balances into a real budget.
+
+Checking, savings, cash and credit-card accounts can be included in the combined cash-flow forecast. Investment accounts and accounts explicitly marked “tracked only” are excluded from combined spending cash; they remain part of total tracked balances. Transfers into excluded savings/investment accounts reduce available cash without being treated as expenses. Credit-card debt is entered as a negative balance. Account values are manually entered snapshots; investment gains are not predicted.
+
+Recurring schedules anchor to their original date. Monthly dates clamp to shorter months without drifting. Optional posting adjustments support weekdays or Canadian/Ontario bank business days. Actual institution posting dates can vary. Unrecorded overdue items apply to today’s forecast, while a matched recorded payment suppresses that occurrence. Category limits are not automatically projected as spending: forecasts include recorded future transactions and active recurring items only.
+
+Monthly income targets and expense plans represent a regular month; actual biweekly cash flow follows the calendar, including three-payment months. Items with unconfirmed dates stay paused, and unconfirmed account balances do not produce a numerical forecast.
+
+CSV imports require a header and mapped Date, Description, and signed Amount, or separate Debit/Credit columns. Dates support ISO, month/day/year and day/month/year. Positive signed amounts are income; negative amounts are expenses. Unknown categories go to Other when available. Review imported transfers and match recurring payments after import. CSV exports are ledger reports; JSON backups are the complete round-trip format.
+
+Private setup links use compressed URL fragments. Their data is consumed and removed from the URL locally, with a confirmation before replacing any existing budget. Household presets must never be committed to this public repository or included in public build assets. Automatic analytics initialization is disabled. The app checks backup schemas, protects drafts on storage failures, and receives changes from other tabs without discarding an open transaction draft.
+
+Run `npm test` for calculation, recurrence, transfer, business-day, CSV and schema regressions. Run `npm run test:browser` for both the budgeting and vehicle workflows at desktop/mobile sizes, including persistence, backups, failed writes, multiple tabs and private setup links. Browser fixtures never contact the production backend.
