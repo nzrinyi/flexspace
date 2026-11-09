@@ -21,10 +21,10 @@ export function nextMonth(month: string, n: number) {
   d.setMonth(d.getMonth() + n);
   return localDate(d).slice(0, 7);
 }
-export function displayDate(s: string, short = false) {
+export function displayDate(s: string, short = false, includeYear = !short) {
   return dateObject(s).toLocaleDateString("en-CA", {
     month: short ? "short" : "long",
     day: "numeric",
-    ...(short ? {} : { year: "numeric" }),
+    ...(includeYear ? { year: "numeric" } : {}),
   });
 }

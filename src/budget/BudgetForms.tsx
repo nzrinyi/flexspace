@@ -564,7 +564,7 @@ export function RecurringForm({
           {["weekly", "biweekly", "monthly", "quarterly", "yearly"].map((f) => (
             <option key={f} value={f}>
               {f === "biweekly"
-                ? "Every two weeks"
+                ? "Every two weeks (14 days)"
                 : f[0].toUpperCase() + f.slice(1)}
             </option>
           ))}

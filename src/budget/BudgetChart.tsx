@@ -4,10 +4,14 @@ export function BudgetChart({
   points,
   currency,
   reserve,
+  comparison,
+  assumptions,
 }: {
   points: Array<{ date: string; cents: number }>;
   currency: string;
   reserve: number;
+  comparison?: Array<{ date: string; cents: number }>;
+  assumptions?: string;
 }) {
   const [selected, setSelected] = useState(0);
   useEffect(() => setSelected(0), [points.length]);
@@ -28,8 +32,18 @@ export function BudgetChart({
     right = 16,
     top = 22,
     bottom = 34;
-  const rawMin = Math.min(...points.map((p) => p.cents), 0, reserve),
-    rawMax = Math.max(...points.map((p) => p.cents), reserve, 10000);
+  const rawMin = Math.min(
+      ...points.map((p) => p.cents),
+      ...(comparison ?? []).map((p) => p.cents),
+      0,
+      reserve,
+    ),
+    rawMax = Math.max(
+      ...points.map((p) => p.cents),
+      ...(comparison ?? []).map((p) => p.cents),
+      reserve,
+      10000,
+    );
   const pad = Math.max((rawMax - rawMin) * 0.08, 1000),
     min = rawMin - pad,
     max = rawMax + pad;
@@ -48,11 +62,15 @@ export function BudgetChart({
   return (
     <div className="flow-forecast-chart" ref={container}>
       <div className="flow-chart-readout" aria-live="polite">
-        <span>{displayDate(current.date, true)}</span>
+        <span>{displayDate(current.date, true, Boolean(comparison))}</span>
         <strong className={current.cents < 0 ? "negative" : ""}>
           {money(current.cents, currency)}
         </strong>
-        <small>Projected balance</small>
+        <small>
+          {comparison
+            ? `Scenario · Baseline ${money(comparison[Math.min(selected, comparison.length - 1)].cents, currency)}`
+            : "Projected balance"}
+        </small>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
@@ -90,6 +108,20 @@ export function BudgetChart({
           stroke="#b68a43"
           strokeDasharray="5 5"
         />
+        {comparison && (
+          <path
+            d={comparison
+              .map(
+                (p, i) =>
+                  `${i ? "L" : "M"} ${x(i).toFixed(2)} ${y(p.cents).toFixed(2)}`,
+              )
+              .join(" ")}
+            fill="none"
+            stroke="#637995"
+            strokeWidth="2"
+            strokeDasharray="6 5"
+          />
+        )}
         <path d={area} fill="url(#flow-area)" />
         <path
           d={line}
@@ -125,7 +157,7 @@ export function BudgetChart({
                 i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"
               }
             >
-              {displayDate(points[i].date, true)}
+              {displayDate(points[i].date, true, Boolean(comparison))}
             </text>
           ),
         )}
@@ -144,15 +176,21 @@ export function BudgetChart({
       <div className="flow-chart-key">
         <span>
           <i />
-          Projected balance
+          {comparison ? "Scenario" : "Projected balance"}
         </span>
+        {comparison && (
+          <span>
+            <i style={{ background: "#637995" }} />
+            Baseline (dashed)
+          </span>
+        )}
         <span>
           <i className="reserve" />
           Reserve floor
         </span>
         <small>
-          Includes recorded future transactions, active recurring items and
-          overdue items. Assumes no other spending.
+          {assumptions ??
+            "Includes recorded future transactions, active recurring items and overdue items. Assumes no other spending."}
         </small>
       </div>
     </div>

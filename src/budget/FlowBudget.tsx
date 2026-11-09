@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BudgetEditor, type Editor } from "./BudgetForms";
+import { Scenarios } from "./Scenarios";
 import { BudgetChart } from "./BudgetChart";
 import { useBudget, BUDGET_KEY } from "./useBudget";
 import {
@@ -9,6 +10,7 @@ import {
   dueItems,
   monthTotals,
   categoryLimit,
+  scheduledCategoryIncome,
   categorySpent,
   removeRecord,
   money,
@@ -33,13 +35,15 @@ type View =
   | "recurring"
   | "accounts"
   | "reports"
-  | "settings";
+  | "settings"
+  | "scenarios";
 const sections: Array<{ id: View; label: string; icon: string }> = [
   { id: "overview", label: "Overview", icon: "◫" },
   { id: "transactions", label: "Transactions", icon: "⇄" },
   { id: "budget", label: "Monthly budget", icon: "▤" },
   { id: "recurring", label: "Bills & income", icon: "↻" },
   { id: "accounts", label: "Accounts", icon: "▣" },
+  { id: "scenarios", label: "Scenarios & projections", icon: "⌁" },
   { id: "reports", label: "Reports", icon: "▥" },
 ];
 const titles: Record<View, string> = {
@@ -50,6 +54,7 @@ const titles: Record<View, string> = {
   accounts: "The whole picture.",
   reports: "See where it goes.",
   settings: "Make it yours.",
+  scenarios: "See what could change.",
 };
 export default function FlowBudget({
   onSwitchApp,
@@ -188,7 +193,9 @@ export default function FlowBudget({
             !currentStore.storageError
           ) {
             currentStore.commit(value);
-            setMessage("Your household plan is loaded and saved on this device.");
+            setMessage(
+              "Your household plan is loaded and saved on this device.",
+            );
           } else {
             setEditor({ kind: "restore", value, setup: true });
             setMessage(
@@ -309,7 +316,9 @@ export default function FlowBudget({
                           ? "Opening balances plus the transactions you enter."
                           : view === "reports"
                             ? "Recorded income and spending, without transfers."
-                            : "Your currency, safety buffer and portable backups."}
+                            : view === "scenarios"
+                              ? "Compare changes in income, bills and spending over the next two years."
+                              : "Your currency, safety buffer and portable backups."}
               </p>
             </div>
             {["transactions", "budget", "reports"].includes(view) && (
@@ -671,7 +680,7 @@ export default function FlowBudget({
                         0,
                       ),
                   )}
-                  detail="Regular-month planning target"
+                  detail="Scheduled pay dates plus any undated income targets"
                   accent
                 />
                 <Stat
@@ -716,7 +725,9 @@ export default function FlowBudget({
                 <p className="flow-help">
                   Recorded this month: income {fmt(totals.income)} · spending{" "}
                   {fmt(totals.spent)}. Monthly targets are planning figures; the
-                  forecast uses actual scheduled pay dates.
+                  income follows actual scheduled dates, including
+                  three-paycheque months. Schedules begin after the opening
+                  balance; earlier income is already reflected in that balance.
                 </p>
                 {["income", "expense"].map((kind) => (
                   <div key={kind}>
@@ -1137,6 +1148,12 @@ export default function FlowBudget({
               </div>
             </>
           )}
+          {view === "scenarios" && (
+            <Scenarios
+              data={data}
+              onSave={(next) => save(next, "Scenario saved.")}
+            />
+          )}
           {view === "settings" && (
             <Settings
               key={data.currency + ":" + data.reserveCents}
@@ -1461,6 +1478,10 @@ function BudgetLine({
   const [draft, setDraft] = useState((limit / 100).toFixed(2)),
     [error, setError] = useState("");
   const remaining = limit - spent;
+  const scheduled =
+    category.kind === "income"
+      ? scheduledCategoryIncome(data, category.id, month)
+      : null;
   return (
     <div className="flow-budget-line">
       <div>
@@ -1468,7 +1489,24 @@ function BudgetLine({
           <i style={{ background: category.color }} />
           {category.name}
         </h3>
-        {category.note && <small className="flow-help">{category.note}</small>}
+        {scheduled ? (
+          <small className="flow-help">
+            {scheduled.rules
+              .map(
+                (r) =>
+                  `${money(r.amountCents, data.currency)} ${r.frequency === "biweekly" ? "every 14 days" : r.frequency}`,
+              )
+              .join(" + ")}{" "}
+            · {scheduled.dates.length} scheduled payments in this month.{" "}
+            {data.plans.some(
+              (p) => p.month === month && p.categoryId === category.id,
+            )
+              ? "Manual target override."
+              : "Target follows schedule."}
+          </small>
+        ) : (
+          category.note && <small className="flow-help">{category.note}</small>
+        )}
         <span
           className={
             remaining < 0 && category.kind === "expense"
@@ -1543,6 +1581,24 @@ function BudgetLine({
         </button>
       </form>
       <div className="flow-action-row">
+        {scheduled &&
+          data.plans.some(
+            (p) => p.month === month && p.categoryId === category.id,
+          ) && (
+            <button
+              className="flow-text-button"
+              onClick={() =>
+                onSave({
+                  ...data,
+                  plans: data.plans.filter(
+                    (p) => !(p.month === month && p.categoryId === category.id),
+                  ),
+                })
+              }
+            >
+              Reset to pay schedule
+            </button>
+          )}
         <button
           className="flow-text-button"
           aria-label={`Edit ${category.name} category`}

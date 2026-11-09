@@ -63,6 +63,30 @@ export interface Plan {
   categoryId: string;
   limitCents: number;
 }
+export interface ScenarioEvent {
+  id: string;
+  name: string;
+  accountId: string;
+  type: "income" | "expense";
+  amountCents: number;
+  date: string;
+  frequency: "once" | Frequency;
+  endDate: string;
+}
+export interface BudgetScenario {
+  id: string;
+  name: string;
+  days: number;
+  reserveCents: number;
+  includeSpending: boolean;
+  spendingPercent: number;
+  overrides: Array<{
+    recurringId: string;
+    amountCents: number;
+    active: boolean;
+  }>;
+  events: ScenarioEvent[];
+}
 export interface BudgetData {
   version: 1;
   revision: number;
@@ -74,6 +98,7 @@ export interface BudgetData {
   recurring: Recurring[];
   skipped: string[];
   plans: Plan[];
+  scenarios?: BudgetScenario[];
 }
 import {
   TODAY,
@@ -370,6 +395,82 @@ export function validateBudget(value: unknown): BudgetData {
       throw new Error("Invalid monthly category plan.");
     planKeys.add(key);
   }
+  if (d.scenarios !== undefined) {
+    if (!Array.isArray(d.scenarios) || d.scenarios.length > 50)
+      throw new Error("Keep at most 50 saved scenarios.");
+    const scenarioIds = new Set<string>();
+    for (const scenario of d.scenarios) {
+      if (
+        !scenario ||
+        !text(scenario.id, 100) ||
+        !scenario.id ||
+        scenarioIds.has(scenario.id) ||
+        !text(scenario.name, 100) ||
+        !scenario.name.trim() ||
+        !Number.isInteger(scenario.days) ||
+        scenario.days < 30 ||
+        scenario.days > 730 ||
+        !cents(scenario.reserveCents) ||
+        scenario.reserveCents < 0 ||
+        typeof scenario.includeSpending !== "boolean" ||
+        !Number.isInteger(scenario.spendingPercent) ||
+        scenario.spendingPercent < 0 ||
+        scenario.spendingPercent > 300 ||
+        !Array.isArray(scenario.overrides) ||
+        scenario.overrides.length > 500 ||
+        !Array.isArray(scenario.events) ||
+        scenario.events.length > 100
+      )
+        throw new Error("Invalid saved scenario.");
+      scenarioIds.add(scenario.id);
+      const overrideIds = new Set<string>();
+      for (const o of scenario.overrides) {
+        if (
+          !o ||
+          !text(o.recurringId, 100) ||
+          !o.recurringId ||
+          overrideIds.has(o.recurringId) ||
+          !cents(o.amountCents) ||
+          o.amountCents <= 0 ||
+          typeof o.active !== "boolean"
+        )
+          throw new Error("Invalid recurring scenario change.");
+        overrideIds.add(o.recurringId);
+      }
+      const eventIds = new Set<string>();
+      for (const event of scenario.events) {
+        const account = d.accounts.find((a) => a.id === event?.accountId);
+        if (
+          !event ||
+          !text(event.id, 100) ||
+          !event.id ||
+          eventIds.has(event.id) ||
+          !text(event.name) ||
+          !event.name.trim() ||
+          !account ||
+          !["income", "expense"].includes(event.type) ||
+          !cents(event.amountCents) ||
+          event.amountCents <= 0 ||
+          !validDate(event.date) ||
+          event.date < account.openingDate ||
+          ![
+            "once",
+            "weekly",
+            "biweekly",
+            "monthly",
+            "quarterly",
+            "yearly",
+          ].includes(event.frequency) ||
+          (event.endDate !== "" &&
+            (!validDate(event.endDate) || event.endDate < event.date))
+        )
+          throw new Error(
+            "Invalid scenario event. Check its account, amount and dates.",
+          );
+        eventIds.add(event.id);
+      }
+    }
+  }
   // Retain only the known top-level schema. Unknown fields never become app configuration.
   return {
     version: 1,
@@ -382,6 +483,7 @@ export function validateBudget(value: unknown): BudgetData {
     recurring: d.recurring,
     skipped: d.skipped,
     plans: d.plans,
+    ...(d.scenarios === undefined ? {} : { scenarios: d.scenarios }),
   };
 }
 export function occurrenceDates(
@@ -578,12 +680,40 @@ export function categoryLimit(
   categoryId: string,
   month: string,
 ) {
+  const manual = data.plans.find(
+    (p) => p.categoryId === categoryId && p.month === month,
+  );
+  if (manual) return manual.limitCents;
+  const scheduled = scheduledCategoryIncome(data, categoryId, month);
   return (
-    data.plans.find((p) => p.categoryId === categoryId && p.month === month)
-      ?.limitCents ??
+    scheduled?.cents ??
     data.categories.find((c) => c.id === categoryId)?.defaultLimitCents ??
     0
   );
+}
+export function scheduledCategoryIncome(
+  data: BudgetData,
+  categoryId: string,
+  month: string,
+) {
+  const rules = data.recurring.filter(
+    (r) =>
+      r.categoryId === categoryId &&
+      r.type === "income" &&
+      r.active &&
+      r.dateConfirmed !== false,
+  );
+  if (!rules.length) return null;
+  const from = month + "-01",
+    to = addDays(nextMonth(month, 1) + "-01", -1);
+  const dates = rules.flatMap((rule) =>
+    occurrenceDates(rule, from, to).map((date) => ({ date, rule })),
+  );
+  return {
+    cents: dates.reduce((sum, item) => sum + item.rule.amountCents, 0),
+    dates,
+    rules,
+  };
 }
 export function categorySpent(
   data: BudgetData,

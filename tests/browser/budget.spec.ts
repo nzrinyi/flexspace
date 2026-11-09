@@ -3,6 +3,7 @@ import { emptyBudget, TODAY } from "../../src/budget/model";
 import { test, expect, type Page } from "@playwright/test";
 const KEY = "flexspace.flowbudget.v1";
 async function nav(page: Page, name: string) {
+  await page.locator(".flow-app").waitFor({ state: "visible" });
   const toggle = page.getByRole("button", {
     name: "Toggle budgeting menu",
     exact: true,
@@ -43,10 +44,16 @@ test.beforeEach(async ({ page }) => {
     }),
   ).toBeVisible();
 });
-test("personal budget launches without Firebase or demo controls", async ({ page }) => {
-  await expect(page.getByRole("heading", { name: "Give your money a clearer path." })).toBeVisible();
+test("personal budget launches without Firebase or demo controls", async ({
+  page,
+}) => {
+  await expect(
+    page.getByRole("heading", { name: "Give your money a clearer path." }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: /demo/i })).toHaveCount(0);
-  expect(await page.evaluate((key) => localStorage.getItem(key), KEY)).toBeNull();
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key), KEY),
+  ).toBeNull();
 });
 test("account and transaction persist, monthly budgets and reports reflect real entries", async ({
   page,
@@ -359,7 +366,11 @@ test("private preload links are consumed locally and unknown starting balances n
     "base64url",
   );
   await page.goto("/?app=budget#flow-plan=" + encoded);
-  await expect(page.getByText("Your household plan is loaded and saved on this device.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Your household plan is loaded and saved on this device.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   expect(page.url()).not.toContain("#");
   await page.reload();
   await expect(
@@ -427,7 +438,11 @@ test("tracked savings and investment snapshots do not inflate bill-paying cash",
     "base64url",
   );
   await page.goto("/?app=budget#flow-plan=" + encoded);
-  await expect(page.getByText("Your household plan is loaded and saved on this device.", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Your household plan is loaded and saved on this device.", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.locator(".flow-stat").filter({ hasText: "Current balance" }),
   ).toContainText("$1,000.00");
@@ -465,14 +480,142 @@ test("tracked savings and investment snapshots do not inflate bill-paying cash",
   ).toBeVisible();
 });
 
-test("private setup never overwrites an existing personal budget automatically", async ({ page }) => {
+test("private setup never overwrites an existing personal budget automatically", async ({
+  page,
+}) => {
   await account(page);
   const preset = emptyBudget();
-  preset.accounts = [{ id: "replacement", name: "Replacement account", type: "Checking", openingCents: 90000, openingDate: TODAY() }];
-  const encoded = gzipSync(Buffer.from(JSON.stringify(preset))).toString("base64url");
+  preset.accounts = [
+    {
+      id: "replacement",
+      name: "Replacement account",
+      type: "Checking",
+      openingCents: 90000,
+      openingDate: TODAY(),
+    },
+  ];
+  const encoded = gzipSync(Buffer.from(JSON.stringify(preset))).toString(
+    "base64url",
+  );
   await page.goto("/?app=budget#flow-plan=" + encoded);
-  await expect(page.getByRole("dialog").getByRole("heading", { name: "Load your budget plan" })).toBeVisible();
-  const saved = await page.evaluate(key => JSON.parse(localStorage.getItem(key)!), KEY);
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Load your budget plan" }),
+  ).toBeVisible();
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    KEY,
+  );
   expect(saved.accounts[0].name).toBe("Everyday");
   expect(page.url()).not.toContain("#");
+});
+
+test("saved what-if projections persist without changing real transactions or balances", async ({
+  page,
+}) => {
+  await account(page);
+  const before = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    KEY,
+  );
+  await nav(page, "Scenarios & projections");
+  await page.getByLabel("Scenario name", { exact: true }).fill("Roof repair");
+  await page
+    .getByLabel("Projection length", { exact: true })
+    .selectOption("30");
+  await page
+    .getByLabel("Include remaining monthly spending plan", { exact: true })
+    .uncheck();
+  await page
+    .getByRole("button", { name: "Add hypothetical event", exact: true })
+    .click();
+  await page.getByLabel("Event name", { exact: true }).fill("New roof");
+  await page.getByLabel("Event amount", { exact: true }).fill("250");
+  await expect(
+    page.locator(".flow-stat").filter({ hasText: "Projected closing cash" }),
+  ).toContainText("$750.00");
+  await expect(
+    page.locator(".flow-stat").filter({ hasText: "Difference from baseline" }),
+  ).toContainText("-$250.00");
+  await page
+    .getByRole("button", { name: "Save scenario", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Scenario saved on this device and included in JSON backups.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    KEY,
+  );
+  expect(saved.accounts).toEqual(before.accounts);
+  expect(saved.entries).toEqual(before.entries);
+  expect(saved.scenarios).toHaveLength(1);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+  await page.reload();
+  await nav(page, "Scenarios & projections");
+  await expect(page.getByLabel("Scenario name", { exact: true })).toHaveValue(
+    "Roof repair",
+  );
+  await expect(page.getByLabel("Event amount", { exact: true })).toHaveValue(
+    "250",
+  );
+  await page.getByRole("button", { name: "New scenario", exact: true }).click();
+  await page
+    .getByLabel("Saved scenario", { exact: true })
+    .selectOption(saved.scenarios[0].id);
+  await expect(page.getByLabel("Scenario name", { exact: true })).toHaveValue(
+    "Roof repair",
+  );
+});
+
+test("monthly income follows fortnightly pay dates instead of a fixed two-pay target", async ({
+  page,
+}) => {
+  const preset = emptyBudget();
+  preset.accounts = [
+    {
+      id: "checking",
+      name: "Checking",
+      type: "Checking",
+      openingCents: 100000,
+      openingDate: "2020-01-01",
+    },
+  ];
+  preset.recurring = [
+    {
+      id: "salary",
+      payee: "Salary",
+      type: "income",
+      categoryId: "salary",
+      amountCents: 200000,
+      frequency: "biweekly",
+      accountId: "checking",
+      startDate: "2026-11-05",
+      endDate: "",
+      active: true,
+    },
+  ];
+  await page.evaluate(
+    ({ key, preset }) => localStorage.setItem(key, JSON.stringify(preset)),
+    { key: KEY, preset },
+  );
+  await page.reload();
+  await nav(page, "Monthly budget");
+  await page.getByLabel("Budget month", { exact: true }).fill("2026-12");
+  await expect(
+    page.locator(".flow-budget-line").filter({ hasText: "Salary" }),
+  ).toContainText("$2,000.00 every 14 days · 3 scheduled payments");
+  await expect(
+    page.locator(".flow-stat").filter({ hasText: "Planned monthly income" }),
+  ).toContainText("$6,000.00");
 });
