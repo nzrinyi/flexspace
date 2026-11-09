@@ -43,7 +43,7 @@ jobs:
             });
             if(!changed){console.log('::notice::Active rules already contain no retired collection rule.');return;}
             const {data:created}=await client.request({url:root+'projects/flexspace-1/rulesets',method:'POST',data:{source:{files}}});
-            await client.request({url:root+name+'?updateMask=ruleset_name',method:'PATCH',data:{name,rulesetName:created.name}});
+            await client.request({url:root+name,method:'PATCH',data:{release:{name,rulesetName:created.name}}});
             const {data:verified}=await client.request({url:root+name});
             if(verified.rulesetName!==created.name)throw new Error('Ruleset activation could not be verified.');
             console.log('::notice::Retired Firestore access rule removed and active release verified. Other rules preserved.');
