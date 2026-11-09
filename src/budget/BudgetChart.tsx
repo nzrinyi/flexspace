@@ -6,12 +6,16 @@ export function BudgetChart({
   reserve,
   comparison,
   assumptions,
+  valueLabel = "Projected balance",
+  referenceLabel = "Reserve floor",
 }: {
   points: Array<{ date: string; cents: number }>;
   currency: string;
   reserve: number;
   comparison?: Array<{ date: string; cents: number }>;
   assumptions?: string;
+  valueLabel?: string;
+  referenceLabel?: string;
 }) {
   const [selected, setSelected] = useState(0);
   useEffect(() => setSelected(0), [points.length]);
@@ -62,20 +66,26 @@ export function BudgetChart({
   return (
     <div className="flow-forecast-chart" ref={container}>
       <div className="flow-chart-readout" aria-live="polite">
-        <span>{displayDate(current.date, true, Boolean(comparison))}</span>
+        <span>
+          {displayDate(
+            current.date,
+            true,
+            Boolean(comparison) || valueLabel !== "Projected balance",
+          )}
+        </span>
         <strong className={current.cents < 0 ? "negative" : ""}>
           {money(current.cents, currency)}
         </strong>
         <small>
           {comparison
             ? `Scenario · Baseline ${money(comparison[Math.min(selected, comparison.length - 1)].cents, currency)}`
-            : "Projected balance"}
+            : valueLabel}
         </small>
       </div>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Projected daily balance from ${points[0].date} to ${points[points.length - 1].date}. Use the forecast day slider for exact values.`}
+        aria-label={`${valueLabel === "Projected balance" ? "Projected daily balance" : valueLabel} from ${points[0].date} to ${points[points.length - 1].date}. Use the forecast day slider for exact values.`}
       >
         <defs>
           <linearGradient id="flow-area" x1="0" y1="0" x2="0" y2="1">
@@ -157,7 +167,11 @@ export function BudgetChart({
                 i === 0 ? "start" : i === points.length - 1 ? "end" : "middle"
               }
             >
-              {displayDate(points[i].date, true, Boolean(comparison))}
+              {displayDate(
+                points[i].date,
+                true,
+                Boolean(comparison) || valueLabel !== "Projected balance",
+              )}
             </text>
           ),
         )}
@@ -176,7 +190,7 @@ export function BudgetChart({
       <div className="flow-chart-key">
         <span>
           <i />
-          {comparison ? "Scenario" : "Projected balance"}
+          {comparison ? "Scenario" : valueLabel}
         </span>
         {comparison && (
           <span>
@@ -186,7 +200,7 @@ export function BudgetChart({
         )}
         <span>
           <i className="reserve" />
-          Reserve floor
+          {referenceLabel}
         </span>
         <small>
           {assumptions ??

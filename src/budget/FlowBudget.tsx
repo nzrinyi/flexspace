@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BudgetEditor, type Editor } from "./BudgetForms";
 import { Scenarios } from "./Scenarios";
+import { SavingsOutlook } from "./SavingsOutlook";
 import { BudgetSheet } from "./BudgetSheet";
 import { BudgetChart } from "./BudgetChart";
 import { useBudget, BUDGET_KEY } from "./useBudget";
@@ -378,6 +379,14 @@ export default function FlowBudget({
             <div className="flow-error" role="alert">
               {error || store.storageError}
             </div>
+          )}
+          {["budget", "overview"].includes(view) && (
+            <SavingsOutlook
+              data={data}
+              onSchedules={() => navigate("recurring")}
+              onAccounts={() => navigate("accounts")}
+              onScenarios={() => navigate("scenarios")}
+            />
           )}
           {!data.accounts.length && view === "overview" ? (
             <section className="flow-welcome flow-panel">

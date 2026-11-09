@@ -694,11 +694,9 @@ test("default page is a grouped editable household budget with accurate totals",
   await expect(
     table.getByRole("columnheader", { name: "Actual", exact: true }),
   ).toBeVisible();
-  const row = page
-    .locator(".flow-budget-line")
-    .filter({
-      has: page.getByRole("heading", { name: "Groceries", exact: true }),
-    });
+  const row = page.locator(".flow-budget-line").filter({
+    has: page.getByRole("heading", { name: "Groceries", exact: true }),
+  });
   await expect(row).toContainText("$25.50");
   await expect(row).toContainText("$74.50 left");
   await page
@@ -731,4 +729,121 @@ test("default page is a grouped editable household budget with accurate totals",
   );
   expect(saved.accounts).toEqual(preset.accounts);
   expect(saved.entries).toEqual(preset.entries);
+});
+
+test("main budget shows new savings milestones separately from existing balances and supports scenario comparison", async ({
+  page,
+}) => {
+  const preset = emptyBudget();
+  preset.accounts = [
+    {
+      id: "cash",
+      name: "Chequing",
+      type: "Checking",
+      openingCents: 100000,
+      openingDate: TODAY(),
+    },
+    {
+      id: "savings",
+      name: "Savings",
+      type: "Savings",
+      openingCents: 500000,
+      openingDate: TODAY(),
+      includeInForecast: false,
+    },
+    {
+      id: "investment",
+      name: "Investments",
+      type: "Investment",
+      openingCents: 800000,
+      openingDate: TODAY(),
+      includeInForecast: false,
+    },
+  ];
+  const future = new Date();
+  future.setDate(future.getDate() + 15);
+  const date = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(future.getDate()).padStart(2, "0")}`;
+  preset.entries = [
+    {
+      id: "future-pay",
+      accountId: "cash",
+      type: "income",
+      categoryId: "salary",
+      amountCents: 30000,
+      date,
+      payee: "Extra pay",
+      note: "",
+      cleared: false,
+    },
+  ];
+  preset.scenarios = [
+    {
+      id: "trip",
+      name: "Holiday",
+      days: 365,
+      reserveCents: 0,
+      includeSpending: true,
+      spendingPercent: 100,
+      overrides: [],
+      events: [
+        {
+          id: "cost",
+          name: "Trip",
+          accountId: "cash",
+          type: "expense",
+          amountCents: 20000,
+          date,
+          frequency: "once",
+          endDate: "",
+        },
+      ],
+    },
+  ];
+  await page.evaluate(
+    ({ key, preset }) => localStorage.setItem(key, JSON.stringify(preset)),
+    { key: KEY, preset },
+  );
+  await page.reload();
+  const outlook = page.getByRole("region", {
+    name: "Savings outlook",
+    exact: true,
+  });
+  await expect(outlook).toBeVisible();
+  await expect(outlook).toContainText("Starting liquid balance: $6,000.00");
+  for (const months of [6, 12, 24]) {
+    const card = outlook.getByRole("article", {
+      name: `${months}-month savings estimate`,
+      exact: true,
+    });
+    await expect(card).toContainText("+$300.00");
+    await expect(card).toContainText("$6,300.00");
+  }
+  await page.getByLabel("Outlook plan", { exact: true }).selectOption("trip");
+  await expect(
+    outlook.getByRole("article", {
+      name: "6-month savings estimate",
+      exact: true,
+    }),
+  ).toContainText("+$100.00");
+  await page
+    .getByRole("button", { name: "Show savings projection", exact: true })
+    .click();
+  await page
+    .getByLabel("Savings chart horizon", { exact: true })
+    .selectOption("24");
+  await expect(
+    outlook.getByRole("img", { name: /Savings added from/ }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    KEY,
+  );
+  expect(saved).toEqual(preset);
 });
