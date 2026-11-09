@@ -1,0 +1,52 @@
+name: Remove retired Firestore access rule
+on:
+  push:
+    branches: [codex/retired-rule-cleanup]
+    paths: [.github/workflows/retired-rule-cleanup.yml]
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --prefix "$RUNNER_TEMP/rule-tools" --no-audit --no-fund google-auth-library@9.15.1
+      - name: Remove only the retired match block from the active ruleset
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const {GoogleAuth} = require(process.env.RUNNER_TEMP + '/rule-tools/node_modules/google-auth-library');
+          (async () => {
+            const credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+            const auth = new GoogleAuth({ credentials, scopes:['https://www.googleapis.com/auth/cloud-platform'] });
+            const client = await auth.getClient();
+            const root = 'https://firebaserules.googleapis.com/v1/';
+            const name = 'projects/flexspace-1/releases/cloud.firestore';
+            const {data:release} = await client.request({url:root+name});
+            const {data:ruleset} = await client.request({url:root+release.rulesetName});
+            let changed=false;
+            const files=ruleset.source.files.map(file=>{
+              let content=file.content;
+              while(true){
+                const match=/match\s+\/senstats_senators\/\{[^}]+\}\s*\{/.exec(content);
+                if(!match)break;
+                const start=match.index;let cursor=start+match[0].length,depth=1;
+                while(cursor<content.length&&depth){const c=content[cursor++];if(c==='{')depth++;if(c==='}')depth--;}
+                if(depth)throw new Error('Could not isolate the retired rule safely.');
+                content=content.slice(0,start)+content.slice(cursor);changed=true;
+              }
+              return {...file,content};
+            });
+            if(!changed){console.log('::notice::Active rules already contain no retired collection rule.');return;}
+            const {data:created}=await client.request({url:root+'projects/flexspace-1/rulesets',method:'POST',data:{source:{files}}});
+            await client.request({url:root+name+'?updateMask=ruleset_name',method:'PATCH',data:{name,rulesetName:created.name}});
+            const {data:verified}=await client.request({url:root+name});
+            if(verified.rulesetName!==created.name)throw new Error('Ruleset activation could not be verified.');
+            console.log('::notice::Retired Firestore access rule removed and active release verified. Other rules preserved.');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,'Removed retired collection match block; active release verified. Prior immutable ruleset: '+release.rulesetName+'\n');
+          })().catch(error=>{console.log('::error::'+String(error.message).replace(/https?:\/\/\S+/g,'[URL]').replace(/%/g,'%25').slice(0,700));process.exit(1);});
+          NODE
