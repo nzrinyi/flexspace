@@ -1,0 +1,58 @@
+name: Remove retired app data
+on:
+  push:
+    branches: [codex/retired-data-cleanup]
+    paths: [.github/workflows/retired-data-cleanup.yml]
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install trusted cleanup tooling
+        run: npm install --prefix "$RUNNER_TEMP/cleanup-tools" --no-audit --no-fund firebase-tools@15.33.0
+      - name: Delete only the retired collection and verify
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/cleanup-credentials.json"
+          trap 'rm -f "$GOOGLE_APPLICATION_CREDENTIALS"' EXIT
+          node <<'NODE'
+          const fs = require('node:fs');
+          const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+          if (!raw) throw new Error('Missing existing Firebase service-account binding');
+          const data = JSON.parse(raw);
+          if (data.type !== 'service_account') throw new Error('Expected a service-account credential');
+          fs.writeFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, raw, { mode: 0o600 });
+          NODE
+          unset FIREBASE_SERVICE_ACCOUNT_JSON
+          set +e
+          "$RUNNER_TEMP/cleanup-tools/node_modules/.bin/firebase" firestore:delete senstats_senators --recursive --force --project flexspace-1 --database '(default)' --non-interactive > "$RUNNER_TEMP/cleanup.log" 2>&1
+          cleanup_status=$?
+          set -e
+          if [ "$cleanup_status" -ne 0 ]; then
+            node <<'NODE'
+          const fs = require('node:fs');
+          const text = fs.readFileSync(process.env.RUNNER_TEMP + '/cleanup.log','utf8');
+          const errors = text.split('\n').filter(s => /Error:|HTTP Error|Permission denied|missing the following required permissions/.test(s));
+          for (const message of errors.length ? errors : ['Firestore cleanup failed; inspect the workflow log.']) console.log('::error::' + message.replace(/https?:\/\/\S+/g,'[URL]').replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A').slice(0,800));
+          NODE
+            exit "$cleanup_status"
+          fi
+          node <<'NODE'
+          const fs = require('node:fs');
+          const { GoogleAuth } = require(process.env.RUNNER_TEMP + '/cleanup-tools/node_modules/google-auth-library');
+          (async () => {
+            const auth = new GoogleAuth({ scopes: ['https://www.googleapis.com/auth/datastore'] });
+            const client = await auth.getClient();
+            const response = await client.request({ url: 'https://firestore.googleapis.com/v1/projects/flexspace-1/databases/(default)/documents/senstats_senators?pageSize=1&showMissing=true' });
+            if (response.data.documents?.length) throw new Error('Verification failed: retired records or descendant placeholders remain.');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,'Retired collection and nested records deleted. Verified empty with showMissing=true.\n');
+            console.log('::notice::Retired collection and nested records deleted; verified empty.');
+          })().catch(error => { console.log('::error::' + String(error.message).replace(/https?:\/\/\S+/g,'[URL]').replace(/%/g,'%25').slice(0,800)); process.exit(1); });
+          NODE
