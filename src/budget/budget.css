@@ -1561,3 +1561,215 @@
     gap: 10px;
   }
 }
+
+.flow-budget-sheet .flow-panel-heading {
+  margin-bottom: 12px;
+}
+.flow-budget-sheet .flow-table-scroll {
+  margin-top: 20px;
+}
+.flow-budget-sheet .flow-budget-table {
+  min-width: 720px;
+  table-layout: fixed;
+}
+.flow-budget-table th:first-child {
+  width: 34%;
+}
+.flow-budget-table th:nth-child(2) {
+  width: 20%;
+}
+.flow-budget-table th:nth-child(3) {
+  width: 15%;
+}
+.flow-budget-table th:nth-child(4) {
+  width: 21%;
+}
+.flow-budget-table th:nth-child(5) {
+  width: 10%;
+}
+.flow-budget-table thead th {
+  padding: 11px 14px;
+  background: #f6f8fa;
+  color: #536276;
+  font-size: 11px;
+  font-weight: 600;
+}
+.flow-budget-table thead th:not(:first-child) {
+  text-align: right;
+}
+.flow-budget-sheet .flow-budget-line {
+  display: table-row;
+}
+.flow-budget-table .flow-budget-line > th,
+.flow-budget-table .flow-budget-line > td {
+  padding: 12px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #e8edf1;
+}
+.flow-budget-table .flow-budget-line > th {
+  white-space: normal;
+}
+.flow-budget-table .flow-budget-line h3 {
+  font-size: 12px;
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.flow-budget-table .flow-budget-line td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.flow-budget-table .flow-budget-line form {
+  display: flex;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.flow-budget-table .flow-budget-line input {
+  width: 100%;
+  max-width: 100px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid #dce4eb;
+  border-radius: 5px;
+  background: #fff;
+  color: #202b3c;
+  font: inherit;
+  text-align: right;
+}
+.flow-budget-table .flow-budget-line form label {
+  min-width: 0;
+}
+.flow-budget-table .flow-budget-save {
+  border: 0;
+  padding: 4px;
+  color: #267870;
+  background: transparent;
+}
+.flow-budget-table .flow-progress {
+  margin: 7px 0 0 auto;
+  height: 3px;
+  max-width: 100px;
+}
+.flow-budget-table .flow-budget-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 9px;
+}
+.flow-budget-table .flow-budget-group th,
+.flow-budget-table .flow-budget-group td {
+  background: #edf2f5;
+  color: #344c5b;
+  padding: 11px 14px;
+  font-weight: 600;
+  border-bottom: 1px solid #dce4eb;
+}
+.flow-budget-table .flow-budget-group td {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.flow-budget-group button {
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-weight: 600;
+  text-align: left;
+}
+.flow-budget-group small {
+  display: inline;
+  margin-left: 8px;
+  color: #6b7c8c;
+  font-size: 10px;
+  font-weight: 400;
+}
+.flow-budget-cadence {
+  display: block;
+  margin-top: 5px;
+  color: #617083;
+  font-size: 10px;
+  line-height: 1.5;
+  font-weight: 400;
+}
+.flow-budget-notes {
+  margin-top: 5px;
+  font-size: 10px;
+  font-weight: 400;
+  color: #66778a;
+}
+.flow-budget-notes summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.flow-budget-notes p {
+  font-size: 11px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.flow-budget-start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  border: 1px solid #d8e8e4;
+  background: #f5faf8;
+  padding: 14px;
+  border-radius: 8px;
+  margin: 14px 0;
+  font-size: 12px;
+}
+.flow-budget-footnote {
+  margin-top: 16px;
+}
+@media (max-width: 760px) {
+  .flow-budget-start {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .flow-budget-table th:first-child {
+    width: 215px;
+  }
+  .flow-budget-table thead th:first-child,
+  .flow-budget-table .flow-budget-line > th,
+  .flow-budget-table .flow-budget-group th {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: #fff;
+    box-shadow: 2px 0 4px #202b3c08;
+  }
+  .flow-budget-table .flow-budget-group th {
+    background: #edf2f5;
+  }
+}
+.flow-budget-table .flow-budget-line > th,
+.flow-budget-table .flow-budget-line > td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+.flow-budget-table .flow-budget-line h3 {
+  display: inline-flex;
+}
+.flow-budget-table .flow-budget-notes {
+  display: inline-block;
+  margin: 0 0 0 7px;
+  vertical-align: middle;
+}
+.flow-budget-table .flow-budget-notes[open] {
+  display: block;
+  margin: 7px 0;
+}
+.flow-budget-table .flow-budget-group button {
+  font-size: 12px;
+}
+.flow-budget-table .flow-budget-line > th .flow-budget-cadence {
+  font-size: 10px;
+}
+.flow-budget-table .flow-budget-group td.negative {
+  color: #b54b4b;
+}
+.flow-budget-save {
+  min-width: 26px;
+  min-height: 28px;
+}

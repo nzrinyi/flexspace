@@ -39,10 +39,11 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/?app=budget");
   await expect(
     page.getByRole("heading", {
-      name: "Your money, a little clearer.",
+      name: "Your monthly budget.",
       exact: true,
     }),
   ).toBeVisible();
+  await nav(page, "Overview");
 });
 test("personal budget launches without Firebase or demo controls", async ({
   page,
@@ -75,6 +76,7 @@ test("account and transaction persist, monthly budgets and reports reflect real 
     .click();
   await expect(page.locator(".flow-stats").first()).toContainText("$974.50");
   await page.reload();
+  await nav(page, "Overview");
   await expect(page.locator(".flow-stats").first()).toContainText("$974.50");
   await nav(page, "Monthly budget");
   await page.getByLabel("Groceries monthly limit", { exact: true }).fill("100");
@@ -366,6 +368,7 @@ test("private preload links are consumed locally and unknown starting balances n
     "base64url",
   );
   await page.goto("/?app=budget#flow-plan=" + encoded);
+  await nav(page, "Overview");
   await expect(
     page.getByText("Your household plan is loaded and saved on this device.", {
       exact: true,
@@ -373,6 +376,7 @@ test("private preload links are consumed locally and unknown starting balances n
   ).toBeVisible();
   expect(page.url()).not.toContain("#");
   await page.reload();
+  await nav(page, "Overview");
   await expect(
     page.getByRole("heading", { name: "Add your actual starting balance" }),
   ).toBeVisible();
@@ -438,6 +442,7 @@ test("tracked savings and investment snapshots do not inflate bill-paying cash",
     "base64url",
   );
   await page.goto("/?app=budget#flow-plan=" + encoded);
+  await nav(page, "Overview");
   await expect(
     page.getByText("Your household plan is loaded and saved on this device.", {
       exact: true,
@@ -562,6 +567,7 @@ test("saved what-if projections persist without changing real transactions or ba
     ),
   ).toBe(false);
   await page.reload();
+  await nav(page, "Overview");
   await nav(page, "Scenarios & projections");
   await expect(page.getByLabel("Scenario name", { exact: true })).toHaveValue(
     "Roof repair",
@@ -610,6 +616,7 @@ test("monthly income follows fortnightly pay dates instead of a fixed two-pay ta
     { key: KEY, preset },
   );
   await page.reload();
+  await nav(page, "Overview");
   await nav(page, "Monthly budget");
   await page.getByLabel("Budget month", { exact: true }).fill("2026-12");
   await expect(
@@ -618,4 +625,110 @@ test("monthly income follows fortnightly pay dates instead of a fixed two-pay ta
   await expect(
     page.locator(".flow-stat").filter({ hasText: "Planned monthly income" }),
   ).toContainText("$6,000.00");
+});
+
+test("default page is a grouped editable household budget with accurate totals", async ({
+  page,
+}) => {
+  const preset = emptyBudget();
+  preset.accounts = [
+    {
+      id: "checking",
+      name: "Everyday",
+      type: "Checking",
+      openingCents: 100000,
+      openingDate: TODAY(),
+    },
+  ];
+  preset.categories = [
+    {
+      id: "salary",
+      name: "Salary",
+      kind: "income",
+      color: "#267870",
+      defaultLimitCents: 400000,
+      group: "Income",
+    },
+    {
+      id: "rent",
+      name: "Rent",
+      kind: "expense",
+      color: "#5565b3",
+      defaultLimitCents: 50000,
+      group: "Fixed bills",
+    },
+    {
+      id: "food",
+      name: "Groceries",
+      kind: "expense",
+      color: "#4e9181",
+      defaultLimitCents: 10000,
+      group: "Living",
+    },
+  ];
+  preset.entries = [
+    {
+      id: "food-1",
+      accountId: "checking",
+      type: "expense",
+      categoryId: "food",
+      amountCents: 2550,
+      date: TODAY(),
+      payee: "Groceries",
+      note: "",
+      cleared: true,
+    },
+  ];
+  await page.evaluate(
+    ({ key, preset }) => localStorage.setItem(key, JSON.stringify(preset)),
+    { key: KEY, preset },
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Your monthly budget.", exact: true }),
+  ).toBeVisible();
+  const table = page.getByRole("table", { name: "Monthly household budget" });
+  await expect(
+    table.getByRole("columnheader", { name: "Planned", exact: true }),
+  ).toBeVisible();
+  await expect(
+    table.getByRole("columnheader", { name: "Actual", exact: true }),
+  ).toBeVisible();
+  const row = page
+    .locator(".flow-budget-line")
+    .filter({
+      has: page.getByRole("heading", { name: "Groceries", exact: true }),
+    });
+  await expect(row).toContainText("$25.50");
+  await expect(row).toContainText("$74.50 left");
+  await page
+    .getByRole("button", { name: "Collapse Living", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Groceries", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Expand Living", exact: true })
+    .click();
+  await page.getByLabel("Groceries monthly limit", { exact: true }).fill("120");
+  await page
+    .getByRole("button", { name: "Save Groceries limit", exact: true })
+    .click();
+  await expect(row).toContainText("$94.50 left");
+  await expect(
+    page.locator(".flow-stat").filter({ hasText: "Planned monthly expenses" }),
+  ).toContainText("$620.00");
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
+  const saved = await page.evaluate(
+    (key) => JSON.parse(localStorage.getItem(key)!),
+    KEY,
+  );
+  expect(saved.accounts).toEqual(preset.accounts);
+  expect(saved.entries).toEqual(preset.entries);
 });

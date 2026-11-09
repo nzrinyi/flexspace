@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BudgetEditor, type Editor } from "./BudgetForms";
 import { Scenarios } from "./Scenarios";
+import { BudgetSheet } from "./BudgetSheet";
 import { BudgetChart } from "./BudgetChart";
 import { useBudget, BUDGET_KEY } from "./useBudget";
 import {
@@ -10,7 +11,6 @@ import {
   dueItems,
   monthTotals,
   categoryLimit,
-  scheduledCategoryIncome,
   categorySpent,
   removeRecord,
   money,
@@ -21,7 +21,6 @@ import {
   addDays,
   validateBudget,
   type BudgetData,
-  type Category,
   type DueItem,
   type Entry,
 } from "./model";
@@ -38,9 +37,9 @@ type View =
   | "settings"
   | "scenarios";
 const sections: Array<{ id: View; label: string; icon: string }> = [
+  { id: "budget", label: "Monthly budget", icon: "▤" },
   { id: "overview", label: "Overview", icon: "◫" },
   { id: "transactions", label: "Transactions", icon: "⇄" },
-  { id: "budget", label: "Monthly budget", icon: "▤" },
   { id: "recurring", label: "Bills & income", icon: "↻" },
   { id: "accounts", label: "Accounts", icon: "▣" },
   { id: "scenarios", label: "Scenarios & projections", icon: "⌁" },
@@ -49,7 +48,7 @@ const sections: Array<{ id: View; label: string; icon: string }> = [
 const titles: Record<View, string> = {
   overview: "Your money, a little clearer.",
   transactions: "Every little movement.",
-  budget: "A plan for what matters.",
+  budget: "Your monthly budget.",
   recurring: "One less thing to remember.",
   accounts: "The whole picture.",
   reports: "See where it goes.",
@@ -65,7 +64,7 @@ export default function FlowBudget({
     data = store.data;
   const latestStore = useRef(store);
   latestStore.current = store;
-  const [view, setView] = useState<View>("overview"),
+  const [view, setView] = useState<View>("budget"),
     [month, setMonth] = useState(TODAY().slice(0, 7)),
     [editor, setEditor] = useState<Editor | null>(null),
     [message, setMessage] = useState(""),
@@ -225,7 +224,7 @@ export default function FlowBudget({
       <aside className={`flow-sidebar ${menuOpen ? "open" : ""}`}>
         <button
           className="flow-brand"
-          onClick={() => navigate("overview")}
+          onClick={() => navigate("budget")}
           aria-label="FlowBudget home"
         >
           <span className="flow-logo" aria-hidden="true">
@@ -309,7 +308,7 @@ export default function FlowBudget({
                   : view === "transactions"
                     ? "Your ledger, with room for the details."
                     : view === "budget"
-                      ? "Give each spending category a monthly limit."
+                      ? "Your household plan: income, fixed bills and living expenses."
                       : view === "recurring"
                         ? "Recurring plans become real transactions only when you record them."
                         : view === "accounts"
@@ -709,96 +708,17 @@ export default function FlowBudget({
                   detail="Income target less planned expenses"
                 />
               </div>
-              <section className="flow-panel">
-                <div className="flow-panel-heading">
-                  <div>
-                    <h2>Your category plan</h2>
-                    <p>Edit limits for {monthName}. Zero means unplanned.</p>
-                  </div>
-                  <button
-                    className="flow-button"
-                    onClick={() => setEditor({ kind: "category" })}
-                  >
-                    ＋ Add category
-                  </button>
-                </div>
-                <p className="flow-help">
-                  Recorded this month: income {fmt(totals.income)} · spending{" "}
-                  {fmt(totals.spent)}. Monthly targets are planning figures; the
-                  income follows actual scheduled dates, including
-                  three-paycheque months. Schedules begin after the opening
-                  balance; earlier income is already reflected in that balance.
-                </p>
-                {["income", "expense"].map((kind) => (
-                  <div key={kind}>
-                    <h3 className="flow-section-label">
-                      {kind === "income" ? "Income targets" : "Spending plan"}
-                    </h3>
-                    {Array.from(
-                      new Set(
-                        data.categories
-                          .filter((c) => c.kind === kind)
-                          .map(
-                            (c) =>
-                              c.group ??
-                              (kind === "income" ? "Income" : "Spending"),
-                          ),
-                      ),
-                    ).map((group) => (
-                      <div className="flow-plan-group" key={group}>
-                        <div className="flow-plan-group-heading">
-                          <h3>{group}</h3>
-                          <span>
-                            {fmt(
-                              data.categories
-                                .filter(
-                                  (c) =>
-                                    c.kind === kind &&
-                                    (c.group ??
-                                      (kind === "income"
-                                        ? "Income"
-                                        : "Spending")) === group,
-                                )
-                                .reduce(
-                                  (sum, c) =>
-                                    sum + categoryLimit(data, c.id, month),
-                                  0,
-                                ),
-                            )}{" "}
-                            planned
-                          </span>
-                        </div>
-                        <div className="flow-budget-lines">
-                          {data.categories
-                            .filter(
-                              (c) =>
-                                c.kind === kind &&
-                                (c.group ??
-                                  (kind === "income"
-                                    ? "Income"
-                                    : "Spending")) === group,
-                            )
-                            .map((c) => (
-                              <BudgetLine
-                                key={`${c.id}:${month}`}
-                                data={data}
-                                category={c}
-                                month={month}
-                                onSave={(next) =>
-                                  save(next, "Monthly plan saved.")
-                                }
-                                onEdit={() =>
-                                  setEditor({ kind: "category", value: c })
-                                }
-                                onDelete={() => remove("category", c.id)}
-                              />
-                            ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </section>
+              <BudgetSheet
+                data={data}
+                month={month}
+                onSave={(next) => save(next, "Monthly plan saved.")}
+                onEdit={(category) =>
+                  setEditor({ kind: "category", value: category })
+                }
+                onDelete={(id) => remove("category", id)}
+                onAdd={() => setEditor({ kind: "category" })}
+                onAccount={() => setEditor({ kind: "account" })}
+              />
             </>
           )}
           {view === "recurring" && (
@@ -1445,181 +1365,6 @@ function SpendingList({ data, month }: { data: BudgetData; month: string }) {
       title="No spending recorded"
       text="Your category breakdown will appear as you add expenses."
     />
-  );
-}
-function BudgetLine({
-  data,
-  category,
-  month,
-  onSave,
-  onEdit,
-  onDelete,
-}: {
-  data: BudgetData;
-  category: Category;
-  month: string;
-  onSave: (data: BudgetData) => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const limit = categoryLimit(data, category.id, month),
-    spent =
-      category.kind === "income"
-        ? data.entries
-            .filter(
-              (e) =>
-                e.type === "income" &&
-                e.categoryId === category.id &&
-                e.date.startsWith(month) &&
-                e.date <= TODAY(),
-            )
-            .reduce((sum, e) => sum + e.amountCents, 0)
-        : categorySpent(data, category.id, month);
-  const [draft, setDraft] = useState((limit / 100).toFixed(2)),
-    [error, setError] = useState("");
-  const remaining = limit - spent;
-  const scheduled =
-    category.kind === "income"
-      ? scheduledCategoryIncome(data, category.id, month)
-      : null;
-  return (
-    <div className="flow-budget-line">
-      <div>
-        <h3>
-          <i style={{ background: category.color }} />
-          {category.name}
-        </h3>
-        {scheduled ? (
-          <small className="flow-help">
-            {scheduled.rules
-              .map(
-                (r) =>
-                  `${money(r.amountCents, data.currency)} ${r.frequency === "biweekly" ? "every 14 days" : r.frequency}`,
-              )
-              .join(" + ")}{" "}
-            · {scheduled.dates.length} scheduled payments in this month.{" "}
-            {data.plans.some(
-              (p) => p.month === month && p.categoryId === category.id,
-            )
-              ? "Manual target override."
-              : "Target follows schedule."}
-          </small>
-        ) : (
-          category.note && <small className="flow-help">{category.note}</small>
-        )}
-        <span
-          className={
-            remaining < 0 && category.kind === "expense"
-              ? "negative"
-              : "flow-help"
-          }
-        >
-          {category.kind === "income"
-            ? limit
-              ? remaining > 0
-                ? `${money(remaining, data.currency)} to target`
-                : `${money(-remaining, data.currency)} above target`
-              : "No income target"
-            : limit
-              ? remaining < 0
-                ? `${money(-remaining, data.currency)} over budget`
-                : `${money(remaining, data.currency)} left`
-              : spent
-                ? "Unplanned spending"
-                : "No limit set"}
-        </span>
-        <div className="flow-progress">
-          <span
-            className={
-              remaining < 0 && category.kind === "expense" ? "over" : ""
-            }
-            style={{
-              width: `${limit ? Math.min(100, (spent / limit) * 100) : 0}%`,
-            }}
-          />
-        </div>
-      </div>
-      <span className="flow-budget-spent">
-        {money(spent, data.currency)}
-        <small>{category.kind === "income" ? "received" : "spent"}</small>
-      </span>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setError("");
-          try {
-            const cents = parseMoney(draft, true);
-            if (cents < 0) throw new Error("Limit must be zero or positive.");
-            const plan = { categoryId: category.id, month, limitCents: cents };
-            onSave({
-              ...data,
-              plans: [
-                ...data.plans.filter(
-                  (p) => !(p.categoryId === category.id && p.month === month),
-                ),
-                plan,
-              ],
-            });
-          } catch (err) {
-            setError(String(err));
-          }
-        }}
-      >
-        <label>
-          <span className="flow-sr-only">{category.name} monthly limit</span>
-          <input
-            inputMode="decimal"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-        </label>
-        <button
-          className="flow-button"
-          aria-label={`Save ${category.name} limit`}
-        >
-          Save
-        </button>
-      </form>
-      <div className="flow-action-row">
-        {scheduled &&
-          data.plans.some(
-            (p) => p.month === month && p.categoryId === category.id,
-          ) && (
-            <button
-              className="flow-text-button"
-              onClick={() =>
-                onSave({
-                  ...data,
-                  plans: data.plans.filter(
-                    (p) => !(p.month === month && p.categoryId === category.id),
-                  ),
-                })
-              }
-            >
-              Reset to pay schedule
-            </button>
-          )}
-        <button
-          className="flow-text-button"
-          aria-label={`Edit ${category.name} category`}
-          onClick={onEdit}
-        >
-          Edit
-        </button>
-        <button
-          className="flow-icon-button danger"
-          aria-label={`Remove ${category.name} category`}
-          onClick={onDelete}
-        >
-          ×
-        </button>
-      </div>
-      {error && (
-        <p className="flow-error" role="alert">
-          {error}
-        </p>
-      )}
-    </div>
   );
 }
 function Settings({

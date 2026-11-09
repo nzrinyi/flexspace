@@ -147,7 +147,7 @@ test("honour-system profile switch and visible app switching remain available", 
   await page.getByRole("button", { name: "FlowBudget", exact: false }).click();
   await expect(
     page.getByRole("heading", {
-      name: "Your money, a little clearer.",
+      name: "Your monthly budget.",
       exact: true,
     }),
   ).toBeVisible();

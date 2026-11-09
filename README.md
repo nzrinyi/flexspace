@@ -116,7 +116,7 @@ Quotes and drives can be edited, archived, and restored. Forms retain their draf
 
 ## FlowBudget
 
-Open `/?app=budget` or choose FlowBudget in the app launcher. FlowBudget works independently of CarMatch’s Firebase sign-in and stores its data in the current browser. No banking login, bank feed, or cross-device synchronization is configured. Export JSON backups before switching devices or clearing browser data.
+Open `/?app=budget` or choose FlowBudget in the app launcher. The landing page is the monthly household budget: collapsible income/expense groups with subtotals, inline planned amounts, actual recorded activity, remaining amounts and category notes. The forecast dashboard remains available under Overview. Remaining category amounts are planning differences, not envelope allocations or spendable account balances. FlowBudget works independently of CarMatch’s Firebase sign-in and stores its data in the current browser. No banking login, bank feed, or cross-device synchronization is configured. Export JSON backups before switching devices or clearing browser data.
 
 Features include manual accounts and transactions, transfers, statement-cleared status, mapped CSV import with preview/duplicate detection, spending categories and income targets, monthly plans, recurring bills/paychecks, a daily cash-flow forecast, account filtering, reserve planning, reports, editable records and undo.
 
