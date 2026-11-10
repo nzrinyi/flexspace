@@ -49,14 +49,10 @@ test("cloud budgets are separate, survive reloads and do not write a local budge
 }) => {
   await create(page, "Home");
   await account(page, "Household cash");
-  await page
-    .getByRole("button", { name: "Budgets & sharing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Budgets", exact: true }).click();
   await create(page, "Travel");
   await account(page, "Travel cash", "200");
-  await page
-    .getByRole("button", { name: "Budgets & sharing", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Budgets", exact: true }).click();
   await page.getByRole("button", { name: "Home", exact: true }).click();
   await nav(page, "Accounts");
   await expect(
@@ -103,19 +99,12 @@ test("cloud save failures keep the editor and draft open until a server-confirme
     .click();
   await expect(dialog).toHaveCount(0);
 });
-test("a wife device joins by private link, syncs updates, and cannot silently replace an open draft", async ({
+test("another device opens the same budget normally, syncs updates, and preserves open drafts", async ({
   page,
   context,
 }) => {
   await create(page, "Family");
   await account(page, "Joint cash");
-  await page
-    .getByRole("button", { name: "Budgets & sharing", exact: true })
-    .click();
-  const link = await page
-    .getByLabel("Private budget link", { exact: true })
-    .inputValue();
-  await page.getByRole("button", { name: "Family", exact: true }).click();
   await page
     .getByRole("button", { name: "＋ Add transaction", exact: true })
     .click();
@@ -124,10 +113,7 @@ test("a wife device joins by private link, syncs updates, and cannot silently re
   await own.getByLabel("Amount", { exact: true }).fill("10");
   const wife = await context.newPage();
   await wife.route("https://**/*", (r) => r.abort());
-  const url = new URL(link);
-  url.searchParams.set("cloudTest", "1");
-  url.searchParams.set("testUser", "wife");
-  await wife.goto(url.toString());
+  await wife.goto("/?app=budget&cloudTest=1&testUser=wife");
   await expect(
     wife.getByRole("heading", { name: "Your monthly budget.", exact: true }),
   ).toBeVisible();

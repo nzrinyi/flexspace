@@ -3,20 +3,17 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   runTransaction,
   serverTimestamp,
   setDoc,
-  writeBatch,
-  deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { emptyBudget, validateBudget, type BudgetData } from "./model";
 export interface CloudBudget {
   id: string;
   name: string;
-  ownerId: string;
-  accessKey: string;
   data: BudgetData;
 }
 export interface BudgetReference {
@@ -47,11 +44,6 @@ export function budgetIdentity() {
     });
   return identity;
 }
-export function accessKey() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
 export function serializeBudget(value: BudgetData) {
   const data = validateBudget(value);
   const dataJSON = JSON.stringify(data);
@@ -65,12 +57,7 @@ export function readCloud(
   id: string,
   raw: Record<string, unknown>,
 ): CloudBudget {
-  if (
-    typeof raw.name !== "string" ||
-    typeof raw.ownerId !== "string" ||
-    typeof raw.accessKey !== "string" ||
-    typeof raw.dataJSON !== "string"
-  )
+  if (typeof raw.name !== "string" || typeof raw.dataJSON !== "string")
     throw new Error(
       "This cloud budget could not be read. It has not been overwritten.",
     );
@@ -80,13 +67,8 @@ export function readCloud(
   return {
     id,
     name: raw.name,
-    ownerId: raw.ownerId,
-    accessKey: raw.accessKey,
     data,
   };
-}
-function ref(uid: string, id: string) {
-  return doc(db, "flowBudgetUsers", uid, "budgets", id);
 }
 export function listenBudgets(
   uid: string,
@@ -94,7 +76,7 @@ export function listenBudgets(
   error: (e: Error) => void,
 ) {
   return onSnapshot(
-    collection(db, "flowBudgetUsers", uid, "budgets"),
+    collection(db, "flowBudgets"),
     (snap) =>
       next(
         snap.docs
@@ -127,23 +109,24 @@ export function listenBudget(
     error,
   );
 }
-export async function rememberBudget(uid: string, budget: BudgetReference) {
-  await setDoc(ref(uid, budget.id), {
-    name: budget.name,
-    budgetId: budget.id,
-    updatedAt: serverTimestamp(),
-  });
+export async function rememberBudget(_uid: string, budget: BudgetReference) {
   await setDoc(
-    doc(db, "flowBudgetUsers", uid),
+    doc(db, "flowBudgetWorkspace", "household"),
     { activeBudgetId: budget.id },
     { merge: true },
   );
 }
-export async function lastBudget(uid: string) {
-  const snap = await getDoc(doc(db, "flowBudgetUsers", uid));
-  return snap.exists() && typeof snap.data().activeBudgetId === "string"
-    ? (snap.data().activeBudgetId as string)
-    : "";
+export async function lastBudget(_uid: string) {
+  const active = await getDoc(doc(db, "flowBudgetWorkspace", "household"));
+  if (active.exists() && active.data().activeBudgetId)
+    return active.data().activeBudgetId as string;
+  const budgets = await getDocs(collection(db, "flowBudgets"));
+  return (
+    budgets.docs.sort(
+      (a, b) =>
+        (b.data().updatedAt?.seconds ?? 0) - (a.data().updatedAt?.seconds ?? 0),
+    )[0]?.id ?? ""
+  );
 }
 export async function createCloudBudget(
   uid: string,
@@ -155,48 +138,26 @@ export async function createCloudBudget(
   if (!cleanName || cleanName.length > 100)
     throw new Error("Enter a budget name of 1–100 characters.");
   const { data, dataJSON } = serializeBudget({ ...value, revision: 0 });
-  const key = accessKey();
   const existing = await getDoc(doc(db, "flowBudgets", id));
   if (existing.exists()) {
     const found = readCloud(id, existing.data());
     await rememberBudget(uid, found);
     return found;
   }
-  const batch = writeBatch(db);
-  batch.set(doc(db, "flowBudgets", id), {
-    name: cleanName,
-    ownerId: uid,
-    accessKey: key,
-    dataJSON,
-    revision: 0,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  await runTransaction(db, async (tx) => {
+    const target = doc(db, "flowBudgets", id),
+      snapshot = await tx.get(target);
+    if (snapshot.exists())
+      throw new Error("This budget already exists. Open it from Budgets.");
+    tx.set(target, {
+      name: cleanName,
+      dataJSON,
+      revision: 0,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
   });
-  batch.set(doc(db, "flowBudgetInvites", key), { budgetId: id, ownerId: uid });
-  batch.set(ref(uid, id), {
-    budgetId: id,
-    name: cleanName,
-    updatedAt: serverTimestamp(),
-  });
-  await batch.commit();
-  const budget = { id, name: cleanName, ownerId: uid, accessKey: key, data };
-  await rememberBudget(uid, budget);
-  return budget;
-}
-export async function joinCloudBudget(uid: string, key: string) {
-  if (!/^[a-f0-9]{64}$/.test(key))
-    throw new Error("That private budget link is invalid.");
-  const invite = await getDoc(doc(db, "flowBudgetInvites", key));
-  if (!invite.exists())
-    throw new Error(
-      "That invitation is unavailable. Ask for a new private budget link.",
-    );
-  const id = invite.data().budgetId;
-  if (typeof id !== "string") throw new Error("That invitation is invalid.");
-  await setDoc(doc(db, "flowBudgetInvites", key, "members", uid), { uid });
-  const snap = await getDoc(doc(db, "flowBudgets", id));
-  if (!snap.exists()) throw new Error("This budget is unavailable.");
-  const budget = readCloud(id, snap.data());
+  const budget = { id, name: cleanName, data };
   await rememberBudget(uid, budget);
   return budget;
 }
@@ -246,35 +207,6 @@ export async function renameCloudBudget(
   });
   await rememberBudget(uid, { id: budget.id, name });
 }
-export async function forgetCloudBudget(uid: string, id: string) {
-  await deleteDoc(ref(uid, id));
-  await setDoc(
-    doc(db, "flowBudgetUsers", uid),
-    { activeBudgetId: "" },
-    { merge: true },
-  );
-}
-export function privateBudgetLink(key: string) {
-  return (
-    window.location.origin +
-    window.location.pathname +
-    "?app=budget#budget-invite=" +
-    key
-  );
-}
-
-export async function legacyWasMigrated(uid: string) {
-  const snap = await getDoc(doc(db, "flowBudgetUsers", uid));
-  return snap.exists() && snap.data().legacyMigrated === true;
-}
-export async function markLegacyMigrated(uid: string) {
-  await setDoc(
-    doc(db, "flowBudgetUsers", uid),
-    { legacyMigrated: true },
-    { merge: true },
-  );
-}
-
 export async function activateBudget(uid: string, id: string) {
   const snap = await getDoc(doc(db, "flowBudgets", id));
   if (!snap.exists()) throw new Error("Budget unavailable.");

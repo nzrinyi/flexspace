@@ -161,3 +161,7 @@ export async function runTransaction(_db: any, fn: any) {
   for (const write of writes) await write();
   return result;
 }
+
+export async function getDocs(ref: any) {
+  return collectionSnapshot(ref.path);
+}

@@ -270,7 +270,7 @@ function BudgetWorkspace({
                 {cloudView.cloud
                   ? cloudView.saving
                     ? "Saving to Firestore…"
-                    : "Shared budget · saved in Firestore"
+                    : "Saved in Firestore"
                   : "Manual tracking · no bank connection"}
               </small>
             </div>
@@ -312,7 +312,7 @@ function BudgetWorkspace({
                   cloudView.onManage();
                 }}
               >
-                Budgets & sharing
+                Budgets
               </button>
             )}
             <button
@@ -1418,13 +1418,13 @@ function Settings({
       <section className="flow-panel">
         <h2>Your data & backups</h2>
         <p>
-          Budget data is stored in Firestore and synced with devices that join
-          through your private budget link. No bank login is collected.
+          Your budgets are saved in Firestore and available on every device that
+          opens this app. No bank login is collected.
         </p>
         <p>
-          Keep your private budget link for opening this budget on another
-          device. A JSON backup preserves accounts, transactions, recurring
-          schedules and budgets.
+          Open this app on your phone or another computer to use the same
+          budgets. JSON backups preserve accounts, transactions, schedules and
+          budgets.
         </p>
         <div className="flow-action-row">
           <button className="flow-button primary" onClick={onBackup}>

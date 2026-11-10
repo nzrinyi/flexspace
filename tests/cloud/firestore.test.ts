@@ -4,7 +4,6 @@ import assert from "node:assert/strict";
 import {
   initializeTestEnvironment,
   assertFails,
-  assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import {
@@ -13,43 +12,21 @@ import {
   getDoc,
   getDocs,
   collection,
-  writeBatch,
   updateDoc,
-  runTransaction,
   serverTimestamp,
 } from "firebase/firestore";
 let env: RulesTestEnvironment;
-const key = "a".repeat(64),
-  id = "household";
 function context(uid: string) {
   return env.authenticatedContext(uid).firestore();
 }
-function payload(ownerId = "owner") {
+function payload() {
   return {
     name: "Household",
-    ownerId,
-    accessKey: key,
     dataJSON: JSON.stringify({ revision: 0 }),
     revision: 0,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
-}
-async function create() {
-  const db = context("owner"),
-    batch = writeBatch(db);
-  batch.set(doc(db, "flowBudgets", id), payload());
-  batch.set(doc(db, "flowBudgetInvites", key), {
-    budgetId: id,
-    ownerId: "owner",
-  });
-  batch.set(doc(db, "flowBudgetUsers", "owner", "budgets", id), {
-    budgetId: id,
-    name: "Household",
-    updatedAt: serverTimestamp(),
-  });
-  await batch.commit();
-  return db;
 }
 before(async () => {
   env = await initializeTestEnvironment({
@@ -63,119 +40,76 @@ beforeEach(async () => {
 after(async () => {
   await env.cleanup();
 });
-test("owner creates a private budget and directory entry in an atomic batch", async () => {
-  const db = await create();
+test("all devices can list and open household budgets without invitations", async () => {
+  const desktop = context("desktop"),
+    phone = context("phone");
+  await setDoc(doc(desktop, "flowBudgets", "household"), payload());
+  assert.equal((await getDocs(collection(phone, "flowBudgets"))).size, 1);
   assert.equal(
-    (await getDoc(doc(db, "flowBudgets", id))).data()?.name,
+    (await getDoc(doc(phone, "flowBudgets", "household"))).data()?.name,
     "Household",
   );
-  await assertSucceeds(
-    getDocs(collection(db, "flowBudgetUsers", "owner", "budgets")),
-  );
 });
-test("strangers cannot read, list or modify financial data or another device's budget directory", async () => {
-  await create();
-  const stranger = context("stranger");
-  await assertFails(getDoc(doc(stranger, "flowBudgets", id)));
-  await assertFails(getDocs(collection(stranger, "flowBudgets")));
-  await assertFails(getDocs(collection(stranger, "flowBudgetInvites")));
-  await assertFails(
-    getDocs(collection(stranger, "flowBudgetUsers", "owner", "budgets")),
-  );
-  await assertFails(
-    updateDoc(doc(stranger, "flowBudgets", id), {
-      dataJSON: "{}",
-      revision: 1,
-      updatedAt: serverTimestamp(),
-    }),
-  );
-  await assertFails(
-    getDoc(doc(env.unauthenticatedContext().firestore(), "flowBudgets", id)),
-  );
-});
-test("a second device joins with a private invite and receives and writes live budget updates", async () => {
-  const owner = await create(),
+test("the selected household budget is shared across devices", async () => {
+  const desktop = context("desktop"),
     phone = context("phone");
-  const invitation = await getDoc(doc(phone, "flowBudgetInvites", key));
-  assert.equal(invitation.data()?.budgetId, id);
-  await setDoc(doc(phone, "flowBudgetInvites", key, "members", "phone"), {
-    uid: "phone",
-  });
-  await assertSucceeds(getDoc(doc(phone, "flowBudgets", id)));
-  await setDoc(doc(phone, "flowBudgetUsers", "phone", "budgets", id), {
-    budgetId: id,
-    name: "Household",
-    updatedAt: serverTimestamp(),
-  });
-  await runTransaction(phone, async (tx) => {
-    const target = doc(phone, "flowBudgets", id),
-      snapshot = await tx.get(target);
-    tx.update(target, {
-      dataJSON: JSON.stringify({ revision: 1, shared: true }),
-      revision: snapshot.data()!.revision + 1,
-      updatedAt: serverTimestamp(),
-    });
+  await setDoc(doc(desktop, "flowBudgetWorkspace", "household"), {
+    activeBudgetId: "household",
   });
   assert.equal(
-    JSON.parse((await getDoc(doc(owner, "flowBudgets", id))).data()!.dataJSON)
-      .shared,
-    true,
+    (await getDoc(doc(phone, "flowBudgetWorkspace", "household"))).data()
+      ?.activeBudgetId,
+    "household",
   );
 });
-test("membership cannot be forged without an existing invitation or on behalf of someone else", async () => {
-  await create();
-  const db = context("intruder");
-  await assertFails(
-    setDoc(
-      doc(db, "flowBudgetInvites", "b".repeat(64), "members", "intruder"),
-      { uid: "intruder" },
-    ),
-  );
-  await assertFails(
-    setDoc(doc(db, "flowBudgetInvites", key, "members", "owner"), {
-      uid: "owner",
-    }),
-  );
-  await assertFails(
-    setDoc(doc(db, "flowBudgetInvites", "b".repeat(64)), {
-      budgetId: id,
-      ownerId: "intruder",
-    }),
-  );
-  await assertFails(
-    setDoc(doc(db, "flowBudgetUsers", "intruder", "budgets", id), {
-      budgetId: id,
-      name: "Stolen",
-      updatedAt: serverTimestamp(),
-    }),
-  );
-});
-test("revision checks reject stale updates and access-control fields cannot be overwritten", async () => {
-  const db = await create();
-  await updateDoc(doc(db, "flowBudgets", id), {
+test("a second device can save the same budget while stale revisions are rejected", async () => {
+  const desktop = context("desktop"),
+    phone = context("phone");
+  await setDoc(doc(desktop, "flowBudgets", "household"), payload());
+  await updateDoc(doc(phone, "flowBudgets", "household"), {
     dataJSON: JSON.stringify({ revision: 1 }),
     revision: 1,
     updatedAt: serverTimestamp(),
   });
+  assert.equal(
+    (await getDoc(doc(desktop, "flowBudgets", "household"))).data()?.revision,
+    1,
+  );
   await assertFails(
-    updateDoc(doc(db, "flowBudgets", id), {
+    updateDoc(doc(desktop, "flowBudgets", "household"), {
       dataJSON: "{}",
       revision: 1,
       updatedAt: serverTimestamp(),
     }),
   );
+});
+test("existing budgets remain accessible regardless of their former owner metadata", async () => {
+  await env.withSecurityRulesDisabled(async (c) => {
+    await setDoc(doc(c.firestore(), "flowBudgets", "old"), {
+      ...payload(),
+      ownerId: "old-device",
+      accessKey: "a".repeat(64),
+    });
+  });
+  const phone = context("new-phone");
+  assert.equal(
+    (await getDoc(doc(phone, "flowBudgets", "old"))).data()?.name,
+    "Household",
+  );
+  await updateDoc(doc(phone, "flowBudgets", "old"), {
+    dataJSON: JSON.stringify({ revision: 1 }),
+    revision: 1,
+    updatedAt: serverTimestamp(),
+  });
+});
+test("invalid budget documents and destructive deletes remain rejected", async () => {
+  const db = context("desktop");
   await assertFails(
-    updateDoc(doc(db, "flowBudgets", id), {
-      ownerId: "someone-else",
-      revision: 2,
-      updatedAt: serverTimestamp(),
-    }),
+    setDoc(doc(db, "flowBudgets", "invalid"), { name: "Missing budget data" }),
   );
   await assertFails(
-    updateDoc(doc(db, "flowBudgets", id), {
-      accessKey: "b".repeat(64),
-      revision: 2,
-      updatedAt: serverTimestamp(),
-    }),
+    getDocs(
+      collection(env.unauthenticatedContext().firestore(), "flowBudgets"),
+    ),
   );
 });

@@ -5,18 +5,12 @@ import {
   type BudgetStore,
 } from "./BudgetStoreContext";
 import {
-  legacyWasMigrated,
-  markLegacyMigrated,
   activateBudget,
   budgetIdentity,
   createCloudBudget,
-  forgetCloudBudget,
-  joinCloudBudget,
   lastBudget,
   listenBudget,
   listenBudgets,
-  privateBudgetLink,
-  rememberBudget,
   renameCloudBudget,
   saveCloudBudget,
   type BudgetReference,
@@ -38,16 +32,6 @@ function legacyBudget() {
     return null;
   }
 }
-function consumeInvite() {
-  const hash = window.location.hash;
-  if (!hash.startsWith("#budget-invite=")) return "";
-  window.history.replaceState(
-    {},
-    "",
-    window.location.pathname + window.location.search,
-  );
-  return hash.slice(15);
-}
 export function BudgetCloud({
   children,
   onSwitchApp,
@@ -65,8 +49,6 @@ export function BudgetCloud({
   const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("Household budget");
-  const [invite, setInvite] = useState("");
-  const [copyMessage, setCopyMessage] = useState("");
   const [legacy] = useState(legacyBudget);
   const [upload, setUpload] = useState<BudgetData | null>(null);
   const [booting, setBooting] = useState(true);
@@ -77,13 +59,11 @@ export function BudgetCloud({
   const undo = useRef<{ value: BudgetData; revision: number } | null>(null);
   const [canUndo, setCanUndo] = useState(false);
   const migrationStarted = useRef(false);
-  const [migrated, setMigrated] = useState(false);
-  const bootInputs = useRef<{ setup: string | null; key: string } | null>(null);
+  const bootInputs = useRef<{ setup: string | null } | null>(null);
   const boot = useRef<Promise<{
     uid: string;
     id: string;
     upload?: BudgetData;
-    migrated?: boolean;
   }> | null>(null);
   useEffect(() => {
     let live = true;
@@ -92,30 +72,24 @@ export function BudgetCloud({
         if (!bootInputs.current)
           bootInputs.current = {
             setup: consumeSetupFragment(),
-            key: consumeInvite(),
           };
-        const { setup, key } = bootInputs.current;
+        const { setup } = bootInputs.current;
         let initial: BudgetData | null = null;
         if (setup) initial = await decodeSetup(setup);
         const identity = await budgetIdentity();
         if (initial) {
           return { uid: identity, id: "", upload: initial };
         }
-        if (key) {
-          const joined = await joinCloudBudget(identity, key);
-          return { uid: identity, id: joined.id };
-        }
+
         return {
           uid: identity,
           id: await lastBudget(identity),
-          migrated: await legacyWasMigrated(identity),
         };
       })();
     boot.current
       .then((value) => {
         if (!live) return;
         setUid(value.uid);
-        setMigrated(Boolean(value.migrated));
         if (value.upload) setUpload(value.upload);
         setActive(value.id);
         setManager(!value.id);
@@ -172,7 +146,7 @@ export function BudgetCloud({
       },
       (e) => {
         setError(
-          "Could not open this budget. Use its private invite link on a new device. " +
+          "Could not open this budget. Try opening it from Budgets. " +
             e.message,
         );
         setManager(true);
@@ -187,16 +161,13 @@ export function BudgetCloud({
       active ||
       upload ||
       !legacy ||
-      migrated ||
       migrationStarted.current
     )
       return;
     migrationStarted.current = true;
     setBusy(true);
-    void createCloudBudget(uid, "Household budget", legacy, "legacy-" + uid)
+    void createCloudBudget(uid, "Household budget", legacy, "household")
       .then(async (created) => {
-        await markLegacyMigrated(uid);
-        setMigrated(true);
         setActive(created.id);
         setManager(false);
       })
@@ -206,7 +177,7 @@ export function BudgetCloud({
         ),
       )
       .finally(() => setBusy(false));
-  }, [uid, items, active, upload, legacy, migrated]);
+  }, [uid, items, active, upload, legacy]);
   async function perform(fn: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
@@ -304,11 +275,11 @@ export function BudgetCloud({
     <div className="flow-cloud-page">
       <header>
         <div>
-          <span className="flow-eyebrow">FLOWBUDGET · FIRESTORE</span>
+          <span className="flow-eyebrow">FLOWBUDGET</span>
           <h1>Budget manager</h1>
-          <p>Separate budgets, shared across your devices.</p>
+          <p>Your household budgets, available on all your devices.</p>
         </div>
-        <button onClick={onSwitchApp} className="flow-button">
+        <button className="flow-button" onClick={onSwitchApp}>
           Switch app
         </button>
       </header>
@@ -328,237 +299,140 @@ export function BudgetCloud({
           Retry connection
         </button>
       ) : (
-        <>
-          {active && !budget && !manager && (
-            <p role="status">Loading budget…</p>
-          )}
-          <div className="flow-cloud-grid">
-            <section className="flow-panel">
-              <h2>Your budgets</h2>
-              {items === null ? (
-                <p>Loading your list…</p>
-              ) : items.length === 0 ? (
-                <p>
-                  No cloud budgets yet. Create one or open a private invitation.
-                </p>
-              ) : (
-                <ul className="flow-cloud-list">
-                  {items.map((item) => (
-                    <li key={item.id}>
-                      <button
-                        className="flow-button"
-                        disabled={busy}
-                        onClick={() => open(item.id)}
-                      >
-                        {item.name}
-                      </button>
-                      <button
-                        className="flow-text-button"
-                        disabled={busy}
-                        onClick={() =>
-                          void perform(async () => {
-                            if (
-                              !window.confirm(
-                                "Remove this budget from your list? Its data stays in Firestore. Keep its private link to open it again.",
-                              )
-                            )
-                              return;
-                            await forgetCloudBudget(uid, item.id);
-                            if (active === item.id) {
-                              setActive("");
-                              setBudget(null);
-                            }
-                          })
-                        }
-                      >
-                        Remove from my list
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {budget && (
-                <>
-                  <h3>Sharing: {budget.name}</h3>
-                  <p>
-                    Anyone with this private invitation can join and edit this
-                    budget. Send it to your wife or open it on your phone. Keep
-                    the link for access after clearing browser sign-in.
-                  </p>
-                  <label>
-                    Private budget link
-                    <input
-                      readOnly
-                      value={privateBudgetLink(budget.accessKey)}
-                      onFocus={(e) => e.target.select()}
-                    />
-                  </label>
-                  <button
-                    className="flow-button"
-                    onClick={() =>
-                      void navigator.clipboard
-                        .writeText(privateBudgetLink(budget.accessKey))
-                        .then(
-                          () => setCopyMessage("Private link copied."),
-                          () =>
-                            setCopyMessage(
-                              "Select and copy the private link above.",
-                            ),
-                        )
-                    }
-                  >
-                    Copy private link
-                  </button>
-                  {copyMessage && <p role="status">{copyMessage}</p>}
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void perform(async () => {
-                        await renameCloudBudget(uid, budget, name);
-                        setCopyMessage("Budget renamed.");
-                      });
-                    }}
-                  >
-                    <label>
-                      Rename current budget
-                      <input
-                        value={name}
-                        maxLength={100}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </label>
-                    <button className="flow-button" disabled={busy}>
-                      Rename budget
+        <div className="flow-cloud-grid">
+          <section className="flow-panel">
+            <h2>Your budgets</h2>
+            {items === null ? (
+              <p>Loading budgets…</p>
+            ) : items.length === 0 ? (
+              <p>Create your household budget to get started.</p>
+            ) : (
+              <ul className="flow-cloud-list">
+                {items.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      className="flow-button"
+                      disabled={busy}
+                      onClick={() => open(item.id)}
+                    >
+                      {item.name}
                     </button>
-                  </form>
-                </>
-              )}
-            </section>
-            <section className="flow-panel">
-              <h2>Create a budget</h2>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {budget && (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   void perform(async () => {
-                    const created = await createCloudBudget(
-                      uid,
-                      name,
-                      upload ?? emptyBudget(),
-                    );
-                    setUpload(null);
-                    open(created.id);
+                    await renameCloudBudget(uid, budget, name);
                   });
                 }}
               >
                 <label>
-                  Budget name
+                  Rename budget
                   <input
-                    required
                     maxLength={100}
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                 </label>
-                <button className="flow-button primary" disabled={busy}>
-                  {busy
-                    ? "Saving…"
-                    : upload
-                      ? "Create budget from imported plan"
-                      : "Create empty budget"}
+                <button className="flow-button" disabled={busy}>
+                  Save name
                 </button>
               </form>
+            )}
+          </section>
+          <section className="flow-panel">
+            <h2>Create a budget</h2>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void perform(async () => {
+                  const created = await createCloudBudget(
+                    uid,
+                    name,
+                    upload ?? emptyBudget(),
+                  );
+                  setUpload(null);
+                  open(created.id);
+                });
+              }}
+            >
               <label>
-                Import JSON backup
+                Budget name
                 <input
-                  type="file"
-                  accept=".json,application/json"
-                  onChange={async (e) => {
-                    try {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      if (file.size > 1000000)
-                        throw new Error(
-                          "Backup is too large for a cloud budget.",
-                        );
-                      setUpload(validateBudget(JSON.parse(await file.text())));
-                      setError("");
-                    } catch (err) {
-                      setError(String(err));
-                    }
-                    e.target.value = "";
-                  }}
+                  required
+                  maxLength={100}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </label>
-              {upload && (
-                <p>
-                  Imported plan ready: {upload.accounts.length} accounts,{" "}
-                  {upload.entries.length} transactions. Creating a budget will
-                  upload the whole plan.
-                </p>
-              )}
-              {legacy && (
-                <div className="flow-cloud-migration">
-                  <h3>Your previous browser budget was found</h3>
-                  <p>
-                    Upload its accounts, transactions, schedules and scenarios
-                    to Firestore. The old browser copy is kept as a migration
-                    backup and is no longer updated.
-                  </p>
-                  <button
-                    className="flow-button"
-                    disabled={busy}
-                    onClick={() =>
-                      void perform(async () => {
-                        const migrated = await createCloudBudget(
-                          uid,
-                          name,
-                          legacy,
-                          "legacy-" + uid,
-                        );
-                        await markLegacyMigrated(uid);
-                        open(migrated.id);
-                      })
-                    }
-                  >
-                    Move existing budget to Firestore
-                  </button>
-                </div>
-              )}
-              <h2>Open a shared budget</h2>
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void perform(async () => {
-                    const key = invite.includes("#budget-invite=")
-                      ? invite.split("#budget-invite=")[1]
-                      : invite.trim();
-                    const joined = await joinCloudBudget(uid, key);
-                    open(joined.id);
-                    setInvite("");
-                  });
+              <button className="flow-button primary" disabled={busy}>
+                {busy
+                  ? "Saving…"
+                  : upload
+                    ? "Create budget from imported plan"
+                    : "Create empty budget"}
+              </button>
+            </form>
+            <label>
+              Import JSON backup
+              <input
+                type="file"
+                accept=".json,application/json"
+                onChange={async (e) => {
+                  try {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 1000000)
+                      throw new Error("Backup is too large.");
+                    setUpload(validateBudget(JSON.parse(await file.text())));
+                    setError("");
+                  } catch (err) {
+                    setError(String(err));
+                  }
+                  e.target.value = "";
                 }}
-              >
-                <label>
-                  Private invitation link or code
-                  <input
-                    required
-                    value={invite}
-                    onChange={(e) => setInvite(e.target.value)}
-                  />
-                </label>
-                <button className="flow-button" disabled={busy}>
-                  Open shared budget
+              />
+            </label>
+            {upload && (
+              <p>
+                Ready to import: {upload.accounts.length} accounts and{" "}
+                {upload.entries.length} transactions.
+              </p>
+            )}
+            {legacy && (
+              <div className="flow-cloud-migration">
+                <h3>Your previous browser budget</h3>
+                <p>The original copy is kept as a recovery backup.</p>
+                <button
+                  className="flow-button"
+                  disabled={busy}
+                  onClick={() =>
+                    void perform(async () => {
+                      const created = await createCloudBudget(
+                        uid,
+                        name,
+                        legacy,
+                        "household",
+                      );
+                      open(created.id);
+                    })
+                  }
+                >
+                  Open existing household budget
                 </button>
-              </form>
-            </section>
-          </div>
-          <p className="flow-help">
-            Budget data is saved in Firestore. This browser keeps only its
-            Firebase sign-in; it does not store the cloud budget locally.
-            Removing a budget from your list does not delete its data.
-          </p>
-        </>
+              </div>
+            )}
+          </section>
+        </div>
       )}
+      <p className="flow-help">
+        Changes save automatically to Firestore. Open this app on any device to
+        use the same budgets.
+      </p>
     </div>
   );
 }
