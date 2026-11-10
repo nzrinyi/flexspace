@@ -36,14 +36,22 @@ export type Editor =
   | { kind: "restore"; value: BudgetData; setup?: boolean };
 export interface FormProps {
   data: BudgetData;
-  onSave: (data: BudgetData, message: string, replacing?: boolean) => void;
+  onSave: (
+    data: BudgetData,
+    message: string,
+    replacing?: boolean,
+  ) => void | Promise<void>;
   onClose: () => void;
+  cloud?: boolean;
+  busy?: boolean;
 }
 export function BudgetModal({
   title,
   children,
   onClose,
+  busy = false,
 }: {
+  busy?: boolean;
   title: string;
   children: ReactNode;
   onClose: () => void;
@@ -64,6 +72,7 @@ export function BudgetModal({
     };
   }, []);
   function close() {
+    if (busy) return;
     if (dirty.current && !window.confirm("Discard your unsaved changes?"))
       return;
     onClose();
@@ -89,6 +98,7 @@ export function BudgetModal({
         <button
           className="flow-icon-button"
           type="button"
+          disabled={busy}
           aria-label="Close dialog"
           onClick={close}
         >
@@ -106,25 +116,30 @@ function Form({
   note,
 }: {
   children: ReactNode;
-  save: () => void;
+  save: () => void | Promise<void>;
   label?: string;
   note?: string;
 }) {
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   return (
     <form
       className="flow-form"
-      onSubmit={(e: FormEvent) => {
+      onSubmit={async (e: FormEvent) => {
         e.preventDefault();
+        if (saving) return;
         setError("");
+        setSaving(true);
         try {
-          save();
+          await save();
         } catch (err) {
           setError(
             err instanceof Error
               ? err.message
               : "Could not save. Your draft is preserved.",
           );
+        } finally {
+          setSaving(false);
         }
       }}
     >
@@ -136,8 +151,8 @@ function Form({
         </p>
       )}
       <footer className="flow-wide">
-        <button className="flow-button primary" type="submit">
-          {label}
+        <button className="flow-button primary" type="submit" disabled={saving}>
+          {saving ? "Saving…" : label}
         </button>
       </footer>
     </form>
@@ -166,14 +181,14 @@ export function AccountForm({
   return (
     <Form
       label={value ? "Save account" : "Create account"}
-      save={() => {
+      save={async () => {
         const account = {
           ...draft,
           name: draft.name.trim(),
           openingCents: parseMoney(amount, true),
           balanceConfirmed: true,
         };
-        onSave(
+        await onSave(
           validateBudget({ ...data, accounts: upsert(data.accounts, account) }),
           "Account saved.",
         );
@@ -280,7 +295,7 @@ export function EntryForm({
   return (
     <Form
       label={value ? "Save transaction" : "Add transaction"}
-      save={() => {
+      save={async () => {
         const entry = {
           ...draft,
           payee: draft.payee.trim(),
@@ -294,7 +309,7 @@ export function EntryForm({
             : { toAccountId: undefined }),
         };
         validateEntry(entry, data);
-        onSave(
+        await onSave(
           { ...data, entries: upsert(data.entries, entry) },
           "Transaction saved.",
         );
@@ -488,13 +503,13 @@ export function RecurringForm({
   return (
     <Form
       label={value ? "Save recurring item" : "Create recurring item"}
-      save={() => {
+      save={async () => {
         const recurring = {
           ...draft,
           payee: draft.payee.trim(),
           amountCents: parseMoney(amount),
         };
-        onSave(
+        await onSave(
           validateBudget({
             ...data,
             recurring: upsert(data.recurring, recurring),
@@ -668,7 +683,7 @@ export function CategoryForm({
   return (
     <Form
       label={value ? "Save category" : "Create category"}
-      save={() => {
+      save={async () => {
         const category = {
           ...draft,
           name: draft.name.trim(),
@@ -676,7 +691,7 @@ export function CategoryForm({
         };
         if (category.defaultLimitCents < 0)
           throw new Error("Budget must be zero or positive.");
-        onSave(
+        await onSave(
           validateBudget({
             ...data,
             categories: upsert(data.categories, category),
@@ -800,11 +815,11 @@ export function CSVImport({ data, onSave }: FormProps) {
       {rows.length > 0 && columns && (
         <Form
           label={`Import ${valid.length} transactions`}
-          save={() => {
+          save={async () => {
             if (previewError) throw new Error(previewError);
             if (!valid.length)
               throw new Error("No valid, selected transactions to import.");
-            onSave(
+            await onSave(
               validateBudget({
                 ...data,
                 entries: [...data.entries, ...valid.map((r) => r.entry!)],
@@ -932,6 +947,17 @@ export function BudgetEditor({
   editor,
   ...props
 }: FormProps & { editor: Editor }) {
+  const baseRevision = useRef(props.data.revision);
+  const originalSave = props.onSave;
+  props.onSave = async (next, notice, replacing) => {
+    if (props.cloud && baseRevision.current !== props.data.revision) {
+      baseRevision.current = props.data.revision;
+      throw new Error(
+        "This budget changed on another device while this form was open. Your draft is kept. Review it and save again.",
+      );
+    }
+    await originalSave(next, notice, replacing);
+  };
   const titles = {
     account:
       editor.kind === "account" && editor.value
@@ -956,7 +982,11 @@ export function BudgetEditor({
         : "Restore budget backup",
   };
   return (
-    <BudgetModal title={titles[editor.kind]} onClose={props.onClose}>
+    <BudgetModal
+      title={titles[editor.kind]}
+      onClose={props.onClose}
+      busy={props.busy}
+    >
       {editor.kind === "account" ? (
         <AccountForm {...props} value={editor.value} />
       ) : editor.kind === "entry" ? (
@@ -972,7 +1002,9 @@ export function BudgetEditor({
           label={
             editor.setup
               ? "Load household plan"
-              : "Replace this device’s budget"
+              : props.cloud
+                ? "Replace shared budget"
+                : "Replace this device’s budget"
           }
           save={() =>
             props.onSave(
@@ -981,7 +1013,11 @@ export function BudgetEditor({
               true,
             )
           }
-          note="This replaces the budget stored on this device. Export a backup of your current budget before proceeding."
+          note={
+            props.cloud
+              ? "This replaces the shared Firestore budget for everyone using it. Export a backup before proceeding."
+              : "This replaces the budget stored on this device. Export a backup of your current budget before proceeding."
+          }
         >
           <p className="flow-wide">
             Backup contains {editor.value.accounts.length} accounts,{" "}

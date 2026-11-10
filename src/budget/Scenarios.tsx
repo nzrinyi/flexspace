@@ -24,7 +24,7 @@ export function Scenarios({
   onSave,
 }: {
   data: BudgetData;
-  onSave: (data: BudgetData) => void;
+  onSave: (data: BudgetData) => void | Promise<void>;
 }) {
   const [draft, setDraft] = useState<BudgetScenario>(
     () => data.scenarios?.[0] ?? newScenario(data),
@@ -48,7 +48,7 @@ export function Scenarios({
   const confirmed =
     cashAccounts.length > 0 &&
     cashAccounts.every((a) => a.balanceConfirmed !== false);
-  function save() {
+  async function save() {
     try {
       const next = validateBudget({
         ...data,
@@ -57,9 +57,9 @@ export function Scenarios({
           draft,
         ],
       });
-      onSave(next);
+      await onSave(next);
       setError("");
-      setNotice("Scenario saved on this device and included in JSON backups.");
+      setNotice("Scenario saved and included in JSON backups.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save scenario.");
     }
@@ -195,9 +195,9 @@ export function Scenarios({
           {(data.scenarios ?? []).some((s) => s.id === draft.id) && (
             <button
               className="flow-button"
-              onClick={() => {
+              onClick={async () => {
                 try {
-                  onSave({
+                  await onSave({
                     ...data,
                     scenarios: data.scenarios?.filter((s) => s.id !== draft.id),
                   });

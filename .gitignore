@@ -7,3 +7,8 @@ dist/
 # Local test reports
 test-results/
 playwright-report/
+
+# Firebase emulator logs
+firestore-debug.log
+ui-debug.log
+firebase-debug.log

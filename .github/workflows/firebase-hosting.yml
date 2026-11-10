@@ -28,6 +28,31 @@ jobs:
       - name: Test calculations
         run: npm test
 
+      - name: Setup Java for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Test budget Firestore access rules
+        shell: bash
+        run: |
+          set +e
+          npm run test:firestore > "$RUNNER_TEMP/budget-rules-test.log" 2>&1
+          test_status=$?
+          set -e
+          cat "$RUNNER_TEMP/budget-rules-test.log"
+          if [ "$test_status" -ne 0 ]; then
+            node <<'NODE'
+          const fs = require('node:fs');
+          const lines = fs.readFileSync(process.env.RUNNER_TEMP + '/budget-rules-test.log', 'utf8').split('\n');
+          const messages = lines.filter(line => /not ok|error:|Error:|failureType:/.test(line)).slice(-12);
+          for (const message of messages) console.log('::error::' + message.replace(/%/g, '%25').replace(/\r/g, '%0D').slice(0, 500));
+          NODE
+            exit "$test_status"
+          fi
+          echo '::notice::Budget Firestore access-rule tests passed against the demo emulator.'
+
       - name: Build
         run: npm run build
         env:
@@ -38,6 +63,11 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: "544136326567"
           VITE_FIREBASE_APP_ID: "1:544136326567:web:eeab9a468ce0f82299da82"
           VITE_FIREBASE_MEASUREMENT_ID: G-LVT5RRD31W
+
+      - name: Deploy budget security rules
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node .github/scripts/deploy-budget-rules.cjs
 
       - name: Deploy to Firebase Hosting
         env:

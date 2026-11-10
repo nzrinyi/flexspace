@@ -34,7 +34,7 @@ export function BudgetSheet({
 }: {
   data: BudgetData;
   month: string;
-  onSave: (data: BudgetData) => void;
+  onSave: (data: BudgetData) => void | Promise<void>;
   onEdit: (category: Category) => void;
   onDelete: (id: string) => void;
   onAdd: () => void;
@@ -188,7 +188,7 @@ function BudgetRow({
   data: BudgetData;
   month: string;
   category: Category;
-  onSave: (data: BudgetData) => void;
+  onSave: (data: BudgetData) => void | Promise<void>;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -232,9 +232,9 @@ function BudgetRow({
             {scheduled && overridden && (
               <button
                 className="flow-text-button"
-                onClick={() => {
+                onClick={async () => {
                   try {
-                    onSave({
+                    await onSave({
                       ...data,
                       plans: data.plans.filter(
                         (p) =>
@@ -266,14 +266,14 @@ function BudgetRow({
       </th>
       <td>
         <form
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             setError("");
             try {
               const cents = parseMoney(draft, true);
               if (cents < 0)
                 throw new Error("Planned amount must be zero or positive.");
-              onSave({
+              await onSave({
                 ...data,
                 plans: [
                   ...data.plans.filter(

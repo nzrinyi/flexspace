@@ -8,6 +8,10 @@ export default defineConfig({
       name: "isolated-firebase-fixture",
       enforce: "pre",
       resolveId(source, importer) {
+        if (importer?.includes("/src/budget/") && source === "./useBudget")
+          return path.resolve("tests/browser/legacy-budget-store.ts");
+        if (importer?.includes("/src/budget/") && source === "./BudgetCloud")
+          return path.resolve("tests/browser/mock-budget-cloud.tsx");
         if (
           importer?.includes("/src/") &&
           (source === "./firebase" || source === "../firebase")

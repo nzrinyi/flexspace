@@ -99,6 +99,7 @@ export interface BudgetData {
   skipped: string[];
   plans: Plan[];
   scenarios?: BudgetScenario[];
+  reportWidgets?: string[];
 }
 import {
   TODAY,
@@ -471,6 +472,22 @@ export function validateBudget(value: unknown): BudgetData {
       }
     }
   }
+  if (
+    d.reportWidgets !== undefined &&
+    (!Array.isArray(d.reportWidgets) ||
+      new Set(d.reportWidgets).size !== d.reportWidgets.length ||
+      d.reportWidgets.some(
+        (w) =>
+          ![
+            "netWorth",
+            "cashFlow",
+            "comparisons",
+            "categories",
+            "calendar",
+          ].includes(w),
+      ))
+  )
+    throw new Error("Invalid reports dashboard layout.");
   // Retain only the known top-level schema. Unknown fields never become app configuration.
   return {
     version: 1,
@@ -483,6 +500,9 @@ export function validateBudget(value: unknown): BudgetData {
     recurring: d.recurring,
     skipped: d.skipped,
     plans: d.plans,
+    ...(d.reportWidgets === undefined
+      ? {}
+      : { reportWidgets: d.reportWidgets }),
     ...(d.scenarios === undefined ? {} : { scenarios: d.scenarios }),
   };
 }

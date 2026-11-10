@@ -1,0 +1,60 @@
+    // BEGIN FLOWBUDGET CLOUD
+    function fbSignedIn() { return request.auth != null; }
+    function fbMember(value) {
+      return fbSignedIn() && (value.ownerId == request.auth.uid
+        || (exists(/databases/$(database)/documents/flowBudgetInvites/$(value.accessKey))
+          && exists(/databases/$(database)/documents/flowBudgetInvites/$(value.accessKey)/members/$(request.auth.uid))));
+    }
+    function fbShape(value) {
+      return value.keys().hasOnly(['name', 'ownerId', 'accessKey', 'dataJSON', 'revision', 'createdAt', 'updatedAt'])
+        && value.name is string && value.name.size() > 0 && value.name.size() <= 100
+        && value.ownerId is string && value.accessKey is string && value.accessKey.matches('^[a-f0-9]{64}$')
+        && value.dataJSON is string && value.dataJSON.size() <= 750000
+        && value.revision is int && value.revision >= 0
+        && value.createdAt is timestamp && value.updatedAt is timestamp;
+    }
+    match /flowBudgets/{budgetId} {
+      allow get: if fbSignedIn() && (!exists(/databases/$(database)/documents/flowBudgets/$(budgetId)) || fbMember(resource.data));
+      allow list: if false;
+      allow create: if fbSignedIn() && fbShape(request.resource.data)
+        && request.resource.data.ownerId == request.auth.uid && request.resource.data.revision == 0;
+      allow update: if fbMember(resource.data) && fbShape(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'dataJSON', 'revision', 'updatedAt'])
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+    match /flowBudgetInvites/{key} {
+      allow get: if fbSignedIn();
+      allow list: if false;
+      allow create: if fbSignedIn() && request.resource.data.keys().hasOnly(['budgetId', 'ownerId'])
+        && request.resource.data.budgetId is string && request.resource.data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/flowBudgets/$(request.resource.data.budgetId)).data.ownerId == request.auth.uid
+        && getAfter(/databases/$(database)/documents/flowBudgets/$(request.resource.data.budgetId)).data.accessKey == key;
+      allow update, delete: if false;
+      match /members/{uid} {
+        allow get: if fbSignedIn() && request.auth.uid == uid;
+        allow list: if false;
+        allow create, update: if fbSignedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['uid']) && request.resource.data.uid == uid
+          && exists(/databases/$(database)/documents/flowBudgetInvites/$(key));
+        allow delete: if fbSignedIn() && request.auth.uid == uid;
+      }
+    }
+    match /flowBudgetUsers/{uid} {
+      allow read: if fbSignedIn() && request.auth.uid == uid;
+      allow create, update: if fbSignedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['activeBudgetId', 'legacyMigrated'])
+        && (!('activeBudgetId' in request.resource.data) || request.resource.data.activeBudgetId is string)
+        && (!('legacyMigrated' in request.resource.data) || request.resource.data.legacyMigrated is bool);
+      allow delete: if false;
+      match /budgets/{budgetId} {
+        allow read, delete: if fbSignedIn() && request.auth.uid == uid;
+        allow create, update: if fbSignedIn() && request.auth.uid == uid
+          && request.resource.data.keys().hasOnly(['budgetId', 'name', 'updatedAt'])
+          && request.resource.data.budgetId == budgetId && request.resource.data.name is string
+          && request.resource.data.name.size() <= 100 && request.resource.data.updatedAt is timestamp
+          && (getAfter(/databases/$(database)/documents/flowBudgets/$(budgetId)).data.ownerId == uid
+            || existsAfter(/databases/$(database)/documents/flowBudgetInvites/$(getAfter(/databases/$(database)/documents/flowBudgets/$(budgetId)).data.accessKey)/members/$(uid)));
+      }
+    }
+    // END FLOWBUDGET CLOUD

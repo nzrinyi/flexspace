@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BudgetEditor, type Editor } from "./BudgetForms";
 import { Scenarios } from "./Scenarios";
+import { ReportsDashboard } from "./ReportsDashboard";
+import { BudgetCloud, type CloudView } from "./BudgetCloud";
 import { SavingsOutlook } from "./SavingsOutlook";
 import { BudgetSheet } from "./BudgetSheet";
 import { BudgetChart } from "./BudgetChart";
@@ -56,10 +58,12 @@ const titles: Record<View, string> = {
   settings: "Make it yours.",
   scenarios: "See what could change.",
 };
-export default function FlowBudget({
+function BudgetWorkspace({
   onSwitchApp,
+  cloudView,
 }: {
   onSwitchApp: () => void;
+  cloudView: CloudView;
 }) {
   const store = useBudget(),
     data = store.data;
@@ -120,16 +124,16 @@ export default function FlowBudget({
     setMenuOpen(false);
     setError("");
   }
-  function save(next: BudgetData, notice: string, replacing = false) {
-    store.commit(next, replacing);
+  async function save(next: BudgetData, notice: string, replacing = false) {
+    await store.commit(next, replacing);
     setEditor(null);
     setMessage(notice);
     setError("");
   }
-  function action(fn: () => void) {
+  async function action(fn: () => void | Promise<void>) {
     setError("");
     try {
-      fn();
+      await fn();
     } catch (e) {
       setError(
         e instanceof Error
@@ -185,16 +189,18 @@ export default function FlowBudget({
       const encoded = consumeSetupFragment();
       if (!encoded) return;
       void decodeSetup(encoded)
-        .then((value) => {
+        .then(async (value) => {
           const currentStore = latestStore.current;
           if (
             !currentStore.data.accounts.length &&
             !currentStore.data.entries.length &&
             !currentStore.storageError
           ) {
-            currentStore.commit(value);
+            await currentStore.commit(value);
             setMessage(
-              "Your household plan is loaded and saved on this device.",
+              cloudView.cloud
+                ? "Your household plan is saved in Firestore."
+                : "Your household plan is loaded and saved on this device.",
             );
           } else {
             setEditor({ kind: "restore", value, setup: true });
@@ -257,8 +263,16 @@ export default function FlowBudget({
           <div className="flow-device">
             <span aria-hidden="true">◉</span>
             <div>
-              <strong>Yours. On this device.</strong>
-              <small>Manual tracking · no bank connection</small>
+              <strong>
+                {cloudView.cloud ? cloudView.name : "Yours. On this device."}
+              </strong>
+              <small>
+                {cloudView.cloud
+                  ? cloudView.saving
+                    ? "Saving to Firestore…"
+                    : "Shared budget · saved in Firestore"
+                  : "Manual tracking · no bank connection"}
+              </small>
             </div>
           </div>
           <button
@@ -284,6 +298,23 @@ export default function FlowBudget({
             Flexspace <span>/</span> FlowBudget
           </span>
           <div className="flow-topbar-actions">
+            {cloudView.cloud && (
+              <button
+                className="flow-button"
+                onClick={() => {
+                  if (
+                    editor &&
+                    !window.confirm(
+                      "Close this editor and open the budget manager? Unsaved form changes will be lost.",
+                    )
+                  )
+                    return;
+                  cloudView.onManage();
+                }}
+              >
+                Budgets & sharing
+              </button>
+            )}
             <button
               className="flow-button"
               disabled={!data.accounts.length}
@@ -357,8 +388,8 @@ export default function FlowBudget({
               {store.canUndo && (
                 <button
                   onClick={() =>
-                    action(() => {
-                      store.undo();
+                    action(async () => {
+                      await store.undo();
                       setMessage("Last change undone.");
                     })
                   }
@@ -999,83 +1030,16 @@ export default function FlowBudget({
             </>
           )}
           {view === "reports" && (
-            <>
-              <div className="flow-stats three">
-                <Stat
-                  label="Income"
-                  value={fmt(totals.income)}
-                  detail={monthName}
-                  accent
-                />
-                <Stat
-                  label="Spending"
-                  value={fmt(totals.spent)}
-                  detail={monthName}
-                />
-                <Stat
-                  label="Net cash flow"
-                  value={fmt(totals.income - totals.spent)}
-                  detail="Income less expenses · transfers excluded"
-                  negative={totals.spent > totals.income}
-                />
-              </div>
-              <div className="flow-two-columns">
-                <section className="flow-panel">
-                  <div className="flow-panel-heading">
-                    <h2>Spending by category</h2>
-                    <button
-                      className="flow-button"
-                      onClick={() => window.print()}
-                    >
-                      Print report
-                    </button>
-                  </div>
-                  <SpendingList data={data} month={month} />
-                </section>
-                <section className="flow-panel">
-                  <div className="flow-panel-heading">
-                    <div>
-                      <h2>Six-month view</h2>
-                      <p>Recorded income and expenses</p>
-                    </div>
-                  </div>
-                  <div className="flow-month-report">
-                    {Array.from({ length: 6 }, (_, i) =>
-                      nextMonth(month, i - 5),
-                    ).map((m) => {
-                      const t = monthTotals(data, m),
-                        max = Math.max(t.income, t.spent, 1);
-                      return (
-                        <div key={m}>
-                          <strong>
-                            {new Date(
-                              Number(m.slice(0, 4)),
-                              Number(m.slice(5)) - 1,
-                              1,
-                            ).toLocaleDateString("en-CA", {
-                              month: "short",
-                              year: "2-digit",
-                            })}
-                          </strong>
-                          <div>
-                            <span
-                              className="income"
-                              style={{ width: `${(t.income / max) * 100}%` }}
-                            />
-                            <small>Income {fmt(t.income)}</small>
-                            <span
-                              className="expense"
-                              style={{ width: `${(t.spent / max) * 100}%` }}
-                            />
-                            <small>Spent {fmt(t.spent)}</small>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              </div>
-            </>
+            <ReportsDashboard
+              data={data}
+              month={month}
+              onSave={(next) => save(next, "Reports dashboard saved.")}
+              onEditEntry={(entry) =>
+                setEditor({ kind: "entry", value: entry })
+              }
+              onRecordDue={(due) => setEditor({ kind: "entry", due })}
+              onBudget={() => navigate("budget")}
+            />
           )}
           {view === "scenarios" && (
             <Scenarios
@@ -1095,7 +1059,13 @@ export default function FlowBudget({
           <footer className="flow-footer">
             <span>FlowBudget · built for a little peace of mind.</span>
             <button onClick={exportBackup}>Export backup</button>
-            <span>Stored on this device. Back up regularly.</span>
+            <span>
+              {cloudView.cloud
+                ? cloudView.saving
+                  ? "Saving to Firestore…"
+                  : "Saved in Firestore · changes sync across devices"
+                : "Stored on this device. Back up regularly."}
+            </span>
           </footer>
         </main>
       </div>
@@ -1108,6 +1078,8 @@ export default function FlowBudget({
               : "new")
           }
           editor={editor}
+          cloud={cloudView.cloud}
+          busy={Boolean(store.saving)}
           data={data}
           onSave={save}
           onClose={() => setEditor(null)}
@@ -1383,7 +1355,7 @@ function Settings({
   onRestore,
 }: {
   data: BudgetData;
-  onSave: (data: BudgetData) => void;
+  onSave: (data: BudgetData) => void | Promise<void>;
   onBackup: () => void;
   onRestore: (data: BudgetData) => void;
 }) {
@@ -1396,14 +1368,14 @@ function Settings({
         <h2>Planning preferences</h2>
         <form
           className="flow-form"
-          onSubmit={(e) => {
+          onSubmit={async (e) => {
             e.preventDefault();
             setError("");
             try {
               const reserveCents = parseMoney(reserve, true);
               if (reserveCents < 0)
                 throw new Error("Reserve must be zero or positive.");
-              onSave({ ...data, currency, reserveCents });
+              await onSave({ ...data, currency, reserveCents });
             } catch (err) {
               setError(String(err));
             }
@@ -1444,15 +1416,15 @@ function Settings({
         </form>
       </section>
       <section className="flow-panel">
-        <h2>Your data, your copy.</h2>
+        <h2>Your data & backups</h2>
         <p>
-          Data stays in this browser on this device. It does not sync to another
-          device or to Emily/Nick profiles. No bank login is collected.
+          Budget data is stored in Firestore and synced with devices that join
+          through your private budget link. No bank login is collected.
         </p>
         <p>
-          Download a backup before clearing browser data or switching devices. A
-          JSON backup preserves accounts, transactions, recurring schedules and
-          budgets.
+          Keep your private budget link for opening this budget on another
+          device. A JSON backup preserves accounts, transactions, recurring
+          schedules and budgets.
         </p>
         <div className="flow-action-row">
           <button className="flow-button primary" onClick={onBackup}>
@@ -1509,7 +1481,7 @@ function Settings({
             }
           }}
         >
-          Download original saved file
+          Download pre-cloud browser backup
         </button>
       </section>
       {error && (
@@ -1534,5 +1506,17 @@ function Settings({
         </p>
       </section>
     </div>
+  );
+}
+
+export default function FlowBudget({
+  onSwitchApp,
+}: {
+  onSwitchApp: () => void;
+}) {
+  return (
+    <BudgetCloud onSwitchApp={onSwitchApp}>
+      {(view) => <BudgetWorkspace onSwitchApp={onSwitchApp} cloudView={view} />}
+    </BudgetCloud>
   );
 }

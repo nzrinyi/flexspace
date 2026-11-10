@@ -547,10 +547,9 @@ test("saved what-if projections persist without changing real transactions or ba
     .getByRole("button", { name: "Save scenario", exact: true })
     .click();
   await expect(
-    page.getByText(
-      "Scenario saved on this device and included in JSON backups.",
-      { exact: true },
-    ),
+    page.getByText("Scenario saved and included in JSON backups.", {
+      exact: true,
+    }),
   ).toBeVisible();
   const saved = await page.evaluate(
     (key) => JSON.parse(localStorage.getItem(key)!),
@@ -846,4 +845,87 @@ test("main budget shows new savings milestones separately from existing balances
     KEY,
   );
   expect(saved).toEqual(preset);
+});
+
+test("reports dashboard shows cards, opens calendar activity and saves its widget layout", async ({
+  page,
+}) => {
+  const preset = emptyBudget();
+  preset.accounts = [
+    {
+      id: "cash",
+      name: "Chequing",
+      type: "Checking",
+      openingCents: 100000,
+      openingDate: TODAY(),
+    },
+  ];
+  preset.entries = [
+    {
+      id: "food",
+      accountId: "cash",
+      type: "expense",
+      amountCents: 2550,
+      date: TODAY(),
+      payee: "Calendar groceries",
+      categoryId: "category-1",
+      note: "",
+      cleared: true,
+    },
+  ];
+  await page.evaluate(
+    ({ key, preset }) => localStorage.setItem(key, JSON.stringify(preset)),
+    { key: KEY, preset },
+  );
+  await page.reload();
+  await nav(page, "Reports");
+  await expect(
+    page.getByRole("heading", { name: "Reports dashboard", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".flow-stat").filter({ hasText: "Total expenses (YTD)" }),
+  ).toContainText("$25.50");
+  const date = new Date(TODAY() + "T12:00:00").toLocaleDateString("en-CA", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+  await page
+    .getByRole("button", {
+      name: `${date}: 1 transactions, 0 scheduled payments`,
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".flow-report-day")).toContainText(
+    "Calendar groceries",
+  );
+  await page
+    .getByRole("button", { name: "Edit transaction", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog").getByLabel("Description", { exact: true }),
+  ).toHaveValue("Calendar groceries");
+  await page.getByRole("button", { name: "Close dialog", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit dashboard", exact: true })
+    .click();
+  await page.getByLabel("Transaction calendar", { exact: true }).uncheck();
+  await page
+    .getByRole("button", { name: "Save dashboard", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Transaction calendar", exact: true }),
+  ).toHaveCount(0);
+  await page.reload();
+  await nav(page, "Reports");
+  await expect(
+    page.getByRole("heading", { name: "Transaction calendar", exact: true }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    ),
+  ).toBe(false);
 });
